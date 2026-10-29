@@ -8,7 +8,7 @@ HILLARIOUS began as a single-file browser-game experiment at **Claude Community 
 
 ## 🎮 Play
 
-**[Play HILLARIOUS online](https://YOUR-PROJECT.pages.dev)**  
+**[Play HILLARIOUS online](https://hillarious.pages.dev)**  
 *Replace this placeholder with your live Cloudflare Pages URL after deploying.*
 
 No installation or account required. Open the link in a modern browser.
@@ -24,7 +24,7 @@ No installation or account required. Open the link in a modern browser.
 
 ## 🕹️ How to play
 
-1. Open the [live game](https://YOUR-PROJECT.pages.dev), or run it locally using the steps below.
+1. Open the [live game](https://hillarious.pages.dev), or run it locally using the steps below.
 2. Select **Play** and check the in-game controls.
 3. Complete deliveries while navigating the hills and traffic.
 
@@ -88,7 +88,7 @@ This started as an experiment and will keep evolving. Possible next steps includ
 
 ## 💬 Feedback
 
-Found a bug or have an idea? [Open a GitHub issue](https://github.com/YOUR-USERNAME/hillarious/issues).
+Found a bug or have an idea? [Open a GitHub issue](https://github.com/madhukoseke/hillarious/issues).
 
 ---
 
