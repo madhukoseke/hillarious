@@ -50,9 +50,11 @@ test('startup: exposes the simulation API without touching the DOM', () => {
 
 test('startup: index.html has no external runtime dependencies', () => {
   // The SVG namespace URI inside the inline data-URI favicon is an identifier, not a request.
-  // The high-score board's X / LinkedIn profile links are only followed when a player clicks them.
-  const html = fs.readFileSync(new URL('index.html', ROOT), 'utf8')
-    .replaceAll('http://www.w3.org/2000/svg', '').replaceAll("'https://x.com/'", '').replaceAll("'https://www.linkedin.com/in/'", '');
+  // The high-score board's profile links and the share buttons are only followed when a player clicks them.
+  const clickOnly = ["'https://x.com/'", "'https://www.linkedin.com/in/'", "'https://hillarious.pages.dev'",
+    "'https://x.com/intent/post?text='", "'https://www.linkedin.com/feed/?shareActive=true&text='"];
+  let html = fs.readFileSync(new URL('index.html', ROOT), 'utf8').replaceAll('http://www.w3.org/2000/svg', '');
+  for (const s of clickOnly) html = html.replaceAll(s, '');
   for (const bad of ['http://', 'https://', '@import', 'fetch(', 'XMLHttpRequest', 'import(', '<script src']) {
     assert.ok(!html.includes(bad), `index.html contains "${bad}"`);
   }
@@ -618,6 +620,16 @@ test('cargo feedback: braking hard at speed spills latte and blames the brake', 
   }
   assert.ok(episodes.length > 0, 'a hard stop should spill some latte');
   assert.equal(episodes[0].cause, 'brake');
+});
+
+test('share: shift text and post links come from the shift summary', () => {
+  const text = H.shareText({ tips: 12.5, avgStars: 4.5, crashes: 1 });
+  for (const part of ['$12.50', '4.5★', '1 crash)', 'https://hillarious.pages.dev']) assert.ok(text.includes(part), `missing ${part}`);
+  assert.ok(H.shareText({ tips: 3, avgStars: 2, crashes: 4 }).includes('4 crashes'));
+  const links = H.shareLinks({ tips: 12.5, avgStars: 4.5, crashes: 1 });
+  assert.ok(links.x.startsWith('https://x.com/intent/post?text='));
+  assert.ok(links.linkedin.startsWith('https://www.linkedin.com/feed/?shareActive=true&text='));
+  assert.equal(decodeURIComponent(links.x.split('text=')[1]), text, 'the post text round-trips');
 });
 
 test('high scores: profile handles are reduced to safe plain handles', () => {

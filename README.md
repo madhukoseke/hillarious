@@ -18,7 +18,9 @@ No installation or account required. Open the link in a modern browser.
 - Delivery missions, obstacles, and playful customer feedback
 - Cable cars, traffic, and recognizable SF-inspired scenery
 - Sound effects and a lightweight arcade feel
-- Keyboard controls, plus touch and gamepad support in the latest build
+- Keyboard, touch, and gamepad controls, with on-screen labels that match the device you use
+- A local high-score board with optional X and LinkedIn handles, plus one-click "Share your shift" posts
+- Separate music and effects volume
 - **One `index.html` file** — no framework or build step needed
 
 ## 🕹️ How to play

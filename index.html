@@ -189,6 +189,8 @@ blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
 @keyframes stamp { from { transform: rotate(8deg) scale(2.6); opacity: 0; } to { transform: rotate(8deg) scale(1); opacity: 1; } }
 .fr-best { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; }
 .fr-best .new { color: var(--coral-deep); font-weight: 800; }
+.share { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; font: 800 13px var(--body); color: var(--ink-soft); }
+.share .chip { text-decoration: none; }
 .vol { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 12px; font: 800 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
 .vol label { display: flex; align-items: center; gap: 8px; }
 .vol input { width: 110px; accent-color: var(--coral); }
@@ -403,6 +405,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         </div>
       </form>
       <ol class="hs-board" id="hs-board" aria-label="High scores"></ol>
+      <div class="share">Share your shift:
+        <a class="chip" id="share-x" target="_blank" rel="noopener noreferrer">Post on X</a>
+        <a class="chip" id="share-li" target="_blank" rel="noopener noreferrer">Post on LinkedIn</a>
+      </div>
       <div class="btns">
         <button class="btn primary" data-act="start">PLAY AGAIN</button>
         <button class="btn" data-act="title">TITLE</button>
@@ -1589,6 +1595,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const t = CONTROL_LABELS[device] || CONTROL_LABELS.keyboard;
     return (actions || []).flatMap((a) => t[a] || []);
   }
+  // "Share your shift" text and intent links for the final review. They only open when a player clicks them.
+  const GAME_URL = 'https://hillarious.pages.dev';
+  function shareText(S) {
+    const crashes = S.crashes === 1 ? '1 crash' : (S.crashes || 0) + ' crashes';
+    return 'I earned ' + fmtMoney(S.tips || 0) + ' in tips on my HILLARIOUS delivery shift in San Francisco (' + (S.avgStars || 0).toFixed(1) + '★, ' + crashes + '). Can you beat it? 🚲 ' + GAME_URL;
+  }
+  function shareLinks(S) {
+    const t = encodeURIComponent(shareText(S));
+    return { x: 'https://x.com/intent/post?text=' + t, linkedin: 'https://www.linkedin.com/feed/?shareActive=true&text=' + t };
+  }
   // A spill episode is named after whatever did the most damage in it.
   const SPILL_CAUSES = { brake: 'Hard brake', landing: 'Rough landing', pothole: 'Pothole', bump: 'Bump', rough: 'Bumpy ride' };
   function mainCause(tally) {
@@ -2066,7 +2082,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, World, Score,
-    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, HumorEngine, DIALOGUE, CRASH_LINES,
+    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
   };
   root.HILL = HILL;
@@ -3932,6 +3948,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       $('fr-v1').textContent = S.verdict.lines[0]; $('fr-v2').textContent = S.verdict.lines[1]; $('fr-stamp').textContent = S.verdict.stamp;
       $('fr-meta').textContent = 'Courier #0042 · ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      const share = shareLinks(S);
+      $('share-x').href = share.x; $('share-li').href = share.linkedin;
       // Nothing is saved yet: the player types a name (and optional X / LinkedIn) to put the shift on the board.
       this.pendingShift = { tips: S.tips, time: S.time, stars: S.avgStars, date: new Date().toISOString().slice(0, 10) };
       const rank = recordShift(this.store.get('shifts', []), this.pendingShift).rank;
