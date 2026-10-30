@@ -188,6 +188,17 @@ blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
 @keyframes stamp { from { transform: rotate(8deg) scale(2.6); opacity: 0; } to { transform: rotate(8deg) scale(1); opacity: 1; } }
 .fr-best { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; }
 .fr-best .new { color: var(--coral-deep); font-weight: 800; }
+.hs-form { display: grid; gap: 8px; margin: 14px 0 6px; padding: 12px 14px; border: 3px solid var(--ink); border-radius: 14px; background: #f6efe0; }
+.hs-form[hidden] { display: none; }
+.hs-form label { display: grid; gap: 4px; font: 800 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.hs-form input { font: 700 16px var(--body); color: var(--ink); background: var(--paper); border: 2px solid var(--ink); border-radius: 10px; padding: 8px 10px; text-transform: none; letter-spacing: normal; }
+.hs-form input:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+.hs-form button:disabled { opacity: 0.5; }
+.hs-status { margin: 0; min-height: 1em; font: 700 13px var(--body); color: var(--coral-deep); }
+.hs-board { margin: 8px 0 12px; padding-left: 22px; font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+.hs-board li { margin: 2px 0; }
+.hs-board b { color: var(--ink); margin-right: 8px; }
+.hs-board a { color: var(--coral-deep); margin-right: 8px; font-weight: 700; }
 
 #rotate { display: none; position: absolute; left: 50%; top: 22%; transform: translateX(-50%); pointer-events: none;
   background: rgba(45, 42, 50, 0.9); color: var(--cream); font: 800 14px var(--body); padding: 8px 14px; border-radius: 999px; white-space: nowrap; }
@@ -310,7 +321,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         <div id="intro-msgs"></div>
       </div>
       <p class="cargo-note" id="intro-cargo"></p>
-      <div class="btns"><button class="btn primary" data-act="go">START DELIVERY <i class="count" id="intro-count">6</i></button></div>
+      <div class="btns"><button class="btn primary" data-act="go">START DELIVERY <i class="count" id="intro-count">12</i></button></div>
     </div>
   </section>
 
@@ -351,7 +362,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       <div class="rc-best" id="rv-best"></div>
       <div class="rc-shift" id="rv-shift"></div>
       <div class="btns">
-        <button class="btn primary" data-act="next" id="rv-next"><span id="rv-next-label">NEXT DELIVERY</span> <i class="count" id="rv-count">9</i></button>
+        <button class="btn primary" data-act="next" id="rv-next"><span id="rv-next-label">NEXT DELIVERY</span> <i class="count" id="rv-count">12</i></button>
         <button class="btn" data-act="again" id="rv-again">RIDE AGAIN</button>
         <button class="btn" data-act="title">TITLE</button>
       </div>
@@ -367,6 +378,17 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       <div class="fr-rows" id="fr-rows"></div>
       <div class="fr-verdict"><div class="fr-stamp" id="fr-stamp">ACCEPTABLE</div><p id="fr-v1"></p><p id="fr-v2"></p></div>
       <div class="fr-best" id="fr-best"></div>
+      <form class="hs-form" id="hs-form" autocomplete="off">
+        <label>Name <input id="hs-name" maxlength="20" placeholder="Your name" required></label>
+        <label>X handle <input id="hs-x" maxlength="30" placeholder="@yourhandle (optional)"></label>
+        <label>LinkedIn <input id="hs-li" maxlength="80" placeholder="linkedin.com/in/yourname (optional)"></label>
+        <p class="hs-status" id="hs-status" aria-live="polite"></p>
+        <div class="btns">
+          <button class="btn primary" type="submit">SAVE TO HIGH SCORES</button>
+          <button class="btn" type="button" data-act="skip-save">SKIP</button>
+        </div>
+      </form>
+      <ol class="hs-board" id="hs-board" aria-label="High scores"></ol>
       <div class="btns">
         <button class="btn primary" data-act="start">PLAY AGAIN</button>
         <button class="btn" data-act="title">TITLE</button>
@@ -1618,6 +1640,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   ];
   const CRASH_LINES = ['YOU HAVE DISCOVERED GRAVITY.', 'YOUR BRAKES HAVE REQUESTED PTO.', 'THIS WAS NOT IN THE JOB DESCRIPTION.'];
   const RECOVER_LINE = 'Employee status: still technically employed.';
+  // How long a line stays up: about 50 ms per character, so a joke can be read without rushing.
+  const readTime = (text) => clamp(2.4 + String(text).length * 0.05, 3.2, 6.5);
+  // Seconds the order intro and the receipt stay up before advancing on their own (a press still skips ahead).
+  const INTRO_SECONDS = 12, REVIEW_SECONDS = 12;
 
   class HumorEngine {
     constructor(lines) { this.lines = lines; this.reset(); }
@@ -1652,7 +1678,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       return shown;
     }
     show(line, who, t, trigger) {
-      const s = { line, who, t0: t, until: t + (line.duration || 2.2) };
+      const s = { line, who, t0: t, until: t + Math.max(line.duration || 0, readTime(line.text)) };
       if (line.speaker === 'customer') { this.phone = s; this.lastPhone = t; } else { this.bubble = s; this.lastBubble = t; }
       this.used.add(line.id);
       if (line.cooldown) this.cool[trigger || line.trigger] = t + line.cooldown;
@@ -2023,6 +2049,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     enableTouch() { if (!this.touchMode) { this.touchMode = true; document.body.classList.add('touch'); } }
     onKey(e, isDown) {
+      if (e.target && e.target.closest && e.target.closest('input, textarea')) return; // let the name fields take typing
       const a = KEYMAP[e.code] || (e.key === ' ' ? 'jump' : null);
       if (!a) return;
       const el = document.activeElement;
@@ -3598,6 +3625,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   /* ---------- 21. GAME (state machine + loop) ---------- */
+  // Keeps only letters, digits, "_" and "-", so a pasted profile URL or "@handle" becomes a plain handle.
+  function cleanHandle(s, max) {
+    return String(s || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop().replace(/^@/, '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, max);
+  }
   const COURSE_BUILDERS = [buildNobHill, buildRussianHill];
   class Game {
     constructor() {
@@ -3632,6 +3663,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (!btn) return;
         this.audio.unlock(); this.audio.play('ui'); this.action(btn.dataset.act);
       });
+      document.getElementById('hs-form').addEventListener('submit', (e) => { this.audio.unlock(); this.submitShift(e); });
       const unlock = () => this.audio.unlock();
       root.addEventListener('pointerdown', unlock); root.addEventListener('keydown', unlock);
       root.addEventListener('resize', () => this.R.resize());
@@ -3668,7 +3700,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
       const shifts = this.store.get('shifts', []), a = this.store.get('best:nobHill', null), b = this.store.get('best:russianHill', null);
-      if (Array.isArray(shifts) && shifts[0] && Number.isFinite(shifts[0].tips)) parts.push('Best shift ' + fmtMoney(shifts[0].tips));
+      if (Array.isArray(shifts) && shifts[0] && Number.isFinite(shifts[0].tips)) parts.push('Best shift ' + fmtMoney(shifts[0].tips) + (shifts[0].name ? ' by ' + shifts[0].name : ''));
       if (a) parts.push('Latte ' + fmtMoney(a.tip) + ' (' + Math.round(a.condition) + '%)');
       if (b) parts.push('Cake ' + fmtMoney(b.tip) + ' (' + Math.round(b.condition) + '%)');
       el.textContent = parts.join('  ·  ');
@@ -3683,6 +3715,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'restart': case 'again': this.restartDelivery(); break;
         case 'next': this.nextDelivery(); break;
         case 'final': this.showFinal(); break;
+        case 'skip-save': this.skipShift(); break;
         case 'mute': this.toggleMute(); break;
         case 'quit': case 'title': this.toTitle(); break;
         default: break;
@@ -3706,7 +3739,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     startDelivery(index) {
       this.newWorld(index);
       const C = this.world.course, cu = C.customer, $ = (id) => document.getElementById(id);
-      this.state = 'intro'; this.introT = this.autopilotName ? 1.2 : 6;
+      this.state = 'intro'; this.introT = this.autopilotName ? 1.2 : INTRO_SECONDS;
       $('intro-eyebrow').textContent = 'DELIVERY ' + C.index + ' OF 2 · ' + C.hood;
       $('intro-h').textContent = C.title;
       $('intro-route').textContent = cu.route;
@@ -3765,7 +3798,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       $('rv-next-label').textContent = last ? 'PERFORMANCE REVIEW' : 'NEXT DELIVERY';
       next.dataset.act = last ? 'final' : 'next';
       $('rv-shift').textContent = '';
-      this.reviewT = this.autopilotName ? 2.5 : last ? 8 : 9;
+      this.reviewT = this.autopilotName ? 2.5 : REVIEW_SECONDS;
       this.announce(rv.stars + ' stars from ' + cu.name + ': ' + rv.text + ' Tip ' + fmtMoney(r.tip) + '.');
       $('rv-count').textContent = String(Math.ceil(this.reviewT));
       this.show('review');
@@ -3794,19 +3827,59 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       $('fr-v1').textContent = S.verdict.lines[0]; $('fr-v2').textContent = S.verdict.lines[1]; $('fr-stamp').textContent = S.verdict.stamp;
       $('fr-meta').textContent = 'Courier #0042 · ' + new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-      const prev = this.store.get('shifts', []), rec = recordShift(prev, { tips: S.tips, time: S.time, stars: S.avgStars, date: new Date().toISOString().slice(0, 10) });
-      this.store.set('shifts', rec.list);
-      const best = $('fr-best'), had = Array.isArray(prev) && prev.length > 0;
-      best.textContent = '';
-      const head = document.createElement('span');
-      head.className = rec.rank === 1 && had ? 'new' : '';
-      head.textContent = rec.rank === 1 ? (had ? 'NEW SHIFT RECORD! ' : 'First shift on record. ') : rec.rank ? 'Ranked #' + rec.rank + ' of your best shifts. ' : 'Not a top-3 shift. HR noticed. ';
-      best.append(head, document.createTextNode('Best shifts: ' + rec.list.map((e) => fmtMoney(e.tips)).join(' · ')));
+      // Nothing is saved yet: the player types a name (and optional X / LinkedIn) to put the shift on the board.
+      this.pendingShift = { tips: S.tips, time: S.time, stars: S.avgStars, date: new Date().toISOString().slice(0, 10) };
+      const rank = recordShift(this.store.get('shifts', []), this.pendingShift).rank;
+      const form = $('hs-form'), profile = this.store.get('profile', {}) || {};
+      for (const el of form.querySelectorAll('input, button')) el.disabled = false;
+      form.hidden = !rank;
+      $('hs-name').value = profile.name || ''; $('hs-x').value = profile.x ? '@' + profile.x : ''; $('hs-li').value = profile.linkedin || '';
+      $('hs-status').textContent = '';
+      this.renderBoard(rank ? 'Top-3 shift! Add your name to save it.' : 'Not a top-3 shift. HR noticed.');
       this.audio.play(S.band === 'poor' ? 'trombone' : 'success');
       this.audio.setMusic('title');
       this.show('final');
+      if (rank) setTimeout(() => $('hs-name').focus({ preventScroll: true }), 60);
       this.announce('Employee performance review. ' + S.verdict.lines.join(' ') + ' Tips earned ' + fmtMoney(S.tips) + '.');
       root.__HILL_FINAL__ = S;
+    }
+    // Shows the top shifts; the list is kept in localStorage, so it's per browser.
+    renderBoard(headline) {
+      const $ = (id) => document.getElementById(id), list = this.store.get('shifts', []), ol = $('hs-board');
+      $('fr-best').textContent = headline;
+      ol.textContent = '';
+      for (const e of Array.isArray(list) ? list : []) {
+        const li = document.createElement('li'), who = document.createElement('b'), tips = document.createElement('span');
+        who.textContent = e.name || 'Anonymous'; tips.textContent = fmtMoney(e.tips) + (e.time ? ' · ' + fmtTime(e.time) : '');
+        li.append(who, tips);
+        if (e.x) { const a = document.createElement('a'); a.href = 'https://x.com/' + e.x; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = '@' + e.x; li.append(a); }
+        if (e.linkedin) { const a = document.createElement('a'); a.href = 'https://www.linkedin.com/in/' + e.linkedin; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'LinkedIn'; li.append(a); }
+        ol.appendChild(li);
+      }
+    }
+    submitShift(e) {
+      e.preventDefault();
+      if (!this.pendingShift) return;
+      const $ = (id) => document.getElementById(id);
+      const name = $('hs-name').value.trim().slice(0, 20), x = cleanHandle($('hs-x').value, 15), linkedin = cleanHandle($('hs-li').value, 60);
+      if (!name) { $('hs-status').textContent = 'Type a name to save your shift.'; $('hs-name').focus(); return; }
+      const rec = recordShift(this.store.get('shifts', []), { ...this.pendingShift, name, x, linkedin });
+      this.store.set('shifts', rec.list);
+      this.store.set('profile', { name, x, linkedin });
+      this.pendingShift = null;
+      this.lockShiftForm('Saved to the high scores.');
+      this.renderBoard('Saved as ' + name + '. Ranked #' + rec.rank + ' of your best shifts.');
+      this.announce('Saved to high scores as ' + name + ', rank ' + rec.rank + '.');
+    }
+    // Disables the form instead of hiding it: hiding moves PLAY AGAIN up under the pointer, so a second click would start a new shift.
+    lockShiftForm(status) {
+      for (const el of document.querySelectorAll('#hs-form input, #hs-form button')) el.disabled = true;
+      document.getElementById('hs-status').textContent = status;
+    }
+    skipShift() {
+      this.pendingShift = null;
+      this.lockShiftForm('Not saved.');
+      this.renderBoard('Shift not saved to the high scores.');
     }
     handleKeys() {
       for (const a of this.input.takeActions()) {
@@ -4072,11 +4145,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     updateFx(dt) {
       const f = this.fx;
       for (const k of ['caption', 'sub', 'hint', 'bubble', 'text', 'toast']) if (f[k]) f[k].t += dt;
-      if (f.caption && f.caption.t > 1.7) f.caption = null;
-      if (f.sub && f.sub.t > 2.2) f.sub = null;
+      if (f.caption && f.caption.t > 3) f.caption = null;
+      if (f.sub && f.sub.t > 3.2) f.sub = null;
       const first = f.hint && (f.hint.id === 'pedal' || f.hint.id === 'cake');
-      if (first && this.world && this.world.bike.pedalIn && f.hint.t > 0.8) f.hint.t = Math.max(f.hint.t, 4.1);
-      if (f.hint && f.hint.t > (first ? 4.5 : 3.6)) f.hint = null;
+      if (first && this.world && this.world.bike.pedalIn && f.hint.t > 0.8) f.hint.t = Math.max(f.hint.t, 5.6);
+      if (f.hint && f.hint.t > (first ? 6 : 5)) f.hint = null;
       if (f.bubble && f.bubble.t > f.bubble.dur) f.bubble = null;
       if (f.text && f.text.t > f.text.dur) f.text = null;
       if (f.toast && f.toast.t > 1.2) f.toast = null;
@@ -4373,7 +4446,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         wrapText(ctx, f.text.line.text, x + u * 0.9, y + u * 2.55, w - u * 1.8, u * 1.05);
       }
       if (f.hint) {
-        const dur = f.hint.id === 'pedal' || f.hint.id === 'cake' ? 4.5 : 3.6;
+        const dur = f.hint.id === 'pedal' || f.hint.id === 'cake' ? 6 : 5;
         ctx.globalAlpha = clamp(f.hint.t / 0.2, 0, 1) * clamp((dur - f.hint.t) / 0.4, 0, 1);
         ctx.font = '900 ' + (u * 0.85).toFixed(1) + 'px ' + FONT_MONO;
         const keyW = (k) => Math.max(u * 1.9, ctx.measureText(k).width + u * 1.1);
@@ -4395,7 +4468,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ctx.globalAlpha = 1;
       }
       if (f.caption) {
-        const t = f.caption.t, s = t < 0.18 ? 1.3 - (t / 0.18) * 0.3 : 1, a = clamp((1.7 - t) / 0.3, 0, 1);
+        const t = f.caption.t, s = t < 0.18 ? 1.3 - (t / 0.18) * 0.3 : 1, a = clamp((3 - t) / 0.3, 0, 1);
         const fs = clamp(Wd / 17, 26, 62);
         ctx.save(); ctx.globalAlpha = a; ctx.translate(Wd / 2, H * 0.33); ctx.rotate(-0.035); ctx.scale(s, s);
         ctx.font = '900 ' + fs.toFixed(1) + 'px ' + FONT_DISPLAY; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -4407,7 +4480,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ctx.restore();
       }
       if (f.sub) {
-        ctx.globalAlpha = clamp(f.sub.t / 0.2, 0, 1) * clamp((2.2 - f.sub.t) / 0.4, 0, 1);
+        ctx.globalAlpha = clamp(f.sub.t / 0.2, 0, 1) * clamp((3.2 - f.sub.t) / 0.4, 0, 1);
         ctx.font = '800 ' + clamp(Wd / 55, 14, 22).toFixed(1) + 'px ' + FONT_BODY;
         const tw = ctx.measureText(f.sub.text).width + 34;
         ctx.fillStyle = 'rgba(45,42,50,0.9)'; rrect(ctx, Wd / 2 - tw / 2, H * 0.42, tw, 44, 22); ctx.fill();
