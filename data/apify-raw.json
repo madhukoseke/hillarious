@@ -1,0 +1,109 @@
+[
+  {
+    "title": "Grace Cathedral",
+    "totalScore": 4.6,
+    "reviewsCount": 2466,
+    "street": "1100 California St",
+    "city": "San Francisco",
+    "state": "California",
+    "countryCode": "US",
+    "website": "https://gracecathedral.org/",
+    "phone": "(415) 749-6300",
+    "categories": [
+      "Episcopal church",
+      "Cathedral",
+      "Christian church",
+      "Church",
+      "Evangelical church",
+      "Musician",
+      "Religious destination",
+      "Religious institution",
+      "Religious organization",
+      "Yoga studio"
+    ],
+    "url": "https://www.google.com/maps/search/?api=1&query=Grace%20Cathedral&query_place_id=ChIJg2Kun5KAhYARg0g3AF1jbQQ",
+    "categoryName": "Episcopal church"
+  },
+  {
+    "title": "Cable Car Museum",
+    "totalScore": 4.7,
+    "reviewsCount": 7196,
+    "street": "1201 Mason St",
+    "city": "San Francisco",
+    "state": "California",
+    "countryCode": "US",
+    "website": "http://www.cablecarmuseum.org/",
+    "phone": "(415) 474-1887",
+    "categories": [
+      "Rail museum",
+      "Museum",
+      "Tourist attraction"
+    ],
+    "url": "https://www.google.com/maps/search/?api=1&query=Cable%20Car%20Museum&query_place_id=ChIJX1oMlvKAhYARNZquwetszd8",
+    "categoryName": "Rail museum"
+  },
+  {
+    "title": "Huntington Park",
+    "totalScore": 4.6,
+    "reviewsCount": 1160,
+    "street": "California St & Taylor St",
+    "city": "San Francisco",
+    "state": "CA",
+    "countryCode": "US",
+    "website": "https://sfrecpark.org/Facilities/Facility/Details/Huntington-Park-438",
+    "phone": "(415) 695-5003",
+    "categories": [
+      "City park",
+      "Park",
+      "Tourist attraction"
+    ],
+    "url": "https://www.google.com/maps/search/?api=1&query=Huntington%20Park&query_place_id=ChIJzYeZZ42AhYAR7fxkTExkME4",
+    "categoryName": "City park"
+  },
+  {
+    "title": "Lombard St",
+    "totalScore": 4.6,
+    "reviewsCount": 3660,
+    "street": null,
+    "city": "San Francisco",
+    "state": "California",
+    "countryCode": "US",
+    "phone": "",
+    "categories": [
+      "Notable street"
+    ],
+    "url": "https://www.google.com/maps/search/?api=1&query=Lombard%20St&query_place_id=ChIJl62Bq92AhYARrLLC3ZcLL8Q",
+    "categoryName": "Notable street"
+  },
+  {
+    "title": "Ina Coolbrith Park",
+    "totalScore": 4.8,
+    "reviewsCount": 1694,
+    "street": "Vallejo & Taylor, Vallejo St",
+    "city": "San Francisco",
+    "state": "California",
+    "countryCode": "US",
+    "website": "https://sfrecpark.org/Facilities/Facility/Details/Ina-Coolbrith-Park-175",
+    "phone": "(415) 274-0291",
+    "categories": [
+      "City park",
+      "Park",
+      "Tourist attraction"
+    ],
+    "url": "https://www.google.com/maps/search/?api=1&query=Ina%20Coolbrith%20Park&query_place_id=ChIJdx6kBe6AhYARsPFmpUAvvcY",
+    "categoryName": "City park"
+  },
+  {
+    "title": "Macondray Ln",
+    "totalScore": null,
+    "reviewsCount": null,
+    "street": null,
+    "city": "San Francisco",
+    "state": "California",
+    "countryCode": "US",
+    "phone": "",
+    "categories": [],
+    "url": "https://www.google.com/maps/search/?api=1&query=Macondray%20Ln&query_place_id=ChIJtxFn_O6AhYARHOmRg0P1zi8",
+    "categoryName": null
+  }
+]

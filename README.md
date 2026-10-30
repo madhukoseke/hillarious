@@ -9,7 +9,6 @@ HILLARIOUS began as a single-file browser-game experiment at **Claude Community 
 ## 🎮 Play
 
 **[Play HILLARIOUS online](https://hillarious.pages.dev)**  
-*Replace this placeholder with your live Cloudflare Pages URL after deploying.*
 
 No installation or account required. Open the link in a modern browser.
 
@@ -30,66 +29,39 @@ No installation or account required. Open the link in a modern browser.
 
 > **Tip:** Start on a desktop browser for the easiest keyboard experience. Mobile and gamepad behavior may vary by browser/device.
 
-## 🚀 Run locally
+## Run locally
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/hillarious.git
+git clone https://github.com/madhukoseke/hillarious.git
 cd hillarious
 ```
 
 For this self-contained game, you can open `index.html` directly in your browser.
 
-Or serve it locally with Python:
+## Tests
+
+The headless simulation and scoring tests need Node.js 22 or later and no other installs:
 
 ```bash
-python3 -m http.server 8000
+node --test "tests/*.test.mjs"
 ```
 
-Then visit **http://localhost:8000**.
+They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`.
 
-## 📁 Project structure
+## Changelog
 
-```text
-hillarious/
-├── index.html      # Complete game: HTML, CSS and JavaScript
-├── README.md       # Project information
-└── .gitignore       # Local files to keep out of Git
-```
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
-## ☁️ Deployment: Cloudflare Pages
-
-This is a static HTML game; no framework or build process is required.
-
-1. Push this repository to GitHub.
-2. In Cloudflare, go to **Compute → Workers & Pages** and create a **Pages** project connected to the repository.
-3. Choose the `main` branch.
-4. Use the following build settings:
-
-   | Setting | Value |
-   | --- | --- |
-   | Framework preset | None |
-   | Build command | Leave blank (or use `exit 0` if required) |
-   | Build output directory | `.` |
-
-5. Deploy and replace the placeholder Play link above with your actual `*.pages.dev` URL.
-
-Future pushes to `main` will trigger new deployments automatically.
-
-## 🛠️ Built with
-
-- HTML, CSS and JavaScript
-- Claude Code with Claude Opus 5.5
-
-## 🗺️ What's next?
+## What's next?
 
 This started as an experiment and will keep evolving. Possible next steps include more missions, new obstacles, game modes, and a leaderboard.
 
-## 💬 Feedback
+## Feedback
 
 Found a bug or have an idea? [Open a GitHub issue](https://github.com/madhukoseke/hillarious/issues).
 
 ---
 
-*Inspired by the experience of driving around San Francisco — where the hills already feel like a game on hard mode.*
+*Inspired by the experience of driving around San Francisco where the hills already feel like a game on hard mode.*

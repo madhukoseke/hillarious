@@ -1,0 +1,63 @@
+{
+  "source": "apify",
+  "game": "HILLARIOUS",
+  "city": "San Francisco",
+  "routes": [
+    {
+      "id": "nob-hill",
+      "name": "Nob Hill",
+      "delivery": "The $9 Latte",
+      "landmarks": [
+        {
+          "id": "grace-cathedral",
+          "name": "Grace Cathedral",
+          "type": "cathedral",
+          "gameX": 180,
+          "visual": "large-gothic-cathedral"
+        },
+        {
+          "id": "huntington-park",
+          "name": "Huntington Park",
+          "type": "park",
+          "gameX": 480,
+          "visual": "trees-and-park-fence"
+        },
+        {
+          "id": "cable-car-museum",
+          "name": "Cable Car Museum",
+          "type": "museum",
+          "gameX": 820,
+          "visual": "historic-brick-building"
+        }
+      ]
+    },
+    {
+      "id": "russian-hill",
+      "name": "Russian Hill",
+      "delivery": "The Wedding Cake",
+      "landmarks": [
+        {
+          "id": "macondray-lane",
+          "name": "Macondray Lane",
+          "type": "residential",
+          "gameX": 180,
+          "visual": "tree-lined-lane"
+        },
+        {
+          "id": "ina-coolbrith-park",
+          "name": "Ina Coolbrith Park",
+          "type": "park",
+          "gameX": 480,
+          "visual": "hillside-park"
+        },
+        {
+          "id": "lombard-street",
+          "name": "Lombard Street",
+          "type": "street",
+          "gameX": 820,
+          "visual": "winding-street-backdrop"
+        }
+      ]
+    }
+  ]
+}

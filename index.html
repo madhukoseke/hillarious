@@ -1564,6 +1564,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const top = all.slice(0, 3);
     return { list: top, rank: top.indexOf(entry) + 1 };
   }
+  // Keeps only letters, digits, "_" and "-", so a pasted profile URL or "@handle" becomes a plain handle.
+  function cleanHandle(s, max) {
+    return String(s || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop().replace(/^@/, '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, max);
+  }
 
   /* =====================================================================
    * 9. HUMOR ENGINE: event-driven dialogue
@@ -1668,7 +1672,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         const cur = phone ? this.phone : this.bubble;
         const busy = cur !== null && t < cur.until;
         if (busy && line.priority <= cur.line.priority) {
-          if (!phone && line.priority >= 4 && !this.queued) { this.queued = { line, who, at: t, trigger }; this.used.add(line.id); bubbleDone = true; }
+          if (!phone && line.priority >= 4 && !this.queued) { this.queued = { line, who, at: cur.until, trigger }; this.used.add(line.id); bubbleDone = true; }
           continue;
         }
         if (!busy && line.priority < 3 && t - (phone ? this.lastPhone : this.lastBubble) < (phone ? 6 : AMBIENT_GAP)) continue;
@@ -1684,7 +1688,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (line.cooldown) this.cool[trigger || line.trigger] = t + line.cooldown;
       return s;
     }
-    // A critical line that arrived while another was talking gets its turn right after.
+    // A critical line that arrived while another was talking gets its turn right after
+    // (`at` is when that bubble ends; the line is dropped if it can't show within 2.5 s of it).
     tick(t, available) {
       if (!this.queued || (this.bubble && t < this.bubble.until)) return null;
       const q = this.queued;
@@ -2018,7 +2023,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, World, Score,
-    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, HumorEngine, DIALOGUE, CRASH_LINES,
+    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
   };
   root.HILL = HILL;
@@ -3625,10 +3630,6 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   /* ---------- 21. GAME (state machine + loop) ---------- */
-  // Keeps only letters, digits, "_" and "-", so a pasted profile URL or "@handle" becomes a plain handle.
-  function cleanHandle(s, max) {
-    return String(s || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop().replace(/^@/, '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, max);
-  }
   const COURSE_BUILDERS = [buildNobHill, buildRussianHill];
   class Game {
     constructor() {

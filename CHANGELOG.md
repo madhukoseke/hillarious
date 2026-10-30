@@ -3,6 +3,20 @@
 All notable changes to HILLARIOUS are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-10-30
+
+### Fixed
+- Critical speech lines, such as the cable car's "DING DING!", were dropped when they had to wait behind one of the longer 1.1.0 bubbles. They now show for up to 2.5 seconds after the bubble ahead of them ends.
+
+### Added
+- The headless test suite (`tests/`) and the landmark data it checks (`data/`) are now in the repository. Run them with `node --test "tests/*.test.mjs"` on Node.js 22 or later.
+- New tests for text read time, queued-line expiry, and profile handle cleaning (48 tests in total).
+- A GitHub Actions workflow runs the tests on every push to `main` and on pull requests.
+
+### Changed
+- The no-external-dependencies test now allows the X and LinkedIn profile links on the high-score board, because they load only when a player clicks them.
+- README: Tests and Changelog sections were added.
+
 ## [1.1.0] - 2026-10-30
 
 ### Added
@@ -29,5 +43,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Keyboard, touch, and gamepad controls.
 - A single offline `index.html` with no build step.
 
+[1.1.1]: https://github.com/madhukoseke/hillarious/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/madhukoseke/hillarious/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/madhukoseke/hillarious/releases/tag/v1.0.0
