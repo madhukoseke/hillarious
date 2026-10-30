@@ -52,6 +52,8 @@ node --test "tests/*.test.mjs"
 
 They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`.
 
+`tests/playtest/cross-browser.mjs` plays a shift on Chromium, Firefox, and WebKit at desktop and phone sizes; setup steps are at the top of the file. Results and the real-device checklist live in [docs/browser-matrix.md](docs/browser-matrix.md).
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.

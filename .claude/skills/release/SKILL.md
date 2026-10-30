@@ -11,6 +11,7 @@ Run these steps in order from the repository root. Stop and report if a step fai
    - Run `git status --short` and `git branch --show-current`. You should be on `main`.
    - If any changes are unrelated to this release, ask before including them.
    - Run `node --test "tests/*.test.mjs"`. Do not release with failing tests.
+   - If the release changes anything players see, run `tests/playtest/cross-browser.mjs` and add the results to `docs/browser-matrix.md`.
 
 2. **Pick the version.**
    - Find the previous version with `git describe --tags --abbrev=0` (for example `v1.1.1`).

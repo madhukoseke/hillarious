@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - How to Play has a two-thumb tip on touch screens.
 - "Share your shift" on the final review opens a ready-made post on X or LinkedIn with your tips, stars, and crashes. Nothing is sent unless you click and post.
 - Separate Music and Effects volume sliders on the title and pause screens, saved between visits. Moving a slider while muted turns sound back on.
+- Cross-browser check (`tests/playtest/cross-browser.mjs`) and a browser and device matrix (`docs/browser-matrix.md`). The game passes on Chromium, Firefox, and WebKit at desktop and phone sizes; real-device checks are still to do.
 - Project instructions for Claude Code (`CLAUDE.md`). Every change now updates the changelog, the README when needed, and the local tech-debt list.
 - A `/release` skill that turns the Unreleased section into a version, then commits and tags it.
 
