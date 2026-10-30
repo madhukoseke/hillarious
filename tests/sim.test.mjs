@@ -602,6 +602,24 @@ test('controls: every hint action has a label on keyboard, touch, and gamepad', 
   assert.deepEqual(H.controlKeys(['hop'], 'nonsense'), ['SPACE'], 'unknown devices fall back to keyboard');
 });
 
+test('cargo feedback: a spill is named after the cause that did the most damage', () => {
+  assert.equal(H.mainCause({}), 'rough', 'no tally means a bumpy ride');
+  assert.equal(H.mainCause({ brake: 2, landing: 5, rough: 1 }), 'landing');
+  for (const c of ['brake', 'landing', 'pothole', 'bump', 'rough']) assert.ok(H.SPILL_CAUSES[c], `label for ${c}`);
+});
+
+test('cargo feedback: braking hard at speed spills latte and blames the brake', () => {
+  const w = new H.World(H.buildNobHill());
+  w.spawn(w.course.start + 2, 13);
+  const episodes = [];
+  for (let i = 0; i < 120 * 3; i++) {
+    w.step(input({ brake: i < 120 * 1.5 }));
+    episodes.push(...w.drain().filter((e) => e.type === 'SPILL_EPISODE'));
+  }
+  assert.ok(episodes.length > 0, 'a hard stop should spill some latte');
+  assert.equal(episodes[0].cause, 'brake');
+});
+
 test('high scores: profile handles are reduced to safe plain handles', () => {
   assert.equal(H.cleanHandle('@madhu_k', 15), 'madhu_k');
   assert.equal(H.cleanHandle('https://x.com/madhu_k?s=20', 15), 'madhu_k');

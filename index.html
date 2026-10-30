@@ -1577,6 +1577,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const t = CONTROL_LABELS[device] || CONTROL_LABELS.keyboard;
     return (actions || []).flatMap((a) => t[a] || []);
   }
+  // A spill episode is named after whatever did the most damage in it.
+  const SPILL_CAUSES = { brake: 'Hard brake', landing: 'Rough landing', pothole: 'Pothole', bump: 'Bump', rough: 'Bumpy ride' };
+  function mainCause(tally) {
+    let best = 'rough', most = 0;
+    for (const k in tally) if (tally[k] > most) { best = k; most = tally[k]; }
+    return best;
+  }
   // Keeps only letters, digits, "_" and "-", so a pasted profile URL or "@handle" becomes a plain handle.
   function cleanHandle(s, max) {
     return String(s || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop().replace(/^@/, '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, max);
@@ -1727,7 +1734,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.rag = { on: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, a: 0, pa: 0, w: 0 };
       this.cup = { on: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, a: 0, pa: 0, w: 0 }; // flying cargo during a crash
       this.lastBonk = -9; this.brakeT = -9; this.flags = {}; this.hintIdx = 0;
-      this.spill = { episode: 0, quiet: 0, acc: 0 };
+      this.spill = { episode: 0, quiet: 0, acc: 0, causes: {} };
+      this.lastT = {}; // world time each event type last fired
       this.boostT = 0; this.fastT = -9; this.slowAcc = 0; this.slowT = -9; this.wobbleT = -9;
       this.deliveredAt = -1;
       this.tq = { pen: 0, px: 0, py: 0, nx: 0, ny: 1, surf: null };
@@ -1737,6 +1745,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     emit(type, data) {
       const e = data || {};
       e.type = type; e.t = this.t;
+      this.lastT[type] = this.t;
       this.events.push(e);
       if (this.events.length > 400) this.events.shift();
     }
@@ -1842,14 +1851,21 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (this.cargo.kind === 'cake' && Math.abs(this.cargo.angle) > 0.3 && this.t - this.wobbleT > 6) { this.wobbleT = this.t; this.emit('CAKE_WOBBLE', {}); }
       if (!this.flags.half && this.cargo.amount < 50) { this.flags.half = true; this.emit('CARGO_HALF', {}); }
     }
+    sinceEvent(type) { return this.lastT[type] !== undefined ? this.t - this.lastT[type] : 1e9; }
     trackDamage(amount, dt) {
       const S = this.spill;
       if (amount > 0) {
         S.episode += amount; S.quiet = 0; S.acc += amount;
+        const cause = this.sinceEvent('BONK') < 0.6 ? 'bump' : this.sinceEvent('POTHOLE') < 0.6 ? 'pothole'
+          : this.sinceEvent('LAND') < 0.6 ? 'landing' : this.bike.brakeAmt > 0.5 ? 'brake' : 'rough';
+        S.causes[cause] = (S.causes[cause] || 0) + amount;
         if (S.acc > 0.2) { this.emit('SPILL', { amount: S.acc, dir: this.cargo.lastSpillDir || 1 }); S.acc = 0; }
       } else if (S.episode > 0) {
         S.quiet += dt;
-        if (S.quiet > 0.35) { if (S.episode >= 1) this.emit('SPILL_EPISODE', { total: S.episode }); S.episode = 0; S.acc = 0; }
+        if (S.quiet > 0.35) {
+          if (S.episode >= 1) this.emit('SPILL_EPISODE', { total: S.episode, cause: mainCause(S.causes) });
+          S.episode = 0; S.acc = 0; S.causes = {};
+        }
       }
     }
     collect(pu) {
@@ -1864,7 +1880,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (this.state === 'riding' && this.invuln <= 0 && impact > PHYS.crashLandImpact) { this.crash('landing', clamp((impact - 12) / 6, 0, 1)); return; }
       const hurt = this.cargo.splash(impact, rel, this.state !== 'riding');
       this.drainCargo();
-      if (hurt > 0) { this.spill.episode += hurt; this.spill.quiet = 0; this.emit('SPLASH', { amount: hurt, x: b.x, y: b.y }); }
+      if (hurt > 0) {
+        const S = this.spill;
+        S.episode += hurt; S.quiet = 0; S.causes.landing = (S.causes.landing || 0) + hurt;
+        this.emit('SPLASH', { amount: hurt, x: b.x, y: b.y });
+      }
       if (this.state === 'riding' && airTime > 0.38 && impact < 8 && Math.abs(rel) < 0.3) {
         this.score.cleanLandings++; this.score.style += 50;
         this.emit('CLEAN_LANDING', { airTime });
@@ -2034,7 +2054,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, World, Score,
-    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, CONTROL_LABELS, controlKeys, HumorEngine, DIALOGUE, CRASH_LINES,
+    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
   };
   root.HILL = HILL;
@@ -2060,6 +2080,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     [['hop'], 'Hop.', 'Tap for small, hold for big. Press just before landing to hop again.'],
   ];
   const KEY_ALTS = { pedal: ['W'], brake: ['S'], leanBack: ['A'], leanFwd: ['D'] }; // keyboard only, shown in How to Play
+  const LEVEL_WARN = 0.55; // radians off the slope while airborne before "LEVEL OUT!" shows (about 31°; tune after playtests)
   class InputManager {
     constructor() {
       this.down = {}; this.touchDown = {}; this.padDown = {}; this.padPrev = {}; this.jumpQueued = false; this.actions = [];
@@ -4084,7 +4105,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         B.react = { kind: B.kind === 'tourist' && kind === 'cheer' ? 'photo' : kind, t: 0, dur };
       }
     }
-    pop(text, kind) { this.fx.pops.push({ text, kind, t: 0 }); if (this.fx.pops.length > 4) this.fx.pops.shift(); }
+    pop(text, kind, life = 1.6) { this.fx.pops.push({ text, kind, t: 0, life }); if (this.fx.pops.length > 4) this.fx.pops.shift(); }
     spawnCargoBits(n, burst) {
       const W = this.world, b = W.bike, P = this.particles, cake = W.cargo.kind === 'cake';
       const rim = cake ? b.localToWorld(CAKE.mountX, 0.45, { x: 0, y: 0 }) : b.localToWorld(CARGO.mountX + 0.02, 0.3, { x: 0, y: 0 });
@@ -4128,7 +4149,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           if (!cake) { A.play('slosh'); this.spawnCargoBits(Math.min(9, 2 + Math.round(e.amount * 4)), false); }
           else if (Math.random() < 0.5) this.spawnCargoBits(2, false);
           break;
-        case 'SPILL_EPISODE': this.pop('-' + Math.round(e.total) + unit, 'bad'); if (!cake && e.total >= 3) this.say('COFFEE_SPILL'); break;
+        case 'SPILL_EPISODE': { // bigger losses say what caused them
+          const named = e.total >= 2 && SPILL_CAUSES[e.cause];
+          this.pop('-' + Math.round(e.total) + unit + (named ? ' · ' + named : ''), 'bad', named ? 2.6 : 1.6);
+        }
+          if (!cake && e.total >= 3) this.say('COFFEE_SPILL'); break;
         case 'STRAP': A.play('wobble'); this.cam.shake(0.12); break;
         case 'CAKE_DECOR': this.dropDecor(e); if (!e.crash) this.say('CAKE_DECOR'); break;
         case 'CAKE_GROOM': this.dropDecor(e); this.say('CAKE_GROOM'); break;
@@ -4205,7 +4230,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (f.text && f.text.t > f.text.dur) f.text = null;
       if (f.toast && f.toast.t > 1.2) f.toast = null;
       for (const p of f.pops) p.t += dt;
-      f.pops = f.pops.filter((p) => p.t < 1.6);
+      f.pops = f.pops.filter((p) => p.t < p.life);
       if (f.flash > 0) f.flash = Math.max(0, f.flash - dt * 3);
       if (f.stamp >= 0) f.stamp += dt;
     }
@@ -4448,7 +4473,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (W.cargo.shield) badge('BUBBLE WRAP', '#cfe6f2');
       if (W.boostT > 0) badge('ESPRESSO', COL.mustard, W.boostT / 6);
       this.fx.pops.forEach((p, i) => {
-        ctx.globalAlpha = 1 - clamp((p.t - 1.0) / 0.6, 0, 1); ctx.textAlign = 'right';
+        ctx.globalAlpha = 1 - clamp((p.t - (p.life - 0.6)) / 0.6, 0, 1); ctx.textAlign = 'right';
         ctx.font = '900 ' + (u * 0.95).toFixed(1) + 'px ' + FONT_DISPLAY;
         const y = iy + u * 0.5 + i * u * 1.35 - p.t * u * 0.6;
         ctx.lineWidth = 4; ctx.strokeStyle = COL.ink; ctx.strokeText(p.text, Wd - pad, y);
@@ -4495,6 +4520,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ctx.font = '800 ' + (u * 0.8).toFixed(1) + 'px ' + FONT_BODY; ctx.fillText(cu.name + ' (customer) · now', x + u * 3.0, y + u * 1.2);
         ctx.font = '700 ' + (u * 0.88).toFixed(1) + 'px ' + FONT_BODY;
         wrapText(ctx, f.text.line.text, x + u * 0.9, y + u * 2.55, w - u * 1.8, u * 1.05);
+      }
+      const b = W.bike, rel = wrapAngle(b.a - Math.atan(W.terrain.slope(b.x)));
+      if (W.state === 'riding' && !b.grounded && b.airTime > 0.25 && Math.abs(rel) > LEVEL_WARN) { // tilted in the air: warn before the landing
+        const txt = 'LEVEL OUT!  ' + controlKeys(['leanBack', 'leanFwd'], this.input.device).join(' '), pulse = 0.85 + Math.sin(this.time * 14) * 0.15;
+        ctx.font = '900 ' + (u * 1.1).toFixed(1) + 'px ' + FONT_BODY; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(txt).width + u * 2;
+        ctx.globalAlpha = pulse; ctx.fillStyle = COL.coral; rrect(ctx, Wd / 2 - tw / 2, H * 0.2, tw, u * 2.2, u * 1.1); ctx.fill();
+        ctx.fillStyle = COL.cream; ctx.fillText(txt, Wd / 2, H * 0.2 + u * 1.1); ctx.globalAlpha = 1;
       }
       if (f.hint) {
         const dur = f.hint.id === 'pedal' || f.hint.id === 'cake' ? 6 : 5;

@@ -10,6 +10,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Controls are shown for the device you are using. The title strip, How to Play, ride hints, and pause help switch between keyboard keys, touch buttons, and gamepad buttons as soon as you use one.
 
 ### Added
+- Bigger cargo losses now say what caused them, for example "-12% latte · Rough landing". Causes are a hard brake, a rough landing, a pothole, a bump, or a bumpy ride.
+- A "LEVEL OUT!" warning, with your lean controls, appears when the bike is tilted steeply in the air before a landing.
 - How to Play has a two-thumb tip on touch screens.
 - Project instructions for Claude Code (`CLAUDE.md`). Every change now updates the changelog, the README when needed, and the local tech-debt list.
 - A `/release` skill that turns the Unreleased section into a version, then commits and tags it.
