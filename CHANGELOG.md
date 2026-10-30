@@ -3,6 +3,12 @@
 All notable changes to HILLARIOUS are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Project instructions for Claude Code (`CLAUDE.md`). Every change now updates the changelog, the README when needed, and the local tech-debt list.
+- A `/release` skill that turns the Unreleased section into a version, then commits and tags it.
+
 ## [1.1.1] - 2026-10-30
 
 ### Fixed
@@ -43,6 +49,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Keyboard, touch, and gamepad controls.
 - A single offline `index.html` with no build step.
 
+[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.1.1...HEAD
 [1.1.1]: https://github.com/madhukoseke/hillarious/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/madhukoseke/hillarious/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/madhukoseke/hillarious/releases/tag/v1.0.0
