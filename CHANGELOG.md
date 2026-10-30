@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-30
+
 ### Changed
 - The order intro and the receipt now wait for you. Continue with the button, Enter, Space, a tap, or gamepad A. The 12-second countdown is gone; autopilot demos still advance on their own.
 - Controls are shown for the device you are using. The title strip, How to Play, ride hints, and pause help switch between keyboard keys, touch buttons, and gamepad buttons as soon as you use one.
@@ -59,7 +61,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Keyboard, touch, and gamepad controls.
 - A single offline `index.html` with no build step.
 
-[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/madhukoseke/hillarious/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/madhukoseke/hillarious/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/madhukoseke/hillarious/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/madhukoseke/hillarious/releases/tag/v1.0.0

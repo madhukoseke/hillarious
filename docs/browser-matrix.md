@@ -8,12 +8,12 @@ Each run starts a shift as a player (the intro must wait for input), rides, then
 
 | Date | Version | Browser | Size | Result | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-30 | 1.2.0 (pre-release) | Chromium 141 | Desktop 1280×720, keyboard | Pass | No console or page errors. Tips $5.04 / $4.85. |
-| 2026-10-30 | 1.2.0 (pre-release) | Chromium 141 | Landscape phone 844×390, touch | Pass | Touch labels shown. Final card scrolls; Save and Play Again reachable. |
-| 2026-10-30 | 1.2.0 (pre-release) | Firefox 142 | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
-| 2026-10-30 | 1.2.0 (pre-release) | Firefox 142 | Landscape phone 844×390, touch | Pass | No errors. |
-| 2026-10-30 | 1.2.0 (pre-release) | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
-| 2026-10-30 | 1.2.0 (pre-release) | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | Final card scrolls; Save and Play Again reachable. |
+| 2026-10-30 | 1.2.0 | Chromium 141 | Desktop 1280×720, keyboard | Pass | No console or page errors. Tips $5.04 / $4.85. |
+| 2026-10-30 | 1.2.0 | Chromium 141 | Landscape phone 844×390, touch | Pass | Touch labels shown. Final card scrolls; Save and Play Again reachable. |
+| 2026-10-30 | 1.2.0 | Firefox 142 | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
+| 2026-10-30 | 1.2.0 | Firefox 142 | Landscape phone 844×390, touch | Pass | No errors. |
+| 2026-10-30 | 1.2.0 | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
+| 2026-10-30 | 1.2.0 | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | Final card scrolls; Save and Play Again reachable. |
 
 All six runs produced identical tips, so the simulation is deterministic across engines.
 
