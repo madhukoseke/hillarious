@@ -5,7 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+- The order intro and the receipt now wait for you. Continue with the button, Enter, Space, a tap, or gamepad A. The 12-second countdown is gone; autopilot demos still advance on their own.
+- Controls are shown for the device you are using. The title strip, How to Play, ride hints, and pause help switch between keyboard keys, touch buttons, and gamepad buttons as soon as you use one.
+
 ### Added
+- How to Play has a two-thumb tip on touch screens.
 - Project instructions for Claude Code (`CLAUDE.md`). Every change now updates the changelog, the README when needed, and the local tech-debt list.
 - A `/release` skill that turns the Unreleased section into a version, then commits and tags it.
 

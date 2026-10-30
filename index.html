@@ -114,7 +114,7 @@ kbd {
 }
 .card h2 { margin: 0 0 12px; font-family: var(--display); font-weight: 900; font-size: clamp(22px, 3vw, 34px); letter-spacing: 0.02em; }
 .howto .rows { display: grid; gap: 9px; margin: 6px 0 14px; }
-.howto .row { display: grid; grid-template-columns: 7.4em 1fr; align-items: center; gap: 12px; font-size: 15px; }
+.howto .row { display: grid; grid-template-columns: minmax(7.4em, auto) 1fr; align-items: center; gap: 12px; font-size: 15px; }
 .howto ul { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
 .intro .eyebrow { font-family: var(--mono); font-weight: 800; font-size: 13px; letter-spacing: 0.12em; color: var(--coral-deep); }
 .intro h2 { margin: 4px 0 2px; font-size: clamp(30px, 4.4vw, 48px); }
@@ -127,7 +127,8 @@ kbd {
 .msg { margin: 6px 0 0; background: #e9e5dc; color: var(--ink); padding: 9px 13px; border-radius: 16px 16px 16px 4px;
   font-size: 15px; line-height: 1.35; max-width: 92%; }
 .cargo-note { margin: 14px 0 0; font-weight: 700; }
-.btn .count { font-style: normal; display: inline-block; margin-left: 0.6em; min-width: 1.6em; padding: 0.05em 0.4em;
+.btn .count[hidden] { display: none; }
+.btn .count {font-style: normal; display: inline-block; margin-left: 0.6em; min-width: 1.6em; padding: 0.05em 0.4em;
   border-radius: 999px; background: rgba(0, 0, 0, 0.18); }
 .pause { text-align: center; width: min(420px, 94vw); }
 .pause p { margin: 0 0 6px; }
@@ -283,9 +284,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         <button class="btn" data-act="howto">HOW TO PLAY</button>
       </div>
       <p class="best" id="title-best"></p>
-      <div class="title-mini"><span class="press">Press <b>SPACE</b> to ride</span><button class="chip" data-act="mute" id="title-mute" aria-pressed="false">Sound: on</button></div>
+      <div class="title-mini"><span class="press" id="title-press">Press <b>SPACE</b> to ride</span><button class="chip" data-act="mute" id="title-mute" aria-pressed="false">Sound: on</button></div>
     </div>
-    <div class="keys" aria-label="Controls">
+    <div class="keys" id="title-keys" aria-label="Controls">
       <span><kbd>↑</kbd>pedal</span><span><kbd>↓</kbd>brake</span><span><kbd>←</kbd><kbd>→</kbd>lean</span>
       <span><kbd>SPACE</kbd>hop</span><span><kbd>P</kbd>pause</span><span><kbd>M</kbd>mute</span><span><kbd>R</kbd>restart</span>
     </div>
@@ -294,7 +295,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   <section id="s-howto" class="screen scrim" aria-labelledby="howto-h">
     <div class="card howto">
       <h2 id="howto-h">How to deliver (mostly) intact</h2>
-      <div class="rows">
+      <div class="rows" id="howto-rows">
         <div class="row"><span><kbd>↑</kbd><kbd>W</kbd></span><span><b>Pedal.</b> More speed, more drama.</span></div>
         <div class="row"><span><kbd>↓</kbd><kbd>S</kbd></span><span><b>Brake.</b> Hard stops surge the latte forward.</span></div>
         <div class="row"><span><kbd>←</kbd><kbd>A</kbd></span><span><b>Lean back.</b> Wheelie, or rotate backward in the air.</span></div>
@@ -304,8 +305,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       </div>
       <ul>
         <li>The latte forgives normal riding. Hard brakes, big landings and crashes cost you.</li>
-        <li>Intersections end in lips. Speed plus <b>SPACE</b> at the edge means big air.</li>
+        <li>Intersections end in lips. Speed plus <b data-control="hop">SPACE</b> at the edge means big air.</li>
         <li>Land on the downslope with the bike level. Crashing only costs time, coffee and dignity.</li>
+        <li id="howto-touch" hidden>Use both thumbs: lean and brake on the left, pedal and hop on the right. Hold HOP for a bigger hop.</li>
       </ul>
       <div class="btns"><button class="btn primary" data-act="back">GOT IT</button></div>
     </div>
@@ -321,7 +323,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         <div id="intro-msgs"></div>
       </div>
       <p class="cargo-note" id="intro-cargo"></p>
-      <div class="btns"><button class="btn primary" data-act="go">START DELIVERY <i class="count" id="intro-count">12</i></button></div>
+      <div class="btns"><button class="btn primary" data-act="go">START DELIVERY <i class="count" id="intro-count" hidden></i></button></div>
     </div>
   </section>
 
@@ -362,7 +364,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       <div class="rc-best" id="rv-best"></div>
       <div class="rc-shift" id="rv-shift"></div>
       <div class="btns">
-        <button class="btn primary" data-act="next" id="rv-next"><span id="rv-next-label">NEXT DELIVERY</span> <i class="count" id="rv-count">12</i></button>
+        <button class="btn primary" data-act="next" id="rv-next"><span id="rv-next-label">NEXT DELIVERY</span> <i class="count" id="rv-count" hidden></i></button>
         <button class="btn" data-act="again" id="rv-again">RIDE AGAIN</button>
         <button class="btn" data-act="title">TITLE</button>
       </div>
@@ -705,12 +707,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     ];
     C.checkpoints = [C.start, mason + 2, blockB + 18, blockB + 52, powell + 2, stockton + 2, blockD + 32, grant + 2].map((x) => ({ x }));
     C.hints = [
-      { x: -1e9, id: 'pedal', keys: ['↑'], text: 'Hold to pedal' },
-      { x: 28, id: 'hop', keys: ['SPACE'], text: 'Hop the pothole. Hold for higher.' },
-      { x: 64, id: 'brake', keys: ['↓'], text: 'Tap to brake. Hold it and the latte surges forward.' },
-      { x: blockB + 24, id: 'car', keys: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
-      { x: powell - 30, id: 'cable', keys: ['↓'], text: 'DING DING: cable car crossing! Brake, or beat it.' },
-      { x: powell + 8, id: 'air', keys: ['SPACE', '←', '→'], text: 'Hop at the lip for BIG AIR. Lean to land level.' },
+      { x: -1e9, id: 'pedal', actions: ['pedal'], text: 'Hold to pedal' },
+      { x: 28, id: 'hop', actions: ['hop'], text: 'Hop the pothole. Hold for higher.' },
+      { x: 64, id: 'brake', actions: ['brake'], text: 'Tap to brake. Hold it and the latte surges forward.' },
+      { x: blockB + 24, id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
+      { x: powell - 30, id: 'cable', actions: ['brake'], text: 'DING DING: cable car crossing! Brake, or beat it.' },
+      { x: powell + 8, id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Hop at the lip for BIG AIR. Lean to land level.' },
     ];
     C.customer = {
       name: 'Skyler', role: 'Founder & CEO, Meetingless', avatar: 'founder', brand: 'MEETINGLESS HQ',
@@ -784,11 +786,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     ];
     C.checkpoints = [C.start, stairsX + STEPS * TREAD + 4, leav + 2, block2 + 12, hyde + 2, block3 + 20, cz - 2, larkin + 6, block4 + 24].map((x) => ({ x }));
     C.hints = [
-      { x: -1e9, id: 'cake', keys: ['↑'], text: 'Wedding cake on board. Smooth is fast.' },
-      { x: 22, id: 'pothole', keys: ['SPACE'], text: 'Big pothole. Hop it!' },
-      { x: stairsX - 12, id: 'stairs', keys: ['↓'], text: 'Macondray Lane steps. Slow down... or hop.' },
-      { x: hyde - 45, id: 'cable', keys: ['↓'], text: 'Cable car on Hyde! Brake early on this slope.' },
-      { x: larkin - 30, id: 'ramp', keys: ['↑', 'SPACE'], text: 'A robot car is stalling at Larkin. Jump the ramp!' },
+      { x: -1e9, id: 'cake', actions: ['pedal'], text: 'Wedding cake on board. Smooth is fast.' },
+      { x: 22, id: 'pothole', actions: ['hop'], text: 'Big pothole. Hop it!' },
+      { x: stairsX - 12, id: 'stairs', actions: ['brake'], text: 'Macondray Lane steps. Slow down... or hop.' },
+      { x: hyde - 45, id: 'cable', actions: ['brake'], text: 'Cable car on Hyde! Brake early on this slope.' },
+      { x: larkin - 30, id: 'ramp', actions: ['pedal', 'hop'], text: 'A robot car is stalling at Larkin. Jump the ramp!' },
     ];
     C.customer = {
       name: 'Gwen', role: 'Wedding planner, Frost & Tiers Events', avatar: 'planner', brand: 'FROST & TIERS EVENTS',
@@ -1564,6 +1566,17 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const top = all.slice(0, 3);
     return { list: top, rank: top.indexOf(entry) + 1 };
   }
+  // Control labels for each input device, by game action. Hints, How to Play, the title strip and pause help all read
+  // from here so they agree. Gamepad names follow the standard mapping; touch labels match the on-screen buttons.
+  const CONTROL_LABELS = {
+    keyboard: { pedal: ['↑'], brake: ['↓'], leanBack: ['←'], leanFwd: ['→'], hop: ['SPACE'], pause: ['P'], mute: ['M'], restart: ['R'], confirm: ['ENTER'] },
+    touch: { pedal: ['PEDAL'], brake: ['BRAKE'], leanBack: ['⟲'], leanFwd: ['⟳'], hop: ['HOP'], pause: ['II'], mute: [], restart: [], confirm: ['TAP'] },
+    gamepad: { pedal: ['RT'], brake: ['LT'], leanBack: ['◀'], leanFwd: ['▶'], hop: ['A'], pause: ['START'], mute: ['Y'], restart: ['SELECT'], confirm: ['A'] },
+  };
+  function controlKeys(actions, device) {
+    const t = CONTROL_LABELS[device] || CONTROL_LABELS.keyboard;
+    return (actions || []).flatMap((a) => t[a] || []);
+  }
   // Keeps only letters, digits, "_" and "-", so a pasted profile URL or "@handle" becomes a plain handle.
   function cleanHandle(s, max) {
     return String(s || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop().replace(/^@/, '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, max);
@@ -1646,8 +1659,6 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const RECOVER_LINE = 'Employee status: still technically employed.';
   // How long a line stays up: about 50 ms per character, so a joke can be read without rushing.
   const readTime = (text) => clamp(2.4 + String(text).length * 0.05, 3.2, 6.5);
-  // Seconds the order intro and the receipt stay up before advancing on their own (a press still skips ahead).
-  const INTRO_SECONDS = 12, REVIEW_SECONDS = 12;
 
   class HumorEngine {
     constructor(lines) { this.lines = lines; this.reset(); }
@@ -2023,7 +2034,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, World, Score,
-    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, HumorEngine, DIALOGUE, CRASH_LINES,
+    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, CONTROL_LABELS, controlKeys, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
   };
   root.HILL = HILL;
@@ -2040,11 +2051,21 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     Escape: 'pause', Enter: 'confirm', NumpadEnter: 'confirm',
   };
   const HOLD_KEYS = ['pedal', 'brake', 'leanBack', 'leanFwd', 'jump'];
+  // How to Play rows: [actions, bold lead, description]. Keycaps come from CONTROL_LABELS for the current device.
+  const HOWTO_ROWS = [
+    [['pedal'], 'Pedal.', 'More speed, more drama.'],
+    [['brake'], 'Brake.', 'Hard stops surge the latte forward.'],
+    [['leanBack'], 'Lean back.', 'Wheelie, or rotate backward in the air.'],
+    [['leanFwd'], 'Lean forward.', 'Nose down, or rotate forward in the air.'],
+    [['hop'], 'Hop.', 'Tap for small, hold for big. Press just before landing to hop again.'],
+  ];
+  const KEY_ALTS = { pedal: ['W'], brake: ['S'], leanBack: ['A'], leanFwd: ['D'] }; // keyboard only, shown in How to Play
   class InputManager {
     constructor() {
       this.down = {}; this.touchDown = {}; this.padDown = {}; this.padPrev = {}; this.jumpQueued = false; this.actions = [];
       this.inp = { pedal: false, brake: false, leanBack: false, leanFwd: false, jumpHeld: false, jumpPressed: false };
       this.touchMode = false; this.padName = '';
+      this.device = 'keyboard'; this.onDevice = null; // last input used: 'keyboard' | 'touch' | 'gamepad'
       root.addEventListener('keydown', (e) => this.onKey(e, true), { passive: false });
       root.addEventListener('keyup', (e) => this.onKey(e, false), { passive: false });
       this.pad = document.getElementById('touch');
@@ -2052,11 +2073,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       root.addEventListener('touchstart', () => this.enableTouch(), { passive: true, capture: true });
       if (this.pad) for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) this.pad.addEventListener(type, (e) => this.onTouches(e), { passive: false });
     }
-    enableTouch() { if (!this.touchMode) { this.touchMode = true; document.body.classList.add('touch'); } }
+    enableTouch() { if (!this.touchMode) { this.touchMode = true; document.body.classList.add('touch'); } this.setDevice('touch'); }
+    setDevice(d) { if (this.device !== d) { this.device = d; if (this.onDevice) this.onDevice(d); } }
     onKey(e, isDown) {
       if (e.target && e.target.closest && e.target.closest('input, textarea')) return; // let the name fields take typing
       const a = KEYMAP[e.code] || (e.key === ' ' ? 'jump' : null);
       if (!a) return;
+      if (isDown) this.setDevice('keyboard');
       const el = document.activeElement;
       if ((a === 'confirm' || a === 'jump') && el && el.tagName === 'BUTTON') return; // let the focused button click
       e.preventDefault();
@@ -2093,6 +2116,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.padName = gp.id || 'gamepad';
       const b = (i) => { const x = gp.buttons && gp.buttons[i]; return !!(x && (x.pressed || x.value > 0.35)); };
       const ax = (gp.axes && gp.axes[0]) || 0, ay = (gp.axes && gp.axes[1]) || 0;
+      if ((gp.buttons && Array.from(gp.buttons).some((x) => x && x.pressed)) || Math.abs(ax) > 0.4 || Math.abs(ay) > 0.55) this.setDevice('gamepad');
       g.pedal = b(7) || b(12) || ay < -0.55;
       g.brake = b(6) || b(1) || b(13) || ay > 0.55;
       g.leanBack = b(14) || ax < -0.4;
@@ -3643,6 +3667,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.R = new Renderer(document.getElementById('cv'));
       this.audio = new AudioManager(this.store);
       this.input = new InputManager();
+      this.input.onDevice = () => this.refreshControls();
       this.particles = new Particles(360);
       this.cam = new Camera();
       this.humor = new HumorEngine(DIALOGUE);
@@ -3670,7 +3695,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       root.addEventListener('resize', () => this.R.resize());
       root.addEventListener('blur', () => { this.input.clear(); if (this.state === 'riding') this.pause(); });
       document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'riding') this.pause(); });
-      this.show('title'); this.refreshBest(); this.audio.setMusic('title'); this.syncMute();
+      this.refreshControls(); this.show('title'); this.refreshBest(); this.audio.setMusic('title'); this.syncMute();
       this.last = performance.now();
       requestAnimationFrame((t) => this.frame(t));
       if (this.autopilotName) setTimeout(() => this.startDelivery(this.startIndex), 250);
@@ -3682,6 +3707,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (id) { const p = this.screens[id].querySelector('.btn.primary'); if (p) setTimeout(() => p.focus({ preventScroll: true }), 30); }
       else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     }
+    // The countdown badge only shows when a screen advances on its own (autopilot demos).
+    showCount(el, t) { el.hidden = t === null; if (t !== null) el.textContent = String(Math.ceil(t)); }
     toggleMute() { const m = this.audio.toggleMute(); this.syncMute(); this.fx.toast = { text: m ? 'Sound off' : 'Sound on', t: 0 }; return m; }
     syncMute() {
       const m = this.audio.muted;
@@ -3689,8 +3716,31 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         const el = document.getElementById(id);
         if (el) { el.textContent = txt; el.setAttribute('aria-pressed', m ? 'true' : 'false'); }
       }
-      const ps = document.getElementById('pause-sound');
-      if (ps) ps.textContent = 'Keys: P resume · R restart · M sound';
+    }
+    // Rewrites every on-screen control label for the device the player used last.
+    refreshControls() {
+      const d = this.input.device, k = (acts) => controlKeys(acts, d), $ = (id) => document.getElementById(id);
+      const el = (tag, text) => { const e = document.createElement(tag); e.textContent = text; return e; };
+      const caps = (labels) => labels.map((l) => el('kbd', l));
+      const strip = $('title-keys'); strip.textContent = '';
+      for (const [acts, name] of [[['pedal'], 'pedal'], [['brake'], 'brake'], [['leanBack', 'leanFwd'], 'lean'], [['hop'], 'hop'], [['pause'], 'pause'], [['mute'], 'mute'], [['restart'], 'restart']]) {
+        const labels = k(acts);
+        if (labels.length) { const s = document.createElement('span'); s.append(...caps(labels), name); strip.appendChild(s); }
+      }
+      const sys = ['pause', 'mute', 'restart'].filter((a) => k([a]).length), sysName = { pause: 'Pause', mute: 'Mute', restart: 'Restart delivery' };
+      const rows = $('howto-rows'); rows.textContent = '';
+      for (const [acts, lead, text] of HOWTO_ROWS.concat([[sys, '', sys.map((a) => sysName[a]).join(' · ')]])) {
+        const row = el('div', ''), keys = el('span', ''), desc = el('span', '');
+        row.className = 'row';
+        keys.append(...caps(k(acts).concat(d === 'keyboard' ? acts.flatMap((a) => KEY_ALTS[a] || []) : [])));
+        if (lead) desc.append(el('b', lead), ' ');
+        desc.append(text); row.append(keys, desc); rows.appendChild(row);
+      }
+      for (const c of document.querySelectorAll('[data-control]')) c.textContent = k([c.dataset.control]).join(' / ');
+      $('howto-touch').hidden = d !== 'touch';
+      const press = $('title-press'); press.textContent = '';
+      if (d === 'touch') press.append('Tap ', el('b', 'START RIDING')); else press.append('Press ', el('b', k(['hop'])[0]), ' to ride');
+      $('pause-sound').textContent = d === 'touch' ? '' : (d === 'gamepad' ? 'Buttons: ' : 'Keys: ') + k(['pause']) + ' resume · ' + k(['restart']) + ' restart · ' + k(['mute']) + ' sound';
     }
     announce(text) {
       const el = document.getElementById('live');
@@ -3740,7 +3790,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     startDelivery(index) {
       this.newWorld(index);
       const C = this.world.course, cu = C.customer, $ = (id) => document.getElementById(id);
-      this.state = 'intro'; this.introT = this.autopilotName ? 1.2 : INTRO_SECONDS;
+      this.state = 'intro'; this.introT = this.autopilotName ? 1.2 : null; // players advance themselves; autopilot demos keep a timer
       $('intro-eyebrow').textContent = 'DELIVERY ' + C.index + ' OF 2 · ' + C.hood;
       $('intro-h').textContent = C.title;
       $('intro-route').textContent = cu.route;
@@ -3749,7 +3799,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const m of cu.messages) { const el = document.createElement('p'); el.className = 'msg'; el.textContent = m; box.appendChild(el); }
       $('intro-cargo').textContent = cu.cargoNote;
       drawAvatar($('intro-avatar'), 4, cu.avatar);
-      $('intro-count').textContent = String(Math.ceil(this.introT));
+      this.showCount($('intro-count'), this.introT);
       this.show('intro'); this.audio.setMusic('title');
       this.announce('Delivery ' + C.index + ' of 2: ' + C.title + '. ' + cu.messages.join(' '));
     }
@@ -3799,9 +3849,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       $('rv-next-label').textContent = last ? 'PERFORMANCE REVIEW' : 'NEXT DELIVERY';
       next.dataset.act = last ? 'final' : 'next';
       $('rv-shift').textContent = '';
-      this.reviewT = this.autopilotName ? 2.5 : REVIEW_SECONDS;
+      this.reviewT = this.autopilotName ? 2.5 : null;
       this.announce(rv.stars + ' stars from ' + cu.name + ': ' + rv.text + ' Tip ' + fmtMoney(r.tip) + '.');
-      $('rv-count').textContent = String(Math.ceil(this.reviewT));
+      this.showCount($('rv-count'), this.reviewT);
       this.show('review');
       root.__HILL_LAST_RESULT__ = r; root.__HILL_RESULTS__ = this.results.slice();
     }
@@ -3916,13 +3966,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         this.audio.tickMusic();
         if (this.state === 'title' || this.state === 'howto') this.renderTitle();
         else {
-          if (this.state === 'intro') {
+          if (this.state === 'intro' && this.introT !== null) {
             this.introT -= dt;
             const el = document.getElementById('intro-count'), s = String(Math.max(1, Math.ceil(this.introT)));
             if (el.textContent !== s) el.textContent = s;
             if (this.introT <= 0) this.beginRide();
           }
-          if (this.state === 'review') {
+          if (this.state === 'review' && this.reviewT !== null) {
             this.reviewT -= dt;
             const el = document.getElementById('rv-count'), s = String(Math.max(1, Math.ceil(this.reviewT)));
             if (el.textContent !== s) el.textContent = s;
@@ -4130,7 +4180,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           const b = W.bike; this.cam.snap(b.x, b.y, b.vx); this.scarf.ok = false;
           break;
         }
-        case 'HINT': if (!this.autopilot) this.fx.hint = { text: e.text, keys: e.keys, id: e.id, t: 0 }; break;
+        case 'HINT': if (!this.autopilot) this.fx.hint = { text: e.text, keys: controlKeys(e.actions, this.input.device), id: e.id, t: 0 }; break;
         case 'DELIVERED': {
           this.state = 'delivered'; this.deliveredT = 0; this.fx.stamp = 0; A.setMusic(null);
           if (e.condition < 30) A.play('trombone'); else if (!cake) A.play('success');

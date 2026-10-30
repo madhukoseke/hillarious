@@ -586,6 +586,22 @@ test('humor engine: a queued critical line expires 2.5 s after the bubble ahead 
   assert.equal(hm.queued, null, 'and it is cleared');
 });
 
+test('controls: every hint action has a label on keyboard, touch, and gamepad', () => {
+  for (const device of ['keyboard', 'touch', 'gamepad']) {
+    for (const a of ['pedal', 'brake', 'leanBack', 'leanFwd', 'hop', 'pause', 'confirm']) {
+      assert.ok(H.controlKeys([a], device).length > 0, `${device} has no label for ${a}`);
+    }
+    for (const build of COURSES) {
+      for (const h of H[build]().hints) {
+        assert.ok(Array.isArray(h.actions) && !('keys' in h), `${build} hint ${h.id} names actions, not keys`);
+        for (const a of h.actions) assert.ok(H.controlKeys([a], device).length > 0, `${build} hint ${h.id}: no ${device} label for ${a}`);
+      }
+    }
+  }
+  assert.deepEqual(H.controlKeys(['hop', 'leanBack'], 'gamepad'), ['A', '◀']);
+  assert.deepEqual(H.controlKeys(['hop'], 'nonsense'), ['SPACE'], 'unknown devices fall back to keyboard');
+});
+
 test('high scores: profile handles are reduced to safe plain handles', () => {
   assert.equal(H.cleanHandle('@madhu_k', 15), 'madhu_k');
   assert.equal(H.cleanHandle('https://x.com/madhu_k?s=20', 15), 'madhu_k');
