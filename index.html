@@ -189,6 +189,10 @@ blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
 @keyframes stamp { from { transform: rotate(8deg) scale(2.6); opacity: 0; } to { transform: rotate(8deg) scale(1); opacity: 1; } }
 .fr-best { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; }
 .fr-best .new { color: var(--coral-deep); font-weight: 800; }
+.vol { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 12px; font: 800 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+.vol label { display: flex; align-items: center; gap: 8px; }
+.vol input { width: 110px; accent-color: var(--coral); }
+.title-wrap .vol { justify-content: flex-start; width: fit-content; margin-left: auto; background: rgba(255, 246, 229, 0.82); padding: 0.35em 0.9em; border-radius: 999px; }
 .hs-form { display: grid; gap: 8px; margin: 14px 0 6px; padding: 12px 14px; border: 3px solid var(--ink); border-radius: 14px; background: #f6efe0; }
 .hs-form[hidden] { display: none; }
 .hs-form label { display: grid; gap: 4px; font: 800 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
@@ -285,6 +289,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       </div>
       <p class="best" id="title-best"></p>
       <div class="title-mini"><span class="press" id="title-press">Press <b>SPACE</b> to ride</span><button class="chip" data-act="mute" id="title-mute" aria-pressed="false">Sound: on</button></div>
+      <div class="vol" aria-label="Volume">
+        <label>Music <input type="range" min="0" max="100" step="5" data-vol="music"></label>
+        <label>Effects <input type="range" min="0" max="100" step="5" data-vol="sfx"></label>
+      </div>
     </div>
     <div class="keys" id="title-keys" aria-label="Controls">
       <span><kbd>↑</kbd>pedal</span><span><kbd>↓</kbd>brake</span><span><kbd>←</kbd><kbd>→</kbd>lean</span>
@@ -336,6 +344,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         <button class="btn" data-act="restart">RESTART DELIVERY</button>
         <button class="btn" data-act="mute" id="pause-mute" aria-pressed="false">SOUND: ON</button>
         <button class="btn" data-act="quit">QUIT TO TITLE</button>
+      </div>
+      <div class="vol" aria-label="Volume">
+        <label>Music <input type="range" min="0" max="100" step="5" data-vol="music"></label>
+        <label>Effects <input type="range" min="0" max="100" step="5" data-vol="sfx"></label>
       </div>
       <p class="small" id="pause-sound"></p>
     </div>
@@ -2166,6 +2178,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     constructor(store) {
       this.store = store; this.ctx = null; this.muted = !!store.get('muted', false);
       this.loops = null; this.last = {}; this.rng = mulberry32(99);
+      const vol = (k) => { const v = Number(store.get('vol:' + k, 1)); return Number.isFinite(v) ? clamp(v, 0, 1) : 1; };
+      this.vol = { music: vol('music'), sfx: vol('sfx') }; // 0..1, scales the channel levels below
+    }
+    level(kind) { return kind === 'music' ? 0.26 * this.vol.music : 0.85 * this.vol.sfx; }
+    setVolume(kind, v) {
+      if (!(kind in this.vol)) return;
+      this.vol[kind] = clamp(Number(v) || 0, 0, 1);
+      this.store.set('vol:' + kind, this.vol[kind]);
+      const node = kind === 'music' ? this.mus : this.sfx;
+      if (this.ctx && node) node.gain.setTargetAtTime(this.level(kind), this.ctx.currentTime, 0.03);
     }
     unlock() {
       if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return; }
@@ -2177,8 +2199,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const comp = c.createDynamicsCompressor();
       comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2;
       this.master.connect(comp); comp.connect(c.destination);
-      this.sfx = c.createGain(); this.sfx.gain.value = 0.85; this.sfx.connect(this.master);
-      this.mus = c.createGain(); this.mus.gain.value = 0.26; this.mus.connect(this.master);
+      this.sfx = c.createGain(); this.sfx.gain.value = this.level('sfx'); this.sfx.connect(this.master);
+      this.mus = c.createGain(); this.mus.gain.value = this.level('music'); this.mus.connect(this.master);
       this.seq = { next: 0, step: 0, mode: null };
       this.noise = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
       const d = this.noise.getChannelData(0);
@@ -2251,7 +2273,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     // Tiny music sequencer: a laid-back title loop and a bouncy ride loop (F - Dm - Bb - C), scheduled just ahead.
     setMusic(mode) { this.musicMode = mode; }
-    duck(t, level) { if (this.ctx && this.mus) { const n = this.ctx.currentTime; this.mus.gain.cancelScheduledValues(n); this.mus.gain.setTargetAtTime(level === undefined ? 0.07 : level, n, 0.04); this.mus.gain.setTargetAtTime(0.26, n + t, 0.4); } }
+    duck(t, level) { if (this.ctx && this.mus) { const n = this.ctx.currentTime; this.mus.gain.cancelScheduledValues(n); this.mus.gain.setTargetAtTime((level === undefined ? 0.07 : level) * this.vol.music, n, 0.04); this.mus.gain.setTargetAtTime(this.level('music'), n + t, 0.4); } }
     tickMusic() {
       if (!this.ctx || this.ctx.state !== 'running' || !this.seq) return;
       const c = this.ctx, q = this.seq, mode = this.musicMode || null, now = c.currentTime;
@@ -3710,13 +3732,21 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (!btn) return;
         this.audio.unlock(); this.audio.play('ui'); this.action(btn.dataset.act);
       });
+      document.getElementById('ui').addEventListener('input', (e) => {
+        const r = e.target.closest('[data-vol]');
+        if (!r) return;
+        this.audio.unlock();
+        if (this.audio.muted && Number(r.value) > 0) this.toggleMute(); // a slider you can hear beats a silent one
+        this.audio.setVolume(r.dataset.vol, Number(r.value) / 100);
+        this.syncVolume();
+      });
       document.getElementById('hs-form').addEventListener('submit', (e) => { this.audio.unlock(); this.submitShift(e); });
       const unlock = () => this.audio.unlock();
       root.addEventListener('pointerdown', unlock); root.addEventListener('keydown', unlock);
       root.addEventListener('resize', () => this.R.resize());
       root.addEventListener('blur', () => { this.input.clear(); if (this.state === 'riding') this.pause(); });
       document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'riding') this.pause(); });
-      this.refreshControls(); this.show('title'); this.refreshBest(); this.audio.setMusic('title'); this.syncMute();
+      this.refreshControls(); this.show('title'); this.refreshBest(); this.audio.setMusic('title'); this.syncMute(); this.syncVolume();
       this.last = performance.now();
       requestAnimationFrame((t) => this.frame(t));
       if (this.autopilotName) setTimeout(() => this.startDelivery(this.startIndex), 250);
@@ -3737,6 +3767,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         const el = document.getElementById(id);
         if (el) { el.textContent = txt; el.setAttribute('aria-pressed', m ? 'true' : 'false'); }
       }
+    }
+    syncVolume() {
+      for (const r of document.querySelectorAll('[data-vol]')) r.value = String(Math.round(this.audio.vol[r.dataset.vol] * 100));
     }
     // Rewrites every on-screen control label for the device the player used last.
     refreshControls() {
