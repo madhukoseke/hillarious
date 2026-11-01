@@ -25,7 +25,7 @@ All six runs produced identical tips, so the simulation is deterministic across 
 
 ### Open cosmetic issues
 
-- On the landscape phone layout, the verdict stamp (for example ACCEPTABLE) is not visible on the final review in Chromium and WebKit. It shows on desktop. Cause not yet confirmed; the stamp is positioned above the verdict box and may be clipped by the scrolling card.
+- Landscape phone (844×390): the verdict stamp is visible when the review opens. The card still scrolls to reach the save form, so the stamp leaves the screen as you scroll. The save form is now compact (overflow 376 → 201 px). Not yet re-run in the cross-browser script; re-check on real devices.
 
 ## Real-device checklist
 

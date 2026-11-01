@@ -871,3 +871,13 @@ test('physics: the landing prediction refactor keeps the landing assist unchange
   assert.ok(out.x > b.x && out.t > 0 && Number.isFinite(out.a));
   assert.equal(b.predictLandingAngle(w), out.a);
 });
+
+test('records: best-tip records are versioned, and corrupt saves are dropped', () => {
+  assert.equal(H.RECORD_VERSION, 1);
+  assert.equal(H.cleanBest(null), null, 'missing record');
+  assert.equal(H.cleanBest('garbage'), null, 'non-object record');
+  assert.equal(H.cleanBest({ tip: 'lots', time: 40 }), null, 'non-numeric tip');
+  assert.equal(H.cleanBest({ tip: 5 }), null, 'missing time');
+  assert.deepEqual(plain(H.cleanBest({ tip: 5, time: 40 })), { v: 1, tip: 5, condition: 0, time: 40 }, 'legacy record reads with defaults');
+  assert.deepEqual(plain(H.cleanBest({ v: 1, tip: 5, condition: 88, time: 40 })), { v: 1, tip: 5, condition: 88, time: 40 });
+});

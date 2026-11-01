@@ -5,6 +5,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+- The save-your-score form on the final review is more compact on landscape phones, so less of the review needs scrolling to reach it.
+- Corrupt or half-written best-tip records are ignored instead of breaking the receipt or Dispatch board.
+
+### Changed
+- Best-tip and high-score records now carry a format version (`v: 1`). Older records still read as before.
+
 ## [1.3.0] - 2026-11-01
 
 ### Added

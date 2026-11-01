@@ -307,6 +307,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   .final > .fr-verdict { grid-column: 2; margin-top: 18px; }
   .final > .fr-best { grid-column: 2; }
   .final > .btns { grid-column: 2; }
+  .final > .hs-form { grid-column: 2; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+  .final > .hs-form label:last-of-type, .final > .hs-form .btns, .final > .hs-form .hs-status { grid-column: 1 / -1; }
   .fr-verdict p { font-size: 18px; }
   .receipt { width: min(780px, 96vw); max-height: 96vh; display: grid; grid-template-columns: 1fr 1fr; column-gap: 22px; align-items: start; padding: 14px 18px 18px; }
   .receipt .rc-lines { font-size: 13px; padding: 4px 0; }
@@ -1962,6 +1964,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const top = all.slice(0, 3);
     return { list: top, rank: top.indexOf(entry) + 1 };
   }
+  // Stored record format version. Version 1 adds `v` to best-tip and shift records; records without `v` still read.
+  const RECORD_VERSION = 1;
+  // Sanitizes a stored best-tip record. Anything that is not a finite tip and time returns null, so corrupt saves never reach the review.
+  function cleanBest(raw) {
+    const b = plainObject(raw);
+    if (!Number.isFinite(b.tip) || !Number.isFinite(b.time)) return null;
+    return { v: RECORD_VERSION, tip: b.tip, condition: Number.isFinite(b.condition) ? b.condition : 0, time: b.time };
+  }
   // Control labels for each input device, by game action. Hints, How to Play, the title strip and pause help all read
   // from here so they agree. Gamepad names follow the standard mapping; touch labels match the on-screen buttons.
   const CONTROL_LABELS = {
@@ -2658,7 +2668,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, World, Score,
-    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
+    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
@@ -4333,7 +4343,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.unlockAll = this.params.get('unlock') === 'all';          // ?unlock=all opens every order and drill (tests, demos)
       this.reducedMotion = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
       this.store = new Store();
-      this.progress = migrateProgress(this.store.get('progress', null), Object.fromEntries(ROUTES.map((r) => [r.id, this.store.get('best:' + r.id, null)])));
+      this.progress = migrateProgress(this.store.get('progress', null), Object.fromEntries(ROUTES.map((r) => [r.id, cleanBest(this.store.get('best:' + r.id, null))])));
       const fc = plainObject(this.store.get('free', null)); // last Free Ride setup, read field by field
       this.freeCfg = { route: typeof fc.route === 'string' ? fc.route : 'testHill', cp: Math.max(0, Number(fc.cp) | 0), cargo: fc.cargo === 'cake' ? 'cake' : 'coffee',
         unbreakable: !!fc.unbreakable, traffic: fc.traffic !== false, slowmo: !!fc.slowmo, overlay: !!fc.overlay };
@@ -4452,7 +4462,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
-      const shifts = this.store.get('shifts', []), a = this.store.get('best:nobHill', null), b = this.store.get('best:russianHill', null);
+      const shifts = this.store.get('shifts', []), a = cleanBest(this.store.get('best:nobHill', null)), b = cleanBest(this.store.get('best:russianHill', null));
       if (Array.isArray(shifts) && shifts[0] && Number.isFinite(shifts[0].tips)) parts.push('Best shift ' + fmtMoney(shifts[0].tips) + (shifts[0].name ? ' by ' + shifts[0].name : ''));
       if (a) parts.push('Latte ' + fmtMoney(a.tip) + ' (' + Math.round(a.condition) + '%)');
       if (b) parts.push('Cake ' + fmtMoney(b.tip) + ' (' + Math.round(b.condition) + '%)');
@@ -4560,7 +4570,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       box.textContent = '';
       let first = null;
       states.forEach((s, i) => {
-        const C = this.courseFor(s.id), cu = C.customer, best = this.store.get('best:' + s.id, null), goals = this.progress.goals[s.id] || [];
+        const C = this.courseFor(s.id), cu = C.customer, best = cleanBest(this.store.get('best:' + s.id, null)), goals = this.progress.goals[s.id] || [];
         const card = mk('div', 'order'), av = mk('canvas'), top = mk('div', 'order-top'), side = mk('div', 'order-side');
         card.dataset.state = s.state; av.width = av.height = 104; av.setAttribute('aria-hidden', 'true');
         drawAvatar(av, s.state === 'locked' ? 3 : 4, cu.avatar);
@@ -4704,9 +4714,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (stamp > oldStamp) el.classList.add('new');
       } else if (!w.best) el.textContent = 'Free ride: nothing saved.' + (this.freeStats.bestAir > 0 ? ' Best air ' + this.freeStats.bestAir.toFixed(2) + ' s.' : '');
       else {
-        const key = 'best:' + C.id, best = this.store.get(key, null);
+        const key = 'best:' + C.id, best = cleanBest(this.store.get(key, null));
         const better = !best || r.tip > best.tip || (r.tip === best.tip && r.time < best.time);
-        if (better) { this.store.set(key, { tip: r.tip, condition: r.condition, time: r.time }); el.textContent = best ? 'NEW PERSONAL BEST TIP!' : 'First delivery logged. HR is watching.'; el.classList.add('new'); }
+        if (better) { this.store.set(key, { v: RECORD_VERSION, tip: r.tip, condition: r.condition, time: r.time }); el.textContent = best ? 'NEW PERSONAL BEST TIP!' : 'First delivery logged. HR is watching.'; el.classList.add('new'); }
         else el.textContent = 'Personal best: ' + fmtMoney(best.tip) + ' · ' + fmtTime(best.time);
       }
       const gbox = $('rv-goals'); gbox.textContent = '';
@@ -4805,7 +4815,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const $ = (id) => document.getElementById(id);
       const name = $('hs-name').value.trim().slice(0, 20), x = cleanHandle($('hs-x').value, 15), linkedin = cleanHandle($('hs-li').value, 60);
       if (!name) { $('hs-status').textContent = 'Type a name to save your shift.'; $('hs-name').focus(); return; }
-      const rec = recordShift(this.store.get('shifts', []), { ...this.pendingShift, name, x, linkedin });
+      const rec = recordShift(this.store.get('shifts', []), { ...this.pendingShift, v: RECORD_VERSION, name, x, linkedin });
       this.store.set('shifts', rec.list);
       this.store.set('profile', { name, x, linkedin });
       this.pendingShift = null;
