@@ -5,6 +5,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-01
+
+### Added
+- Dispatch board: pick a single delivery from your courier phone. Orders unlock in order, so delivering The $9 Latte unlocks The Wedding Cake. Each card shows your best tip, time, and cargo, plus goal stars. A teaser card shows a delivery that is still to come. Single orders keep your best tips but never go on the shift high scores. Routes you delivered before this version stay unlocked.
+- Three goals per delivery, shown as stars on the receipt and the Dispatch board. Nob Hill: deliver 90% of the latte, land the big Powell lip level, beat par with no crashes. Russian Hill: deliver 90% of the cake, clear the Larkin ramp without crashing, beat par with no crashes. Meet all three to master the route.
+- Courier Academy: six short training drills (Pedal & Brake, Hop School, Lip Service, Stair Master, Ding Ding, Final Exam), unlocked one after another. Pat from HR texts the brief and stamps each run PROBATIONARY, CERTIFIED, or DISTINGUISHED. Pass the Final Exam to become a Certified Courier.
+- Free Ride: ride any unlocked hill, or The Test Hill, from any checkpoint. The Test Hill is an always-open sandbox that loops back to the top with fresh cargo. Carry a latte or a cake, and switch on unbreakable cargo, traffic, slow motion (0.5×), or a physics overlay that shows speed, slosh, and where you will land. Nothing in Free Ride is saved.
+- Practice this spot: receipts name the stretch that cost you the most and open Free Ride just before it.
+- Arrow keys and the gamepad d-pad move between menu buttons; Enter or A presses the one in focus.
+- `?unlock=all` opens every order and drill, for demos and testing.
+- Tests for the route list, unlocks, saved progress, goals, drills, practice spots, and the seven new courses (77 tests in total). A Dispatch & Training playtest (`tests/playtest/dispatch-training.js`), and the cross-browser check now opens Dispatch, Training, and Free Ride on each engine.
+
+### Changed
+- The title screen has START SHIFT, DISPATCH, and TRAINING. How to Play is now a small button next to Sound. A full shift is still one press away.
+- On laptop-height screens the receipt opens into two columns, so its buttons never need scrolling.
+
 ## [1.2.0] - 2026-10-30
 
 ### Changed
@@ -61,7 +77,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Keyboard, touch, and gamepad controls.
 - A single offline `index.html` with no build step.
 
-[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/madhukoseke/hillarious/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/madhukoseke/hillarious/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/madhukoseke/hillarious/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/madhukoseke/hillarious/compare/v1.0.0...v1.1.0

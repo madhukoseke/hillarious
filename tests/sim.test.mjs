@@ -64,8 +64,10 @@ test('startup: index.html has no external runtime dependencies', () => {
 /* ------------------------------ course ------------------------------ */
 
 const COURSES = ['buildNobHill', 'buildRussianHill'];
+// Courier Academy drills and The Test Hill get the same geometry and respawn checks as the deliveries.
+const TRAINING = ['buildDrillBrake', 'buildDrillHop', 'buildDrillLip', 'buildDrillStairs', 'buildDrillCable', 'buildDrillExam', 'buildTestHill'];
 
-for (const build of COURSES) {
+for (const build of COURSES.concat(TRAINING)) {
   test(`course ${build}: terrain (incl. potholes and stairs) is finite and C1, analytic slope matches the height`, () => {
     const T = H[build]().terrain;
     let prev = T.height(T.minX);
@@ -688,4 +690,184 @@ test('physics: pedaling turns the cranks the same way as the rolling wheels (no 
   assert.ok(b.vx > 3, 'bike should be moving forward');
   assert.ok(dSpin < 0, 'forward rolling spins the wheels clockwise (negative angle in y-up space)');
   assert.ok(dCrank < 0, `cranks must turn clockwise too, got delta ${dCrank.toFixed(2)}`);
+});
+
+/* -------------------------- dispatch & training -------------------------- */
+
+const plain = (o) => JSON.parse(JSON.stringify(o)); // VM objects -> plain objects for deepEqual
+
+test('routes: the shift order and unlock chain come from one list', () => {
+  assert.deepEqual(plain(H.ROUTES.map((r) => r.id)), ['nobHill', 'russianHill']);
+  assert.deepEqual(plain(H.ROUTES.map((r) => r.requires)), [null, 'nobHill']);
+  for (const r of H.ROUTES) assert.equal(r.build().id, r.id, `${r.id} builds its own course`);
+  assert.ok(H.COMING_SOON.length >= 1 && H.COMING_SOON.every((c) => c.title && c.hood && c.note));
+});
+
+test('progress: migration reads legacy bests and survives corrupt saves', () => {
+  const fresh = plain(H.migrateProgress(null, null));
+  assert.deepEqual(fresh, { v: 1, delivered: {}, goals: {}, drills: {} });
+  // Players from before 1.3 only have best tips: those routes count as delivered.
+  const legacy = plain(H.migrateProgress(undefined, { nobHill: { tip: 4.5, condition: 80, time: 44 }, russianHill: null }));
+  assert.deepEqual(legacy.delivered, { nobHill: 1 });
+  const junk = { delivered: { nobHill: 'lots', russianHill: -2, x: Infinity, y: true }, goals: { nobHill: 'yes', russianHill: [1, 0, 'x'] }, drills: { drillBrake: 9, drillHop: 'NaN', drillLip: 1.7 } };
+  const p = plain(H.migrateProgress(junk, null));
+  assert.deepEqual(p.delivered, { y: 1 });
+  assert.deepEqual(p.goals, { russianHill: [true, false, true] });
+  assert.deepEqual(p.drills, { drillBrake: 3, drillLip: 1 });
+  assert.deepEqual(plain(H.migrateProgress(p, null)), p, 'migration is idempotent');
+  for (const bad of ['oops', 42, [], { delivered: [] }]) assert.deepEqual(plain(H.migrateProgress(bad, null)), fresh);
+});
+
+test('progress: deliveries unlock in order; locks never hide a route already delivered', () => {
+  const states = (p, all) => plain(H.unlockState(H.ROUTES, p, all).map((s) => s.state));
+  const fresh = H.migrateProgress(null, null);
+  assert.deepEqual(states(fresh), ['new', 'locked']);
+  assert.deepEqual(states(fresh, true), ['new', 'new'], '?unlock=all opens everything');
+  const after = H.applyRun(fresh, 'single', 'nobHill', { goals: [false, true, false] });
+  assert.deepEqual(states(after), ['delivered', 'new']);
+  assert.deepEqual(plain(H.newlyUnlocked(H.unlockState(H.ROUTES, fresh), H.unlockState(H.ROUTES, after))), ['russianHill']);
+  // A cake delivered through ?delivery=2 without the latte still shows as delivered.
+  assert.deepEqual(states(H.migrateProgress({ delivered: { russianHill: 1 } }, null)), ['new', 'delivered']);
+  const mastered = H.applyRun(after, 'shift', 'nobHill', { goals: [true, false, true] });
+  assert.deepEqual(plain(mastered.goals.nobHill), [true, true, true], 'goals are best-ever, merged across runs');
+  assert.equal(mastered.delivered.nobHill, 2);
+  assert.deepEqual(states(mastered), ['mastered', 'new']);
+  assert.equal(fresh.delivered.nobHill, undefined, 'applyRun never changes its input');
+});
+
+test('progress: practice never writes records; only a full shift makes a shift record', () => {
+  assert.deepEqual(plain(H.writesFor('shift')), { best: true, shift: true, delivered: true, drill: false });
+  assert.deepEqual(plain(H.writesFor('single')), { best: true, shift: false, delivered: true, drill: false });
+  assert.deepEqual(plain(H.writesFor('drill')), { best: false, shift: false, delivered: false, drill: true });
+  for (const m of ['free', 'bogus', undefined]) assert.deepEqual(plain(H.writesFor(m)), { best: false, shift: false, delivered: false, drill: false });
+  const p = H.migrateProgress({ delivered: { nobHill: 1 }, drills: { drillBrake: 2 } }, null);
+  assert.deepEqual(plain(H.applyRun(p, 'free', 'nobHill', { goals: [true, true, true] })), plain(p), 'free ride changes nothing');
+  const d = H.applyRun(p, 'drill', 'drillBrake', { stamp: 1 });
+  assert.equal(d.drills.drillBrake, 2, 'a worse stamp never replaces a better one');
+  assert.equal(H.applyRun(p, 'drill', 'drillHop', { stamp: 3 }).drills.drillHop, 3);
+  assert.deepEqual(plain(d.delivered), { nobHill: 1 }, 'drills never count as deliveries');
+});
+
+test('drills: unlock one after another, each with three stamp tiers', () => {
+  assert.equal(H.DRILLS.length, 6);
+  assert.deepEqual(plain(H.STAMPS), ['NOT YET', 'PROBATIONARY', 'CERTIFIED', 'DISTINGUISHED']);
+  for (const D of H.DRILLS) {
+    assert.equal(D.tiers.length, 3, `${D.id} has three tiers`);
+    const C = D.build();
+    assert.equal(C.id, D.id); assert.equal(C.title, D.title);
+    assert.equal(C.dialogue, 'drill', 'drills use their own lines, never a delivery\'s');
+  }
+  const states = (p, all) => plain(H.drillStates(H.DRILLS, p, all).map((s) => s.state));
+  const fresh = H.migrateProgress(null, null);
+  assert.deepEqual(states(fresh), ['open', 'locked', 'locked', 'locked', 'locked', 'locked']);
+  assert.deepEqual(states(H.applyRun(fresh, 'drill', 'drillBrake', { stamp: 1 })), ['passed', 'open', 'locked', 'locked', 'locked', 'locked']);
+  assert.ok(states(fresh, true).every((s) => s === 'open'));
+  // Stamps count tiers met in a row: a later tier never makes up for a missed earlier one.
+  const D = H.DRILLS[0];
+  assert.equal(H.drillStamp(D, { stops: 2, stopZones: 2, condition: 96 }), 3);
+  assert.equal(H.drillStamp(D, { stops: 2, stopZones: 2, condition: 91 }), 2);
+  assert.equal(H.drillStamp(D, { stops: 1, stopZones: 2, condition: 100 }), 0);
+});
+
+test('drills: every rider finishes every drill; typical passes all six, careful all but Lip Service', () => {
+  const rows = [];
+  for (const D of H.DRILLS) {
+    for (const p of ['careful', 'typical', 'fast', 'reckless']) {
+      const { w, r } = rideProfile(p, 90, 'build' + D.id.slice(0, 1).toUpperCase() + D.id.slice(1));
+      assert.equal(w.state, 'done', `${D.id}/${p} did not finish`);
+      const stamp = H.drillStamp(D, r);
+      rows.push(`${D.id.padEnd(12)} ${p.padEnd(9)} ${r.time.toFixed(1).padStart(5)} s  cargo ${r.condition.toFixed(1).padStart(5)}%  ${H.STAMPS[stamp]}`);
+      if (p === 'typical') {
+        assert.ok(stamp >= 1, `typical should pass ${D.id}`);
+        assert.ok(r.time <= r.par, `${D.id} typical ${r.time.toFixed(1)} s is over par ${r.par}`);
+      }
+      // The careful bot never hops a lip, so it cannot pass a drill that is only about big air.
+      if (p === 'careful' && D.id !== 'drillLip') assert.ok(stamp >= 1, `careful should pass ${D.id}`);
+    }
+  }
+  console.log('\n  Drill results:\n  ' + rows.join('\n  '));
+});
+
+test('goals: three per route, met by the runs that earn them', () => {
+  for (const R of H.ROUTES) assert.equal(H.ROUTE_GOALS[R.id].length, 3, `${R.id} has three goals`);
+  const base = { condition: 95, time: 40, par: 46, crashes: 0, bigLipClean: true, rampClean: true };
+  assert.deepEqual(plain(H.routeGoals('nobHill', base)), [true, true, true]);
+  assert.deepEqual(plain(H.routeGoals('nobHill', { ...base, condition: 89, bigLipClean: false, crashes: 1 })), [false, false, false]);
+  assert.deepEqual(plain(H.routeGoals('russianHill', { ...base, time: 50, par: 48 })), [true, true, false]);
+  assert.deepEqual(plain(H.routeGoals('nowhere', base)), []);
+  // A level landing off the big Powell lip, and a careful cake that masters Russian Hill.
+  assert.equal(rideProfile('typical').r.bigLipClean, true, 'typical lands the Powell lip level');
+  assert.equal(rideProfile('careful').r.bigLipClean, false, 'careful never jumps it');
+  assert.deepEqual(plain(H.routeGoals('russianHill', rideProfile('careful', 160, 'buildRussianHill').r)), [true, true, true]);
+});
+
+test('practice: checkpoint starts are named by cross street; the trouble spot names the worst stretch', () => {
+  const C = H.buildNobHill(), mason = C.intersections.find((I) => I.name === 'MASON ST');
+  assert.equal(H.cpLabel(C, 0), 'START');
+  assert.equal(H.cpLabel(C, 1), 'MASON ST');
+  assert.match(H.cpLabel(C, 2), /^\d+ m PAST MASON ST$/);
+  for (let i = 0; i < C.checkpoints.length; i++) assert.ok(H.cpLabel(C, i).length > 0);
+  assert.equal(H.troubleSpot(C, []), null);
+  assert.equal(H.troubleSpot(C, [{ kind: 'spill', x: 30, amount: 2 }]), null, 'small losses are not worth practising');
+  const x = C.checkpoints[2].x + 5;
+  const t = H.troubleSpot(C, [{ kind: 'spill', x: 30, amount: 4 }, { kind: 'crash', x, amount: 15 }, { kind: 'crash', x: x + 2, amount: 16 }]);
+  assert.equal(t.cp, 2); assert.equal(t.crashes, 2); assert.equal(t.lost, 31);
+  assert.equal(t.label, H.cpLabel(C, 2));
+  assert.ok(mason.x0 < C.checkpoints[2].x);
+  // A real crash lands in the run log with its position.
+  const w = new H.World(H.makeTestCourse('flat'));
+  settle(w); w.crash('obstacle', 1);
+  const log = w.result().log;
+  assert.equal(log.length, 1); assert.equal(log[0].kind, 'crash'); assert.ok(Number.isFinite(log[0].x) && log[0].amount > 0);
+});
+
+test('free ride: start at any checkpoint with no backlog of hints; unbreakable cargo loses nothing', () => {
+  const C = H.buildNobHill(), k = 4, w = new H.World(C, { startCp: k });
+  assert.equal(w.cpIndex, k);
+  assert.ok(Math.abs(w.bike.x - C.checkpoints[k].x) < 1, 'spawned at the checkpoint');
+  const hints = [];
+  for (let i = 0; i < 240; i++) { w.step(input()); hints.push(...w.drain().filter((e) => e.type === 'HINT')); }
+  assert.ok(hints.length <= 1, `old hints replayed: ${hints.map((h) => h.id)}`);
+  assert.equal(w.score.crashes, 0);
+  const u = new H.World(H.makeTestCourse('flat'), { unbreakable: true });
+  settle(u);
+  u.bike.y += 3.5; u.bike.py = u.bike.y; u.bike.vx = 6;
+  for (let i = 0; i < 360; i++) u.step(input({ brake: i > 120 }));
+  u.crash('obstacle', 1);
+  assert.equal(u.cargo.amount, 100, 'landings, hard brakes and crashes are free');
+  const cake = new H.World(H.makeTestCourse('flat', 'cake'), { unbreakable: true });
+  settle(cake);
+  assert.equal(cake.cargo.bump(9, true), 0);
+});
+
+test('test hill: laps forever, refilling the cargo and resetting the props', () => {
+  const C = H.buildTestHill(), w = new H.World(C), ap = new H.Autopilot('typical'), laps = [];
+  assert.equal(C.loop, true);
+  let lapCargo = null, propsBack = null, knocked = 0;
+  while (w.t < 95) {
+    w.step(ap.input(w));
+    for (const e of w.drain()) {
+      if (e.type === 'SANITY') assert.fail('non-finite physics on the Test Hill');
+      if (e.type === 'CONE') knocked++;
+      if (e.type === 'LAP') {
+        laps.push(e.laps); lapCargo = w.cargo.amount;
+        propsBack = w.obstacles.cones.every((c) => c.state === 0) && w.obstacles.powerups.every((p) => !p.taken);
+      }
+    }
+  }
+  assert.deepEqual(laps, [1, 2]);
+  assert.equal(w.state, 'riding', 'a loop never finishes');
+  assert.equal(lapCargo, 100, 'each lap starts with full cargo');
+  assert.equal(propsBack, true, 'cones stand back up and power-ups return');
+  assert.ok(knocked > 0 || C.cones.length === 0, 'the bot knocked a cone, so the reset was exercised');
+});
+
+test('physics: the landing prediction refactor keeps the landing assist unchanged', () => {
+  const w = new H.World(H.makeTestCourse('slope'));
+  settle(w);
+  const b = w.bike;
+  b.y += 2; b.vx = 9; b.vy = 2;
+  const out = b.predictLanding(w, {});
+  assert.ok(out.x > b.x && out.t > 0 && Number.isFinite(out.a));
+  assert.equal(b.predictLandingAngle(w), out.a);
 });

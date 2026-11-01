@@ -16,6 +16,8 @@ No installation or account required. Open the link in a modern browser.
 
 - Bicycle physics inspired by San Francisco's steep hills
 - Delivery missions, obstacles, and playful customer feedback
+- A Dispatch board to pick single deliveries, which unlock one by one, each with three goals to master
+- Courier Academy: six training drills graded by Pat from HR, plus Free Ride from any checkpoint and The Test Hill sandbox
 - Cable cars, traffic, and recognizable SF-inspired scenery
 - Sound effects and a lightweight arcade feel
 - Keyboard, touch, and gamepad controls, with on-screen labels that match the device you use
@@ -26,8 +28,11 @@ No installation or account required. Open the link in a modern browser.
 ## 🕹️ How to play
 
 1. Open the [live game](https://hillarious.pages.dev), or run it locally using the steps below.
-2. Select **Play** and check the in-game controls.
+2. Select **START SHIFT** for both deliveries and the HR review, or **DISPATCH** to pick one delivery. Delivering one unlocks the next.
 3. Complete deliveries while navigating the hills and traffic.
+4. To practise, open **TRAINING**: work through the drills, or choose **FREE RIDE** to start anywhere with nothing saved. Receipts also offer **Practice this spot** for the stretch that cost you most.
+
+Add `?unlock=all` to the URL to open every order and drill (handy for demos).
 
 > **Tip:** Start on a desktop browser for the easiest keyboard experience. Mobile and gamepad behavior may vary by browser/device.
 
@@ -50,9 +55,9 @@ The headless simulation and scoring tests need Node.js 22 or later and no other 
 node --test "tests/*.test.mjs"
 ```
 
-They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`.
+They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`. `dispatch-training.js` walks Dispatch, a drill, Free Ride, and The Test Hill from a fresh profile.
 
-`tests/playtest/cross-browser.mjs` plays a shift on Chromium, Firefox, and WebKit at desktop and phone sizes; setup steps are at the top of the file. Results and the real-device checklist live in [docs/browser-matrix.md](docs/browser-matrix.md).
+`tests/playtest/cross-browser.mjs` opens Dispatch, Training, and Free Ride, then plays a shift on Chromium, Firefox, and WebKit at desktop and phone sizes. It takes an optional URL argument; setup steps are at the top of the file. Results and the real-device checklist live in [docs/browser-matrix.md](docs/browser-matrix.md).
 
 ## Changelog
 

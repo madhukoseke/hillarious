@@ -38,6 +38,25 @@ async function run(name, engine, sizeName, size) {
     r.device = await page.evaluate(() => HILL.game.input.device);
     await page.screenshot({ path: `${SHOTS}/${name}-${sizeName}-ride.png` });
 
+    // Dispatch shows the locks (fresh profile), Training lists the drills, and a Free Ride starts.
+    const press = (sel) => (touch ? page.tap(sel) : page.click(sel));
+    await page.goto(URL);
+    await page.waitForFunction(() => window.HILL && HILL.game && HILL.game.state === 'title');
+    await press('#s-title [data-act="board"]');
+    await page.waitForFunction(() => HILL.game.state === 'board');
+    r.board = await page.evaluate(() => [...document.querySelectorAll('#board-orders .order')].map((o) => o.dataset.state || 'soon').join(' '));
+    await page.screenshot({ path: `${SHOTS}/${name}-${sizeName}-board.png` });
+    await press('#s-board [data-act="back"]');
+    await press('#s-title [data-act="train"]');
+    await page.waitForFunction(() => HILL.game.state === 'train');
+    r.drills = await page.evaluate(() => [...document.querySelectorAll('#train-drills .drill')].map((d) => d.dataset.state).join(' '));
+    await press('#s-train [data-act="free-setup"]');
+    await page.waitForFunction(() => HILL.game.state === 'free');
+    await page.screenshot({ path: `${SHOTS}/${name}-${sizeName}-free.png` });
+    await press('#s-free [data-act="free-go"]');
+    await page.waitForTimeout(1500);
+    r.freeRide = await page.evaluate(() => HILL.game.state === 'riding' && HILL.game.mode === 'free');
+
     // Full autopilot shift to the final review.
     const t0 = Date.now();
     await page.goto(URL + '?autopilot=typical');

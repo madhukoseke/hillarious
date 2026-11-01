@@ -14,7 +14,7 @@ async (page) => {
   const set = async (k, on) => { if (keys[k] !== on) { keys[k] = on; on ? await page.keyboard.down(k) : await page.keyboard.up(k); } };
   const release = async () => { for (const k of Object.keys(keys)) await set(k, false); };
   const t0 = Date.now(), shots = new Set();
-  await page.keyboard.press('Enter'); // START RIDING
+  await page.keyboard.press('Enter'); // START SHIFT
   for (let d = 1; d <= 2; d++) {
     await page.waitForTimeout(400);
     await page.screenshot({ path: SHOT(d + '-intro') });

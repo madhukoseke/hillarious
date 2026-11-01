@@ -12,7 +12,7 @@ async (page) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(BASE);
   await page.waitForTimeout(600);
-  await page.keyboard.press('Enter');              // START RIDING (focused button)
+  await page.keyboard.press('Enter');              // START SHIFT (focused button)
   await page.waitForTimeout(500);
   await page.screenshot({ path: SHOT('02-intro') });
   await page.keyboard.press('Space');              // START DELIVERY

@@ -4,7 +4,7 @@ Record one row per browser or device run. Automated runs come from `tests/playte
 
 ## Automated runs
 
-Each run starts a shift as a player (the intro must wait for input), rides, then plays a full autopilot shift to the final review.
+Each run starts a shift as a player (the intro must wait for input), rides, then plays a full autopilot shift to the final review. Since the Dispatch & Training work, each run also opens Dispatch (checking the locks), Training, and Free Ride, and starts a free ride.
 
 | Date | Version | Browser | Size | Result | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -14,6 +14,12 @@ Each run starts a shift as a player (the intro must wait for input), rides, then
 | 2026-10-30 | 1.2.0 | Firefox 142 | Landscape phone 844×390, touch | Pass | No errors. |
 | 2026-10-30 | 1.2.0 | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
 | 2026-10-30 | 1.2.0 | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | Final card scrolls; Save and Play Again reachable. |
+| 2026-10-31 | Unreleased | Chromium 141 | Desktop 1280×720, keyboard | Pass | Dispatch shows the cake locked; drills listed; free ride starts. No console or page errors. Tips $5.04 / $4.85. |
+| 2026-10-31 | Unreleased | Chromium 141 | Landscape phone 844×390, touch | Pass | Dispatch, Training, and Free Ride fit without scrolling. The two-column receipt scrolls by about 12 px; its buttons stay visible. |
+| 2026-10-31 | Unreleased | Firefox 142 | Desktop 1280×720, keyboard | Pass | New screens open; no errors. Same tips as Chromium. |
+| 2026-10-31 | Unreleased | Firefox 142 | Landscape phone 844×390, touch | Pass | New screens open; no errors. |
+| 2026-10-31 | Unreleased | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | New screens open; no errors. Same tips as Chromium. |
+| 2026-10-31 | Unreleased | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | New screens open; no errors. |
 
 All six runs produced identical tips, so the simulation is deterministic across engines.
 
