@@ -950,3 +950,15 @@ test('telegraph: a typical ride reports the petals the gust took, and a three-de
   assert.equal(S.deliveries, 3);
   assert.equal(S.stars.length, 3, 'each delivery gets a star rating');
 });
+
+test('sanity: no ride on any route trips the non-finite guard (no silent respawns)', () => {
+  const routes = ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill'];
+  for (const build of routes) {
+    for (const profile of ['careful', 'typical', 'fast', 'reckless']) {
+      const { w, events } = rideProfile(profile, 150, build);
+      const bad = events.filter((e) => e.type === 'SANITY');
+      assert.equal(bad.length, 0, `${build} / ${profile}: the physics guard fired ${bad.length} time(s)`);
+      assert.ok(Number.isFinite(w.cargo.amount), `${build} / ${profile}: cargo stays finite`);
+    }
+  }
+});
