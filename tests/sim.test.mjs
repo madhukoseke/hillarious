@@ -881,3 +881,46 @@ test('records: best-tip records are versioned, and corrupt saves are dropped', (
   assert.deepEqual(plain(H.cleanBest({ tip: 5, time: 40 })), { v: 1, tip: 5, condition: 0, time: 40 }, 'legacy record reads with defaults');
   assert.deepEqual(plain(H.cleanBest({ v: 1, tip: 5, condition: 88, time: 40 })), { v: 1, tip: 5, condition: 88, time: 40 });
 });
+
+test('bouquet prototype: wind sheds petals only at speed, rough hits knock petals loose, unbreakable keeps them', () => {
+  const H = loadGame();
+  const still = { vx: 0, vy: 0, w: 0, a: 0 }, moving = { vx: 9, vy: 0, w: 0, a: 0 };
+  const calm = new H.BouquetCargo();
+  for (let i = 0; i < 1200; i++) calm.update(1 / 120, moving, false, 1);
+  assert.equal(calm.amount, 100, 'light air sheds nothing');
+  const gusty = new H.BouquetCargo();
+  for (let i = 0; i < 1200; i++) gusty.update(1 / 120, still, false, -6);
+  assert.equal(gusty.amount, 100, 'a gust does nothing when the rider is stopped');
+  const windy = new H.BouquetCargo();
+  for (let i = 0; i < 1200; i++) windy.update(1 / 120, moving, false, -6);
+  assert.ok(windy.amount < 100 && windy.amount > 0, 'a gust at speed sheds petals');
+  const soft = new H.BouquetCargo();
+  assert.equal(soft.splash(H.BOUQUET.landMin, 1, false), 0, 'a soft landing costs nothing');
+  const hard = new H.BouquetCargo();
+  assert.ok(hard.splash(H.BOUQUET.landMin + 4, 1, false) > 0, 'a rough landing costs petals');
+  const frozen = new H.BouquetCargo();
+  frozen.update(5, moving, true, -8); frozen.splash(20, 1, true); frozen.bump(12, true);
+  assert.equal(frozen.amount, 100, 'unbreakable cargo keeps every petal');
+  const crash = new H.BouquetCargo();
+  const lost = crash.crashLoss(5);
+  assert.equal(lost, H.BOUQUET.crashBase + H.BOUQUET.crashExtra, 'a crash costs a fixed amount, capped at 1');
+  assert.equal(crash.amount, 100 - lost);
+  crash.crashLoss(1); crash.crashLoss(1); crash.crashLoss(1);
+  assert.equal(crash.amount, 0, 'repeated crashes never go below zero');
+  assert.equal(crash.crashLoss(1), 0, 'an empty bouquet loses nothing more');
+});
+
+test('telegraph hill: the bouquet route is a valid course, the gust sheds petals, and a typical rider finishes it', () => {
+  const C = H.buildTelegraphHill();
+  for (let x = C.terrain.minX; x <= C.terrain.maxX; x += 0.5) assert.ok(Number.isFinite(C.terrain.height(x)), `non-finite terrain at x=${x}`);
+  assert.equal(C.cargo, 'bouquet');
+  assert.ok(C.gusts.length === 1 && C.gusts[0].wind < -H.BOUQUET.windMin, 'one gust zone stronger than the petals can hold');
+  const w = new H.World(C);
+  assert.equal(w.windAt(C.gusts[0].x0 + 1), -6, 'the gust blows inside its zone');
+  assert.equal(w.windAt(C.gusts[0].x1 + 5), 0, 'and nowhere else');
+  assert.equal(w.cargo.kind, 'bouquet', 'the world picks the bouquet cargo');
+  const { r } = rideProfile('typical', 150, 'buildTelegraphHill');
+  assert.ok(r.condition < 100, 'the gust costs petals on the way down');
+  assert.ok(r.condition > 0, 'a typical ride keeps some petals');
+  assert.ok(r.crashes === 0 && r.time > 0, 'a typical ride finishes without a crash');
+});

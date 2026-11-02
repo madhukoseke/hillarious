@@ -853,6 +853,39 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   // Delivery 2: across Russian Hill, from Jones St down to a garden wedding below Lombard Street.
+  // Telegraph Hill (1.4 prototype, not in the shift yet): a steep block with one exposed downhill gust zone.
+  // The gust blows against the rider; bouquet petals go first when it catches them at speed.
+  function buildTelegraphHill() {
+    const C = emptyCourse('telegraph');
+    Object.assign(C, { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 26, seed: 2027 });
+    const b = new CourseBuilder(-60, 0);
+    b.straight(60);
+    C.start = 3;
+    C.park = { x0: -60, x1: 1 };
+    C.intersections.push({ x0: 3, x1: 12, name: 'KEARNY ST' });
+    b.ease(-0.14, 6);
+    const gust0 = b.x; b.straight(40); C.gusts = [{ x0: gust0, x1: b.x, wind: -6 }];
+    b.ease(0, 5);
+    const lipA = b.x + 2; b.straight(4); b.ease(0.07, 1.2); b.ease(-0.1, 1.2);
+    C.lips.push({ x: lipA, big: false });
+    b.straight(40); b.ease(0, 6);
+    b.pothole(b.x + 6, 1.0, 0.22);
+    b.straight(120);
+    const fin = b.x; b.straight(90);
+    C.finishX = fin + 6; C.doorX = fin + 18;
+    C.venue = { x0: fin + 7, x1: fin + 34, arch: fin + 18 };
+    C.terrain = b.build();
+    C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
+    C.checkpoints = [C.start, gust0 + 10, lipA + 2, fin - 10].map((x) => ({ x }));
+    C.hints = [{ x: gust0 - 12, id: 'pedal', actions: ['brake'], text: 'Gust on the downhill. Petals go first. Ease off!' }];
+    C.customer = {
+      name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
+      order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',
+      messages: ['Every petal counts. Do not let the wind win.', 'Gusts are not an excuse. Well, a little.'],
+    };
+    return C;
+  }
+
   function buildRussianHill() {
     const C = emptyCourse('russianHill');
     Object.assign(C, { index: 2, title: 'THE WEDDING CAKE', hood: 'RUSSIAN HILL', street: 'GREEN', theme: 'russian', cargo: 'cake', par: 48, seed: 2026, streetTrees: true });
@@ -1638,6 +1671,46 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
   }
 
+  // Bouquet (Telegraph Hill, 1.4 prototype): no liquid or swinging mass. Petals are lost to gusts at speed, rough
+  // landings, bumps, and crashes. Same interface as the other cargo; `update` also takes the wind for the gust rule.
+  const BOUQUET = { windMin: 2.5, windRate: 1.4, windSpeed: 8, landMin: 6, landPct: 3, bumpMin: 2, bumpPct: 0.8, crashBase: 12, crashExtra: 20 };
+  class BouquetCargo {
+    constructor() { this.kind = 'bouquet'; this.amount = 100; this.shield = false; this.events = []; this.resetSlosh(); }
+    refill() { this.amount = 100; this.resetSlosh(); }
+    resetSlosh() { this.spilling = 0; }
+    get condition() { return this.amount; }
+    get slosh() { return 0; }   // no liquid; the world's finite check reads these
+    get sloshV() { return 0; }
+    update(dt, b, frozen, wind = 0) {
+      let dmg = 0;
+      const gust = Math.max(0, Math.abs(wind) - BOUQUET.windMin) * Math.min(1, Math.abs(b.vx) / BOUQUET.windSpeed);
+      if (gust > 0 && !frozen) dmg += gust * BOUQUET.windRate * dt;
+      dmg = Math.min(this.amount, dmg);
+      this.amount -= dmg;
+      this.spilling = dmg > 0 ? Math.min(1, this.spilling + dt * 8) : Math.max(0, this.spilling - dt * 3);
+      return dmg;
+    }
+    splash(impact, rel, frozen) {
+      if (impact <= BOUQUET.landMin || frozen) return 0;
+      const amt = absorbHit(this, Math.min(this.amount, (impact - BOUQUET.landMin) * BOUQUET.landPct));
+      this.amount -= amt;
+      return amt;
+    }
+    bump(speed, frozen) {
+      if (frozen) return 0;
+      const amt = absorbHit(this, Math.min(this.amount, Math.max(0, speed - BOUQUET.bumpMin) * BOUQUET.bumpPct));
+      this.amount -= amt;
+      return amt;
+    }
+    kick() { /* petals do not swing */ }
+    crashLoss(sev) {
+      const lost = absorbHit(this, Math.min(this.amount, BOUQUET.crashBase + BOUQUET.crashExtra * clamp(sev, 0, 1)));
+      this.amount -= lost;
+      this.resetSlosh();
+      return lost;
+    }
+  }
+
   /* =====================================================================
    * 7. OBSTACLES: potholes and stairs (terrain), cones, power-ups, the parked
    *    Maybe-Mo and its plank, construction ramps, and cross traffic: cable cars
@@ -2292,7 +2365,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     constructor(course, opts) {
       this.course = course; this.terrain = course.terrain; this.opts = opts || {};
       this.bike = new Bike();
-      this.cargo = course.cargo === 'cake' ? new CakeCargo() : new CoffeeCargo();
+      this.cargo = course.cargo === 'cake' ? new CakeCargo() : course.cargo === 'bouquet' ? new BouquetCargo() : new CoffeeCargo();
       this.score = new Score(course.par, this.cargo.kind);
       this.obstacles = new Obstacles(this);
       this.events = []; this.t = 0; this.state = 'riding'; this.cpIndex = 0; this.crashT = 0; this.invuln = 0;
@@ -2367,7 +2440,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'riding': {
           b.step(dt, inp, this, this.t);
           if (this.state !== 'riding') break;
-          this.trackDamage(this.cargo.update(dt, b, !!this.opts.unbreakable), dt);
+          this.trackDamage(this.cargo.update(dt, b, !!this.opts.unbreakable, this.windAt(b.x)), dt);
           this.drainCargo();
           this.score.time += dt;
           this.obstacles.update(dt);
@@ -2552,6 +2625,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.obstacles.onRespawn(x); this.obstacles.resetProps();
       this.emit('LAP', { laps: this.laps, x });
     }
+    windAt(x) { for (const g of this.course.gusts || []) if (x >= g.x0 && x <= g.x1) return g.wind; return 0; }
     result() {
       const s = this.score, C = this.course, O = this.obstacles;
       const stats = { condition: this.cargo.amount, time: s.time, par: s.par, crashes: s.crashes, nearMisses: s.nearMisses, cleanLandings: s.cleanLandings, kind: this.cargo.kind };
@@ -2666,8 +2740,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill,
-    buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, World, Score,
+    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill,
+    buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, BOUQUET, World, Score,
     computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,

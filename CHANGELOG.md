@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- Bouquet cargo engine (not yet in the shift): a fragile bouquet that sheds petals in gusts at speed and when it lands roughly or crashes. Unbreakable cargo keeps every petal.
+- Telegraph Hill course (engine only, not yet on the Dispatch board or in the shift), with one exposed gust zone.
+
 ### Fixed
 - The save-your-score form on the final review is more compact on landscape phones, so less of the review needs scrolling to reach it.
 - Corrupt or half-written best-tip records are ignored instead of breaking the receipt or Dispatch board.
