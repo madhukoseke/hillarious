@@ -924,3 +924,12 @@ test('telegraph hill: the bouquet route is a valid course, the gust sheds petals
   assert.ok(r.condition > 0, 'a typical ride keeps some petals');
   assert.ok(r.crashes === 0 && r.time > 0, 'a typical ride finishes without a crash');
 });
+
+test('cargo words: every cargo has its own labels, and unknown kinds fall back to the latte', () => {
+  const H = loadGame();
+  assert.equal(H.cargoWords('bouquet').condition, 'Petals left');
+  assert.equal(H.cargoWords('bouquet').lost, 'Petals lost');
+  assert.equal(H.cargoWords('cake').name, 'CAKE');
+  assert.equal(H.cargoWords('coffee').unit, '% latte');
+  assert.equal(H.cargoWords('mystery').name, 'LATTE', 'unknown kinds fall back to the latte');
+});

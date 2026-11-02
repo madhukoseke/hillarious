@@ -1002,7 +1002,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     C.park = { x0: -70, x1: 2 };
     C.customer = Object.assign({}, PAT, {
       order: D ? 'DRILL ' + (DRILLS.indexOf(D) + 1) + ' OF ' + DRILLS.length + ' · ' + D.title : C.title,
-      cargoLabel: C.cargo === 'cake' ? 'Cake integrity' : 'Coffee remaining',
+      cargoLabel: cargoWords(C.cargo).condition,
     }, cfg.customer);
     return C;
   }
@@ -1674,6 +1674,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   // Bouquet (Telegraph Hill, 1.4 prototype): no liquid or swinging mass. Petals are lost to gusts at speed, rough
   // landings, bumps, and crashes. Same interface as the other cargo; `update` also takes the wind for the gust rule.
   const BOUQUET = { windMin: 2.5, windRate: 1.4, windSpeed: 8, landMin: 6, landPct: 3, bumpMin: 2, bumpPct: 0.8, crashBase: 12, crashExtra: 20 };
+  // Player-facing words for each cargo, so labels and HUD text stay in step.
+  const CARGO_WORDS = {
+    coffee: { name: 'LATTE', unit: '% latte', condition: 'Coffee remaining', lost: 'Coffee lost' },
+    cake: { name: 'CAKE', unit: '% cake', condition: 'Cake integrity', lost: 'Cake damage' },
+    bouquet: { name: 'BOUQUET', unit: '% petals', condition: 'Petals left', lost: 'Petals lost' },
+  };
+  function cargoWords(kind) { return CARGO_WORDS[kind] || CARGO_WORDS.coffee; }
+
   class BouquetCargo {
     constructor() { this.kind = 'bouquet'; this.amount = 100; this.shield = false; this.events = []; this.resetSlosh(); }
     refill() { this.amount = 100; this.resetSlosh(); }
@@ -1973,7 +1981,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const r2 = (v) => Math.round(v * 100) / 100;
     const items = [{ label: 'Base tip', amount: 5 }];
     const cargoCut = r2(-4.25 * (1 - cond / 100));
-    if (cargoCut < 0) items.push({ label: s.kind === 'cake' ? 'Cake damage' : 'Coffee lost', amount: cargoCut });
+    if (cargoCut < 0) items.push({ label: cargoWords(s.kind).lost, amount: cargoCut });
     if (s.crashes > 0) items.push({ label: 'Crashes', amount: r2(-Math.min(2, s.crashes * 0.5)) });
     const late = Math.max(0, time - par);
     if (late > 0) items.push({ label: 'Late', amount: r2(-Math.min(2, late * 0.08)) });
@@ -2746,7 +2754,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
-    buildDrillStairs, buildDrillCable, buildDrillExam,
+    buildDrillStairs, buildDrillCable, buildDrillExam, cargoWords,
   };
   root.HILL = HILL;
   if (HEADLESS || typeof document === 'undefined') return;
@@ -3325,7 +3333,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     ctx.fillStyle = '#6c6972'; ctx.beginPath(); ctx.arc(BB.x, BB.y, 0.05, 0, TAU); ctx.fill();
     if (P.cake) drawCakeOnRack(ctx, P.cake, t);
     ctx.fillStyle = COL.basketDark; rrect(ctx, 0.44, -0.18, 0.4, 0.2, 0.03); ctx.fill();
-    if (!P.cake) { drawCup(ctx, P.cargo, t); if (P.shield) drawBubbleWrap(ctx, 0.43, -0.16, 0.42, 0.62, t); }
+    if (!P.cake) { if (P.bouquet) drawBouquet(ctx, P.bouquet, t); else drawCup(ctx, P.cargo, t); if (P.shield) drawBubbleWrap(ctx, 0.43, -0.16, 0.42, 0.62, t); }
     ctx.fillStyle = COL.basket; rrect(ctx, 0.44, -0.18, 0.4, 0.13, 0.03); ctx.fill();
     ctx.strokeStyle = COL.basketDark; ctx.lineWidth = 0.012;
     for (let i = 1; i < 6; i++) line(ctx, 0.44 + i * 0.066, -0.18, 0.44 + i * 0.066, -0.05);
@@ -3911,6 +3919,28 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     drawCakeShape(ctx, cake, t, true);
     ctx.restore();
   }
+  // Bouquet in the basket: one bloom per 20% of petals left, so losses show as bare stems.
+  function drawBouquet(ctx, bq, t) {
+    ctx.save(); ctx.translate(0.63, -0.1); ctx.rotate(bq.tilt || 0);
+    const blooms = Math.max(0, Math.ceil(bq.amount / 20)), sway = Math.sin(t * 3) * 0.02;
+    const heads = [[-0.1, 0.42], [-0.02, 0.5], [0.07, 0.44], [0, 0.36], [-0.12, 0.34]];
+    ctx.strokeStyle = '#4f8a5b'; ctx.lineWidth = 0.018;
+    heads.forEach(([x, y]) => line(ctx, 0, 0.02, x + sway, y - 0.03));
+    heads.forEach(([x, y], i) => {
+      if (i >= blooms) return;
+      ctx.fillStyle = '#f29ab0';
+      for (let k = 0; k < 5; k++) { const a = k * TAU / 5 + i; ctx.beginPath(); ctx.arc(x + sway + Math.cos(a) * 0.035, y + Math.sin(a) * 0.035, 0.03, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#f2b33d'; ctx.beginPath(); ctx.arc(x + sway, y, 0.018, 0, TAU); ctx.fill();
+    });
+    ctx.fillStyle = '#d64545'; rrect(ctx, -0.14, 0, 0.28, 0.05, 0.02); ctx.fill();
+    ctx.restore();
+  }
+  function drawFlyingBouquet(ctx, x, y, a) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.translate(0, -0.25);
+    ctx.fillStyle = '#f29ab0';
+    for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(Math.cos(i * 1.7) * 0.2, Math.sin(i * 2.3) * 0.15, 0.05, 0.03, i, 0, TAU); ctx.fill(); }
+    ctx.restore();
+  }
 
   /* ---------- 19. SCENERY (seeded, per course) ---------- */
   const ACCENTS = ['#6b4f7a', '#3f6f73', '#b8564a', '#5b7d4a', '#a8702f', '#4a5f8a'];
@@ -4363,10 +4393,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       P.lean = b.lean; P.brake = b.brakeIn ? clamp(sp / 8, 0, 1) : 0;
       P.stand = clamp(clamp((sp - 11) / 6, 0, 1) * (b.grounded ? 1 : 0.5) + (b.airTime > 0.25 ? 0.4 : 0), 0, 1);
       P.bob = (b.grounded ? Math.sin(game.time * 9) * 0.006 * clamp(sp / 8, 0, 1) : 0.02) - (b.wheels[0].comp - SAG) * 0.25;
-      const cake = c.kind === 'cake';
-      if (!cake) { cg.slosh = c.slosh; cg.sloshV = c.sloshV; cg.tilt = c.tilt; cg.level = c.level(); cg.float = c.float; }
-      P.cargo = cg; P.cake = cake ? c : null; P.shield = c.shield; P.bellRing = game.bellT > 0 ? Math.abs(Math.sin(game.bellT * 30)) : 0;
-      const worried = cake ? Math.abs(c.angle) > 0.22 || c.spilling > 0.2 : Math.abs(c.slosh) > c.thr * 0.72 || c.spilling > 0.2;
+      const cake = c.kind === 'cake', bouquet = c.kind === 'bouquet';
+      if (!cake && !bouquet) { cg.slosh = c.slosh; cg.sloshV = c.sloshV; cg.tilt = c.tilt; cg.level = c.level(); cg.float = c.float; }
+      P.cargo = cg; P.cake = cake ? c : null; P.bouquet = bouquet ? c : null; P.shield = c.shield; P.bellRing = game.bellT > 0 ? Math.abs(Math.sin(game.bellT * 30)) : 0;
+      const worried = cake ? Math.abs(c.angle) > 0.22 || c.spilling > 0.2 : bouquet ? c.spilling > 0.2 : Math.abs(c.slosh) > c.thr * 0.72 || c.spilling > 0.2;
       P.expr = world.state === 'done' ? 'joy' : !b.grounded && b.airTime > 0.18 ? 'wow' : b.brakeIn && sp > 6 ? 'grit' : worried ? 'worried' : sp > 13 ? 'grin' : 'smile';
       this.look.x = worried ? (cake ? -1 : 0.6) : 1; this.look.y = worried ? -0.8 : 0;
       P.look = this.look; P.scarf = null;
@@ -4389,7 +4419,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         for (let i = 0; i < S.n; i++) { const dx = S.x[i] - P.x, dy = S.y[i] - P.y; L.x[i] = dx * ca + dy * sa; L.y[i] = -dx * sa + dy * ca; }
         P.scarf = L;
       }
-      if (b.crashed && world.cup.on) { P.cargo = EMPTY_CUP; P.cake = null; P.shield = false; }
+      if (b.crashed && world.cup.on) { P.cargo = EMPTY_CUP; P.cake = null; P.bouquet = null; P.shield = false; }
       ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.a);
       if (rider) drawBikeBack(ctx, P, pose);
       drawBikeBody(ctx, P, game.time);
@@ -4401,7 +4431,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       if (world.cup.on) {
         const c = world.cup, x = lerp(c.px, c.x, alpha), y = lerp(c.py, c.y, alpha), a = lerpAngle(c.pa, c.a, alpha);
-        if (world.cargo.kind === 'cake') drawFlyingCake(ctx, x, y, a, world.cargo, game.time); else drawFlyingCup(ctx, x, y, a);
+        if (world.cargo.kind === 'cake') drawFlyingCake(ctx, x, y, a, world.cargo, game.time);
+        else if (world.cargo.kind === 'bouquet') drawFlyingBouquet(ctx, x, y, a);
+        else drawFlyingCup(ctx, x, y, a);
       }
     }
   }
@@ -4651,7 +4683,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         top.append(mk('b', '', C.title));
         const stars = mk('span', 'order-stars'), met = goals.filter(Boolean).length;
         this.starsHtml(stars, met, 3, met + ' of 3 goals'); top.append(stars);
-        const cargo = C.cargo === 'cake' ? 'CAKE' : 'LATTE';
+        const cargo = cargoWords(C.cargo).name;
         const sub = mk('div', 'order-sub', C.hood + ' · ' + cargo + ' · PAR ' + fmtTime(C.par).replace(/\.0$/, ''));
         const req = s.requires && ROUTES.find((r) => r.id === s.requires);
         const line = s.state === 'locked' ? 'Deliver ' + this.courseFor(req.id).title + ' to unlock'
@@ -4740,7 +4772,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     pause() {
       if (this.state !== 'riding') return;
       this.state = 'paused'; this.audio.update(null, false); this.audio.setMusic(null);
-      document.getElementById('pause-line').textContent = this.mode === 'drill' ? 'Pat from HR is timing this pause.' : this.world.cargo.kind === 'cake' ? 'The cake is sweating. And judgmental.' : 'The latte is getting cold. And judgmental.';
+      document.getElementById('pause-line').textContent = this.mode === 'drill' ? 'Pat from HR is timing this pause.' : this.world.cargo.kind === 'cake' ? 'The cake is sweating. And judgmental.' : this.world.cargo.kind === 'bouquet' ? 'The petals are holding on. Barely. And judgmental.' : 'The latte is getting cold. And judgmental.';
       document.getElementById('pause-restart').textContent = { drill: 'RESTART DRILL', free: 'RESTART RIDE' }[this.mode] || 'RESTART DELIVERY';
       this.syncMute();
       this.show('pause');
@@ -4764,7 +4796,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       $('rv-name').textContent = cu.name + ' · ' + cu.role.split(',')[0];
       if (drill) { this.starsHtml($('rv-stars'), stamp, 3, 'Stamp: ' + STAMPS[stamp]); $('rv-quote').textContent = PAT_VERDICTS[stamp]; }
       else { this.starsHtml($('rv-stars'), rv.stars, 5, rv.stars + ' out of 5 stars'); $('rv-quote').textContent = rv.text; }
-      $('rv-cond-label').textContent = cake ? 'Cake integrity' : 'Coffee remaining';
+      $('rv-cond-label').textContent = cargoWords(r.kind).condition;
       $('rv-cond').textContent = Math.round(r.condition) + '%' + (cake && r.decorLeft !== null ? ' · ' + r.decorLeft + '/' + CAKE_DECOR.length + ' decor' : '');
       $('rv-time-label').textContent = drill ? 'Drill time' : mode === 'free' ? 'Ride time' : 'Delivery time';
       $('rv-time').textContent = fmtTime(r.time);
@@ -5092,7 +5124,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.audio.play('decor');
     }
     onEvent(e) {
-      const A = this.audio, P = this.particles, W = this.world, cake = W.cargo.kind === 'cake', unit = cake ? '% cake' : '% latte';
+      const A = this.audio, P = this.particles, W = this.world, cake = W.cargo.kind === 'cake', unit = cargoWords(W.cargo.kind).unit;
       switch (e.type) {
         case 'HOP':
           A.play('hop');
@@ -5388,6 +5420,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
     }
+    drawBouquetIcon(ctx, x, y, h, frac) { // one bloom per 20% of petals left
+      const n = Math.max(0, Math.ceil(frac * 5));
+      ctx.strokeStyle = '#4f8a5b'; ctx.lineWidth = Math.max(1, h * 0.07);
+      line(ctx, x, y + h * 0.45, x, y + h * 0.05);
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + (i - (n - 1) / 2) * 0.7;
+        ctx.fillStyle = '#f29ab0'; ctx.beginPath(); ctx.arc(x + Math.cos(a) * h * 0.36, y + h * 0.2 + Math.sin(a) * h * 0.3, h * 0.17, 0, TAU); ctx.fill();
+      }
+    }
     drawCakeIcon(ctx, x, y, h, frac) { // tiers vanish as integrity drops
       const tiers = [[0.95, 0.34], [0.7, 0.3], [0.46, 0.27]], left = frac > 0.66 ? 3 : frac > 0.33 ? 2 : frac > 0 ? 1 : 0;
       let yy = y + h;
@@ -5430,13 +5471,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.beginPath(); ctx.moveTo(bx + bw + u * 0.42, by - u * 0.55); ctx.lineTo(bx + bw + u * 1.2, by - u * 0.3); ctx.lineTo(bx + bw + u * 0.42, by - u * 0.05); ctx.fill();
       ctx.textAlign = 'center'; ctx.font = '800 ' + (u * 0.8).toFixed(1) + 'px ' + FONT_BODY;
       const left = Math.max(0, Math.round(endX - W.bike.x));
-      const label = left + (C.loop ? ' m to the bottom' : this.mode === 'drill' ? ' m to the Academy' : C.id === 'russianHill' ? ' m to the wedding' : ' m to the latte drop');
+      const label = left + (C.loop ? ' m to the bottom' : this.mode === 'drill' ? ' m to the Academy' : C.id === 'russianHill' ? ' m to the wedding' : C.cargo === 'bouquet' ? ' m to the bouquet drop' : ' m to the latte drop');
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,246,229,0.9)'; ctx.strokeText(label, Wd / 2, by + u * 1.45);
       ctx.fillStyle = 'rgba(45,42,50,0.9)'; ctx.fillText(label, Wd / 2, by + u * 1.45);
       const rw = u * 9.2, rx = Wd - pad - rw;
       panel(rx, pad, rw, u * 3.6);
       const cond = W.cargo.amount;
       if (cake) this.drawCakeIcon(ctx, rx + u * 1.5, pad + u * 0.5, u * 2.6, cond / 100);
+      else if (W.cargo.kind === 'bouquet') this.drawBouquetIcon(ctx, rx + u * 1.5, pad + u * 0.55, u * 2.4, cond / 100);
       else this.drawCupIcon(ctx, rx + u * 1.5, pad + u * 0.55, u * 2.4, cond / 100);
       ctx.textAlign = 'left'; ctx.fillStyle = cond < 30 ? COL.coral : COL.ink;
       ctx.font = '900 ' + (u * 1.45).toFixed(1) + 'px ' + FONT_DISPLAY;
@@ -5572,11 +5614,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // Free Ride physics overlay: speed, air and a slosh (or wobble) meter under the HUD, and where an airborne bike will land.
     drawOverlay(W, u) {
       const R = this.R, ctx = R.ctx, b = W.bike, c = W.cargo, cake = c.kind === 'cake', x = this.input.touchMode ? u * 5.2 : u * 0.9, y = u * 5.0, w = u * 13.5, h = u * 3.4;
-      const sp = Math.hypot(b.vx, b.vy), slosh = cake ? Math.abs(c.angle) / CAKE.maxAngle : Math.abs(c.slosh) / Math.max(0.05, c.thr);
+      const bouquet = c.kind === 'bouquet', sp = Math.hypot(b.vx, b.vy);
+      const slosh = cake ? Math.abs(c.angle) / CAKE.maxAngle : bouquet ? (100 - c.amount) / 100 : Math.abs(c.slosh) / Math.max(0.05, c.thr);
       ctx.fillStyle = 'rgba(45,42,50,0.82)'; rrect(ctx, x, y, w, h, u * 0.6); ctx.fill();
       ctx.fillStyle = COL.cream; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + (u * 0.78).toFixed(1) + 'px ' + FONT_MONO;
       ctx.fillText('SPEED ' + sp.toFixed(1) + ' m/s · AIR ' + (b.grounded ? '0.00' : b.airTime.toFixed(2)) + ' s', x + u * 0.6, y + u * 0.8);
-      ctx.fillText((cake ? 'WOBBLE ' : 'SLOSH ') + Math.round(slosh * 100) + '%', x + u * 0.6, y + u * 1.75);
+      ctx.fillText((cake ? 'WOBBLE ' : bouquet ? 'PETALS LOST ' : 'SLOSH ') + Math.round(slosh * 100) + '%', x + u * 0.6, y + u * 1.75);
       ctx.fillStyle = 'rgba(255,246,229,0.25)'; rrect(ctx, x + u * 0.6, y + u * 2.35, w - u * 1.2, u * 0.5, u * 0.25); ctx.fill();
       ctx.fillStyle = slosh > 1 ? COL.coral : slosh > 0.7 ? COL.mustard : '#9fe0a8'; rrect(ctx, x + u * 0.6, y + u * 2.35, (w - u * 1.2) * clamp(slosh, 0, 1), u * 0.5, u * 0.25); ctx.fill();
       if (b.grounded || W.state !== 'riding') return;
@@ -5594,6 +5637,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         'pitch ' + (b.a * 57.3).toFixed(1) + '°  w ' + b.w.toFixed(2) + '  air ' + b.airTime.toFixed(2),
         'contact R/F ' + (b.wheels[0].contact ? 1 : 0) + '/' + (b.wheels[1].contact ? 1 : 0) + '  comp ' + b.wheels[0].comp.toFixed(3) + '/' + b.wheels[1].comp.toFixed(3),
         c.kind === 'cake' ? 'cake angle ' + c.angle.toFixed(2) + '  w ' + c.angVel.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  integrity ' + c.amount.toFixed(1) + '%'
+          : c.kind === 'bouquet' ? 'petals ' + c.amount.toFixed(1) + '%  spilling ' + c.spilling.toFixed(2)
           : 'slosh ' + c.slosh.toFixed(2) + '  thr ' + c.thr.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  latte ' + c.amount.toFixed(1) + '%',
       ];
       ctx.font = '600 12px ' + FONT_MONO; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
