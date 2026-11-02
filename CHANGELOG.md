@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 - A third delivery, THE BOUQUET, from Telegraph Hill. Ruth's fragile bouquet sheds petals in an exposed downhill gust and when it lands roughly or crashes. Unbreakable cargo keeps every petal.
+- The Bouquet has its own lines: Ruth reacts to lost petals, and the rider jokes about pothole damage.
 - Three goals for The Bouquet: deliver at least 90% of the petals, lose under 5% to the gust, and beat par with no crashes. Its receipt has its own star lines.
 - The Bouquet is on the Dispatch board after Russian Hill, and START SHIFT now runs all three deliveries.
 

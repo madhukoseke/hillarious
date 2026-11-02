@@ -2307,6 +2307,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // Customer texts (phone channel)
     { id: 'c-gps', trigger: 'CARGO_HALF', speaker: 'customer', text: 'Why does your GPS show you 12 feet above the road?', priority: 3, cargo: 'coffee', duration: 3.6 },
     { id: 'c-tier', trigger: 'CARGO_HALF', speaker: 'customer', text: 'Please tell me the second tier is just running late.', priority: 3, cargo: 'cake', duration: 3.6 },
+    { id: 'b-pot-r', trigger: 'POTHOLE', speaker: 'rider', text: 'Pothole: 1. Petals: 0.', priority: 1, cargo: 'bouquet' },
+    { id: 'b-half-r', trigger: 'CARGO_HALF', speaker: 'rider', text: 'Losing petals, one bloom at a time.', priority: 2, cargo: 'bouquet' },
+    { id: 'b-half-c', trigger: 'CARGO_HALF', speaker: 'customer', text: 'Are those petals or confetti? Be honest.', priority: 3, cargo: 'bouquet', duration: 3.4 },
+    { id: 'b-crash-c', trigger: 'FIRST_CRASH', speaker: 'customer', text: 'Ruth here. I felt the petals leave.', priority: 3, cargo: 'bouquet', duration: 3.2 },
+    { id: 'b-done-c', trigger: 'DELIVERY_COMPLETE', speaker: 'customer', text: 'Every petal? Honestly, the wind is a menace.', priority: 5, cargo: 'bouquet', duration: 2.6 },
     { id: 'c-slow1', trigger: 'PLAYER_SLOW', speaker: 'customer', text: 'My meeting about meetings ended. Where are you?', priority: 2, delivery: 1, duration: 3.4 },
     { id: 'c-slow2', trigger: 'PLAYER_SLOW', speaker: 'customer', text: 'The string quartet is improvising. Hurry.', priority: 2, delivery: 2, duration: 3.4 },
     { id: 'c-crash1', trigger: 'FIRST_CRASH', speaker: 'customer', text: 'Was that you? The whole building felt that.', priority: 3, delivery: 1, duration: 3.2 },

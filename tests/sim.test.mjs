@@ -962,3 +962,12 @@ test('sanity: no ride on any route trips the non-finite guard (no silent respawn
     }
   }
 });
+
+test('dialogue: the bouquet has its own rider and customer lines, and latte or cake lines never play for it', () => {
+  const hm = new H.HumorEngine(H.DIALOGUE), all = () => ({});
+  hm.reset({ delivery: 3, cargo: 'bouquet' });
+  assert.equal(hm.offer('POTHOLE', 0, all)[0].line.text, 'Pothole: 1. Petals: 0.');
+  const half = hm.offer('CARGO_HALF', 10, all).map((o) => o.line.cargo);
+  assert.ok(half.length > 0 && half.every((c) => c === 'bouquet'), 'half-loss lines are bouquet lines');
+  for (const L of H.DIALOGUE) if (L.cargo && L.cargo !== 'bouquet') assert.notEqual(L.cargo, 'bouquet');
+});
