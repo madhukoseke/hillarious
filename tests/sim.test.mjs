@@ -697,10 +697,10 @@ test('physics: pedaling turns the cranks the same way as the rolling wheels (no 
 const plain = (o) => JSON.parse(JSON.stringify(o)); // VM objects -> plain objects for deepEqual
 
 test('routes: the shift order and unlock chain come from one list', () => {
-  assert.deepEqual(plain(H.ROUTES.map((r) => r.id)), ['nobHill', 'russianHill']);
-  assert.deepEqual(plain(H.ROUTES.map((r) => r.requires)), [null, 'nobHill']);
+  assert.deepEqual(plain(H.ROUTES.map((r) => r.id)), ['nobHill', 'russianHill', 'telegraph']);
+  assert.deepEqual(plain(H.ROUTES.map((r) => r.requires)), [null, 'nobHill', 'russianHill']);
   for (const r of H.ROUTES) assert.equal(r.build().id, r.id, `${r.id} builds its own course`);
-  assert.ok(H.COMING_SOON.length >= 1 && H.COMING_SOON.every((c) => c.title && c.hood && c.note));
+  assert.ok(H.COMING_SOON.every((c) => c.title && c.hood && c.note), 'teasers, if any, carry a title, hood and note');
 });
 
 test('progress: migration reads legacy bests and survives corrupt saves', () => {
@@ -721,17 +721,17 @@ test('progress: migration reads legacy bests and survives corrupt saves', () => 
 test('progress: deliveries unlock in order; locks never hide a route already delivered', () => {
   const states = (p, all) => plain(H.unlockState(H.ROUTES, p, all).map((s) => s.state));
   const fresh = H.migrateProgress(null, null);
-  assert.deepEqual(states(fresh), ['new', 'locked']);
-  assert.deepEqual(states(fresh, true), ['new', 'new'], '?unlock=all opens everything');
+  assert.deepEqual(states(fresh), ['new', 'locked', 'locked']);
+  assert.deepEqual(states(fresh, true), ['new', 'new', 'new'], '?unlock=all opens everything');
   const after = H.applyRun(fresh, 'single', 'nobHill', { goals: [false, true, false] });
-  assert.deepEqual(states(after), ['delivered', 'new']);
+  assert.deepEqual(states(after), ['delivered', 'new', 'locked']);
   assert.deepEqual(plain(H.newlyUnlocked(H.unlockState(H.ROUTES, fresh), H.unlockState(H.ROUTES, after))), ['russianHill']);
   // A cake delivered through ?delivery=2 without the latte still shows as delivered.
-  assert.deepEqual(states(H.migrateProgress({ delivered: { russianHill: 1 } }, null)), ['new', 'delivered']);
+  assert.deepEqual(states(H.migrateProgress({ delivered: { russianHill: 1 } }, null)), ['new', 'delivered', 'new']);
   const mastered = H.applyRun(after, 'shift', 'nobHill', { goals: [true, false, true] });
   assert.deepEqual(plain(mastered.goals.nobHill), [true, true, true], 'goals are best-ever, merged across runs');
   assert.equal(mastered.delivered.nobHill, 2);
-  assert.deepEqual(states(mastered), ['mastered', 'new']);
+  assert.deepEqual(states(mastered), ['mastered', 'new', 'locked']);
   assert.equal(fresh.delivered.nobHill, undefined, 'applyRun never changes its input');
 });
 
@@ -932,4 +932,21 @@ test('cargo words: every cargo has its own labels, and unknown kinds fall back t
   assert.equal(H.cargoWords('cake').name, 'CAKE');
   assert.equal(H.cargoWords('coffee').unit, '% latte');
   assert.equal(H.cargoWords('mystery').name, 'LATTE', 'unknown kinds fall back to the latte');
+});
+
+test('telegraph goals: 90% of the petals, under 5% lost to the gust, and par with no crashes', () => {
+  const base = { condition: 95, gustLoss: 2, time: 20, par: 26, crashes: 0 };
+  assert.deepEqual(plain(H.routeGoals('telegraph', base)), [true, true, true]);
+  assert.deepEqual(plain(H.routeGoals('telegraph', { ...base, gustLoss: 8 })), [true, false, true], 'a gust that takes 8% misses the second goal');
+  assert.deepEqual(plain(H.routeGoals('telegraph', { ...base, condition: 85, crashes: 1 })), [false, true, false]);
+});
+
+test('telegraph: a typical ride reports the petals the gust took, and a three-delivery shift summarises', () => {
+  const { r } = rideProfile('typical', 150, 'buildTelegraphHill');
+  assert.ok(Number.isFinite(r.gustLoss) && r.gustLoss > 0, 'the gust loss is recorded');
+  assert.ok(r.gustLoss <= 100 - r.condition + 1e-6, 'gust loss is part of the total petal loss');
+  const nob = rideProfile('typical', 150, 'buildNobHill').r, russ = rideProfile('typical', 160, 'buildRussianHill').r;
+  const S = plain(H.shiftSummary([nob, russ, r]));
+  assert.equal(S.deliveries, 3);
+  assert.equal(S.stars.length, 3, 'each delivery gets a star rating');
 });

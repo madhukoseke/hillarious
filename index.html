@@ -882,6 +882,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
       order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',
       messages: ['Every petal counts. Do not let the wind win.', 'Gusts are not an excuse. Well, a little.'],
+      cargoNote: 'Cargo: one hand-tied bouquet. Petals only.', cargoLabel: 'Petals left',
     };
     return C;
   }
@@ -2014,6 +2015,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { min: 1, stars: 2, text: "It's abstract. We're calling it modern art." },
     { min: 0, stars: 1, text: 'The cake has filed for divorce.' },
   ];
+  const BOUQUET_REVIEWS = [
+    { min: 90, stars: 5, text: 'Every petal, every bloom. She wept. Happily.' },
+    { min: 60, stars: 4, text: 'A few petals short. The wind had opinions.' },
+    { min: 30, stars: 3, text: 'Half a bouquet and a lot of stems.' },
+    { min: 1, stars: 2, text: 'Mostly stems. Very dramatic stems.' },
+    { min: 0, stars: 1, text: 'Ruth asked for a receipt for the petals.' },
+  ];
+  function reviewsFor(kind) { return kind === 'cake' ? CAKE_REVIEWS : kind === 'bouquet' ? BOUQUET_REVIEWS : COFFEE_REVIEWS; }
   function reviewFor(reviews, condition) {
     const c = Math.round(clamp(Number.isFinite(condition) ? condition : 0, 0, 100));
     for (const r of reviews) if (c >= r.min) return r;
@@ -2027,7 +2036,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   };
   function shiftSummary(results) {
     const done = (results || []).filter(Boolean), n = done.length, r2 = (v) => Math.round(v * 100) / 100;
-    const stars = done.map((r) => reviewFor(r.kind === 'cake' ? CAKE_REVIEWS : COFFEE_REVIEWS, r.condition).stars);
+    const stars = done.map((r) => reviewFor(reviewsFor(r.kind), r.condition).stars);
     const sum = (f) => done.reduce((a, r) => a + (Number.isFinite(f(r)) ? f(r) : 0), 0);
     const avgStars = n ? stars.reduce((a, b) => a + b, 0) / n : 0;
     const crashes = sum((r) => r.crashes);
@@ -2094,9 +2103,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const ROUTES = [
     { id: 'nobHill', build: buildNobHill, requires: null },
     { id: 'russianHill', build: buildRussianHill, requires: 'nobHill' },
+    { id: 'telegraph', build: buildTelegraphHill, requires: 'russianHill' },
   ];
-  // Dispatch-board teasers for deliveries that aren't built yet.
-  const COMING_SOON = [{ title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', note: 'Florist still negotiating.' }];
+  // Dispatch-board teasers for deliveries that aren't built yet. Empty now that every route is built.
+  const COMING_SOON = [];
   // Three optional goals per delivery. Each reads only World.result(); meeting all three masters the route.
   const ROUTE_GOALS = {
     nobHill: [
@@ -2107,6 +2117,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     russianHill: [
       { text: 'Deliver at least 90% of the cake', test: (r) => r.condition >= 90 },
       { text: 'Clear the Larkin ramp without a crash', test: (r) => !!r.rampClean },
+      { text: 'Beat par with no crashes', test: (r) => r.time <= r.par && r.crashes === 0 },
+    ],
+    telegraph: [
+      { text: 'Deliver at least 90% of the petals', test: (r) => r.condition >= 90 },
+      { text: 'Lose under 5% of the petals to the gust', test: (r) => r.gustLoss < 5 },
       { text: 'Beat par with no crashes', test: (r) => r.time <= r.par && r.crashes === 0 },
     ],
   };
@@ -2387,7 +2402,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.tq = { pen: 0, px: 0, py: 0, nx: 0, ny: 1, surf: null };
       this.tmp = { x: 0, y: 0 };
       this.zones = (course.stopZones || []).map((z) => ({ x0: z.x0, x1: z.x1, done: false })); // drill STOP boxes
-      this.feats = { bigLipAir: 0, rampCrash: false }; // goal and drill evidence
+      this.feats = { bigLipAir: 0, rampCrash: false, gustLoss: 0 }; // goal and drill evidence
       this.runLog = []; this.laps = 0;                // crashes and spills by position, for "Practice this spot"
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
@@ -2448,7 +2463,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'riding': {
           b.step(dt, inp, this, this.t);
           if (this.state !== 'riding') break;
-          this.trackDamage(this.cargo.update(dt, b, !!this.opts.unbreakable, this.windAt(b.x)), dt);
+          const windDmg = this.cargo.update(dt, b, !!this.opts.unbreakable, this.windAt(b.x));
+          if (this.cargo.kind === 'bouquet') this.feats.gustLoss += windDmg || 0; // petals the gust took, for the goal
+          this.trackDamage(windDmg, dt);
           this.drainCargo();
           this.score.time += dt;
           this.obstacles.update(dt);
@@ -2644,7 +2661,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         stops: this.zones.filter((z) => z.done).length, stopZones: this.zones.length,
         potholesHit: O.potholes.filter((p) => p.hit).length, potholeCount: O.potholes.length,
         bigLipClean: this.feats.bigLipAir > 0, bigLipAir: this.feats.bigLipAir,
-        rampClean: O.ramps.length > 0 && !this.feats.rampCrash, log: this.runLog.slice(),
+        rampClean: O.ramps.length > 0 && !this.feats.rampCrash, gustLoss: this.feats.gustLoss, log: this.runLog.slice(),
       });
     }
     finite() {
@@ -4445,7 +4462,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.debug = this.params.has('debug');
       const ap = this.params.get('autopilot');
       this.autopilotName = ap === null ? null : AUTOPILOT_PROFILES[ap] ? ap : 'typical';
-      this.startIndex = this.params.get('delivery') === '2' ? 1 : 0; // ?delivery=2 jumps straight to the cake
+      this.startIndex = clamp((Number(this.params.get('delivery')) || 1) - 1, 0, ROUTES.length - 1); // ?delivery=2 jumps straight to the cake, ?delivery=3 to the bouquet
       this.unlockAll = this.params.get('unlock') === 'all';          // ?unlock=all opens every order and drill (tests, demos)
       this.reducedMotion = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
       this.store = new Store();
@@ -4784,7 +4801,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.state = 'review'; this.audio.update(null, false); this.audio.setMusic(null);
       const W = this.world, C = W.course, cu = C.customer, r = W.result(), cake = r.kind === 'cake', $ = (id) => document.getElementById(id);
       const mode = this.mode, w = writesFor(mode), drill = mode === 'drill' ? DRILLS.find((D) => D.id === C.id) : null;
-      const rv = reviewFor(cake ? CAKE_REVIEWS : COFFEE_REVIEWS, r.condition);
+      const rv = reviewFor(reviewsFor(r.kind), r.condition);
       if (mode === 'shift') this.results[this.deliveryIndex] = r;
       const routesBefore = unlockState(ROUTES, this.progress, this.unlockAll), drillsBefore = drillStates(DRILLS, this.progress, this.unlockAll);
       const goals = w.delivered ? routeGoals(C.id, r) : [], oldGoals = (this.progress.goals[C.id] || []).slice();

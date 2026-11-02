@@ -28,7 +28,7 @@ No installation or account required. Open the link in a modern browser.
 ## 🕹️ How to play
 
 1. Open the [live game](https://hillarious.pages.dev), or run it locally using the steps below.
-2. Select **START SHIFT** for both deliveries and the HR review, or **DISPATCH** to pick one delivery. Delivering one unlocks the next.
+2. Select **START SHIFT** for all three deliveries and the HR review, or **DISPATCH** to pick one delivery. Delivering one unlocks the next.
 3. Complete deliveries while navigating the hills and traffic.
 4. To practise, open **TRAINING**: work through the drills, or choose **FREE RIDE** to start anywhere with nothing saved. Receipts also offer **Practice this spot** for the stretch that cost you most.
 

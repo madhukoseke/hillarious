@@ -6,8 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
-- Bouquet cargo engine (not yet in the shift): a fragile bouquet that sheds petals in gusts at speed and when it lands roughly or crashes. Unbreakable cargo keeps every petal.
-- Telegraph Hill course (engine only, not yet on the Dispatch board or in the shift), with one exposed gust zone.
+- A third delivery, THE BOUQUET, from Telegraph Hill. Ruth's fragile bouquet sheds petals in an exposed downhill gust and when it lands roughly or crashes. Unbreakable cargo keeps every petal.
+- Three goals for The Bouquet: deliver at least 90% of the petals, lose under 5% to the gust, and beat par with no crashes. Its receipt has its own star lines.
+- The Bouquet is on the Dispatch board after Russian Hill, and START SHIFT now runs all three deliveries.
+
+### Changed
+- `?delivery=3` starts the shift at The Bouquet, the way `?delivery=2` starts the cake.
+- The progress bar says "to the bouquet drop" on the new delivery.
 
 ### Fixed
 - The save-your-score form on the final review is more compact on landscape phones, so less of the review needs scrolling to reach it.
