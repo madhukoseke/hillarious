@@ -1677,11 +1677,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const BOUQUET = { windMin: 2.5, windRate: 1.4, windSpeed: 8, landMin: 6, landPct: 3, bumpMin: 2, bumpPct: 0.8, crashBase: 12, crashExtra: 20 };
   // Player-facing words for each cargo, so labels and HUD text stay in step.
   const CARGO_WORDS = {
-    coffee: { name: 'LATTE', unit: '% latte', condition: 'Coffee remaining', lost: 'Coffee lost' },
-    cake: { name: 'CAKE', unit: '% cake', condition: 'Cake integrity', lost: 'Cake damage' },
-    bouquet: { name: 'BOUQUET', unit: '% petals', condition: 'Petals left', lost: 'Petals lost' },
+    coffee: { name: 'LATTE', short: 'Latte', noun: 'Coffee', unit: '% latte', condition: 'Coffee remaining', lost: 'Coffee lost' },
+    cake: { name: 'CAKE', short: 'Cake', noun: 'Cake', unit: '% cake', condition: 'Cake integrity', lost: 'Cake damage' },
+    bouquet: { name: 'BOUQUET', short: 'Bouquet', noun: 'Bouquet', unit: '% petals', condition: 'Petals left', lost: 'Petals lost' },
   };
-  function cargoWords(kind) { return CARGO_WORDS[kind] || CARGO_WORDS.coffee; }
+  // Unknown or inherited keys (such as "constructor") fall back to the latte, so saves and URLs can't break a label.
+  function cleanCargo(kind) { return Object.prototype.hasOwnProperty.call(CARGO_WORDS, kind) ? kind : 'coffee'; }
+  function cargoWords(kind) { return CARGO_WORDS[cleanCargo(kind)]; }
 
   class BouquetCargo {
     constructor() { this.kind = 'bouquet'; this.amount = 100; this.shield = false; this.events = []; this.resetSlosh(); }
@@ -2772,7 +2774,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, BOUQUET, World, Score,
-    computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
+    cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
@@ -4473,7 +4475,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.store = new Store();
       this.progress = migrateProgress(this.store.get('progress', null), Object.fromEntries(ROUTES.map((r) => [r.id, cleanBest(this.store.get('best:' + r.id, null))])));
       const fc = plainObject(this.store.get('free', null)); // last Free Ride setup, read field by field
-      this.freeCfg = { route: typeof fc.route === 'string' ? fc.route : 'testHill', cp: Math.max(0, Number(fc.cp) | 0), cargo: fc.cargo === 'cake' ? 'cake' : 'coffee',
+      this.freeCfg = { route: typeof fc.route === 'string' ? fc.route : 'testHill', cp: Math.max(0, Number(fc.cp) | 0), cargo: cleanCargo(fc.cargo),
         unbreakable: !!fc.unbreakable, traffic: fc.traffic !== false, slowmo: !!fc.slowmo, overlay: !!fc.overlay };
       this.mode = 'shift'; this.run = null; this.practiceScale = 1; this.freeStats = { bestAir: 0, totalAir: 0 }; this.courseCache = {};
       this.R = new Renderer(document.getElementById('cv'));
@@ -4590,10 +4592,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
-      const shifts = this.store.get('shifts', []), a = cleanBest(this.store.get('best:nobHill', null)), b = cleanBest(this.store.get('best:russianHill', null));
+      const shifts = this.store.get('shifts', []), a = cleanBest(this.store.get('best:nobHill', null)), b = cleanBest(this.store.get('best:russianHill', null)), t = cleanBest(this.store.get('best:telegraph', null));
       if (Array.isArray(shifts) && shifts[0] && Number.isFinite(shifts[0].tips)) parts.push('Best shift ' + fmtMoney(shifts[0].tips) + (shifts[0].name ? ' by ' + shifts[0].name : ''));
       if (a) parts.push('Latte ' + fmtMoney(a.tip) + ' (' + Math.round(a.condition) + '%)');
       if (b) parts.push('Cake ' + fmtMoney(b.tip) + ' (' + Math.round(b.condition) + '%)');
+      if (t) parts.push('Bouquet ' + fmtMoney(t.tip) + ' (' + Math.round(t.condition) + '%)');
       el.textContent = parts.join('  ·  ');
     }
     action(a, data) {
@@ -4634,7 +4637,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (spec.mode === 'drill') return DRILLS.find((D) => D.id === spec.drill).build();
       const R = ROUTES.find((r) => r.id === spec.route), C = R ? R.build() : buildTestHill();
       if (spec.mode === 'free') {
-        if (spec.cargo === 'cake' || spec.cargo === 'coffee') C.cargo = spec.cargo;
+        if (spec.cargo) C.cargo = cleanCargo(spec.cargo);
         if (!spec.traffic) { C.crossers = []; C.hints = C.hints.filter((h) => h.id !== 'cable' && h.id !== 'ramp'); }
       }
       return C;
@@ -4779,7 +4782,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       };
       row('Hill', [['route', 'testHill', 'THE TEST HILL', cfg.route === 'testHill']].concat(routes.map((s) => ['route', s.id, this.courseFor(s.id).title, cfg.route === s.id, s.state === 'locked'])));
       row('Start at', C.checkpoints.map((cp, i) => ['cp', i, cpLabel(C, i), cfg.cp === i]));
-      row('Cargo', [['cargo', 'coffee', 'LATTE', cfg.cargo === 'coffee'], ['cargo', 'cake', 'CAKE', cfg.cargo === 'cake']]);
+      row('Cargo', [['cargo', 'coffee', 'LATTE', cfg.cargo === 'coffee'], ['cargo', 'cake', 'CAKE', cfg.cargo === 'cake'], ['cargo', 'bouquet', 'BOUQUET', cfg.cargo === 'bouquet']]);
       row('Options', [['unbreakable', 1, 'UNBREAKABLE CARGO', cfg.unbreakable], ['traffic', 1, 'TRAFFIC', cfg.traffic], ['slowmo', 1, 'SLOW-MO 0.5×', cfg.slowmo], ['overlay', 1, 'PHYSICS OVERLAY', cfg.overlay]]);
       this.show('free', focus);
     }
@@ -4787,7 +4790,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const cfg = this.freeCfg;
       if (key === 'route') { cfg.route = val; cfg.cp = 0; cfg.cargo = this.courseFor(val).cargo; }
       else if (key === 'cp') cfg.cp = Number(val) | 0;
-      else if (key === 'cargo') cfg.cargo = val === 'cake' ? 'cake' : 'coffee';
+      else if (key === 'cargo') cfg.cargo = cleanCargo(val);
       else if (key in cfg) cfg[key] = !cfg[key];
       this.showFree(key + ':' + val);
     }
@@ -4889,7 +4892,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const starStr = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
       const late = S.time - S.par, punct = late <= 0 ? 'On time' : late <= 15 ? 'Fashionably late' : 'Geologically slow';
       const grav = S.crashes === 0 ? 'Exemplary' : S.crashes <= 2 ? 'Negotiable' : 'Under review';
-      const per = this.results.filter(Boolean).map((r) => (r.kind === 'cake' ? 'Cake ' : 'Latte ') + Math.round(r.condition) + '%').join(' · ');
+      const per = this.results.filter(Boolean).map((r) => cargoWords(r.kind).short + ' ' + Math.round(r.condition) + '%').join(' · ');
       const data = [
         ['Customer satisfaction', S.avgStars.toFixed(1) + ' / 5', S.stars.map(starStr).join('  ')],
         ['Cargo care', Math.round(S.avgCondition) + '%', per],
@@ -5235,7 +5238,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'DELIVERED': {
           this.state = 'delivered'; this.deliveredT = 0; this.fx.stamp = 0; A.setMusic(null);
           if (e.condition < 30) A.play('trombone'); else if (!cake) A.play('success');
-          this.announce('Delivered! ' + (cake ? 'Cake ' : 'Coffee ') + Math.round(e.condition) + ' percent.');
+          this.announce('Delivered! ' + cargoWords(W.cargo.kind).noun + ' ' + Math.round(e.condition) + ' percent.');
           const b = W.bike, cols = ['#e8604c', '#f2b134', '#2c7a7b', '#9fd3f0', '#fff6e5', '#f39bb0'];
           for (let i = 0; i < 70; i++) P.spawn(PK.CONFETTI, b.x + (Math.random() - 0.5) * 3, b.y + 2 + Math.random(), (Math.random() - 0.5) * 7, 3 + Math.random() * 6, 2.4 + (i % 3) * 0.1, 0.07, cols[i % cols.length]);
           this.react('cheer', 3, 30);

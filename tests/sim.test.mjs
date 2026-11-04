@@ -63,7 +63,9 @@ test('startup: index.html has no external runtime dependencies', () => {
 
 /* ------------------------------ course ------------------------------ */
 
-const COURSES = ['buildNobHill', 'buildRussianHill'];
+const COURSES = ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill'];
+// Landmarks come from the pinned Apify export (TD-13), so only the two original routes have them.
+const LANDMARK_COURSES = ['buildNobHill', 'buildRussianHill'];
 // Courier Academy drills and The Test Hill get the same geometry and respawn checks as the deliveries.
 const TRAINING = ['buildDrillBrake', 'buildDrillHop', 'buildDrillLip', 'buildDrillStairs', 'buildDrillCable', 'buildDrillExam', 'buildTestHill'];
 
@@ -382,6 +384,8 @@ test('gameplay: both deliveries are finishable by every rider; typical runs fit 
       const { w, r } = rideProfile(p, 160, build);
       assert.equal(w.state, 'done', `${build}/${p} did not finish`);
       rows.push(`${build.slice(5).padEnd(11)} ${p.padEnd(9)} ${r.time.toFixed(1).padStart(5)} s  cargo ${r.condition.toFixed(1).padStart(5)}%  crashes ${r.crashes}  tip $${r.tip.toFixed(2)}`);
+      // Telegraph Hill's pace and careful-cargo bands wait on D-12 (F-25), so only the original routes are held to them here.
+      if (!LANDMARK_COURSES.includes(build)) continue;
       if (p === 'typical') {
         typicalTotal += r.time;
         assert.ok(r.time >= 35 && r.time <= 46, `${build} typical time ${r.time.toFixed(1)} s`);
@@ -398,6 +402,7 @@ test('gameplay: humor triggers fire along both routes', () => {
   const need = {
     buildNobHill: ['MAYBEMO_ENCOUNTER', 'MAYBEMO_OVER', 'CABLE_CAR_ENCOUNTER', 'BIG_AIR', 'CLEAN_LANDING', 'POWERUP', 'HINT', 'DELIVERED'],
     buildRussianHill: ['STAIRS', 'CABLE_CAR_ENCOUNTER', 'MAYBEMO_ENCOUNTER', 'MAYBEMO_STOPPED', 'CAKE_DECOR', 'POWERUP', 'DELIVERED'],
+    buildTelegraphHill: ['CLEAN_LANDING', 'DELIVERED'],
   };
   for (const build of COURSES) {
     const types = new Set(rideProfile('typical', 160, build).events.map((e) => e.type));
@@ -647,7 +652,7 @@ test('high scores: profile handles are reduced to safe plain handles', () => {
 test('data: embedded landmarks match the curated Apify export, mapped onto both routes', () => {
   const file = JSON.parse(fs.readFileSync(new URL('data/sf-landmarks.json', ROOT), 'utf8'));
   assert.deepEqual(JSON.parse(JSON.stringify(H.LANDMARK_DATA)), file);
-  for (const build of COURSES) {
+  for (const build of LANDMARK_COURSES) {
     const C = H[build]();
     assert.equal(C.landmarks.length, 3);
     for (const lm of C.landmarks) assert.ok(lm.x > C.start && lm.x < C.doorX && lm.name && lm.visual);
@@ -970,4 +975,12 @@ test('dialogue: the bouquet has its own rider and customer lines, and latte or c
   const half = hm.offer('CARGO_HALF', 10, all).map((o) => o.line.cargo);
   assert.ok(half.length > 0 && half.every((c) => c === 'bouquet'), 'half-loss lines are bouquet lines');
   for (const L of H.DIALOGUE) if (L.cargo && L.cargo !== 'bouquet') assert.notEqual(L.cargo, 'bouquet');
+});
+
+test('cargo ids: Free Ride and saves accept the three cargoes; anything else, even inherited names, falls back to the latte', () => {
+  for (const kind of ['coffee', 'cake', 'bouquet']) assert.equal(H.cleanCargo(kind), kind);
+  for (const bad of [undefined, null, 'toaster', 'constructor', '__proto__', 7]) assert.equal(H.cleanCargo(bad), 'coffee', String(bad));
+  assert.equal(H.cargoWords('constructor').name, 'LATTE', 'a label lookup never returns a prototype value');
+  assert.equal(H.cargoWords('bouquet').short, 'Bouquet');
+  assert.equal(H.cargoWords('cake').noun, 'Cake');
 });

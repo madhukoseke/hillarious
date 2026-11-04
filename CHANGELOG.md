@@ -7,20 +7,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 - A third delivery, THE BOUQUET, from Telegraph Hill. Ruth's fragile bouquet sheds petals in an exposed downhill gust and when it lands roughly or crashes. Unbreakable cargo keeps every petal.
-- The Bouquet has its own lines: Ruth reacts to lost petals, and the rider jokes about pothole damage.
 - Three goals for The Bouquet: deliver at least 90% of the petals, lose under 5% to the gust, and beat par with no crashes. Its receipt has its own star lines.
+- The Bouquet has its own lines: Ruth reacts to lost petals, and the rider jokes about pothole damage.
 - The Bouquet is on the Dispatch board after Russian Hill, and START SHIFT now runs all three deliveries.
+- Free Ride's cargo row offers BOUQUET, and the title's best line shows your best bouquet run.
 
 ### Changed
 - `?delivery=3` starts the shift at The Bouquet, the way `?delivery=2` starts the cake.
 - The progress bar says "to the bouquet drop" on the new delivery.
+- Best-tip and high-score records now carry a format version (`v: 1`). Older records still read as before.
 
 ### Fixed
+- The HR review and the screen reader now say "Bouquet" for bouquet runs instead of "Latte" or "Coffee".
 - The save-your-score form on the final review is more compact on landscape phones, so less of the review needs scrolling to reach it.
 - Corrupt or half-written best-tip records are ignored instead of breaking the receipt or Dispatch board.
-
-### Changed
-- Best-tip and high-score records now carry a format version (`v: 1`). Older records still read as before.
 
 ## [1.3.0] - 2026-11-01
 
