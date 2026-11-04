@@ -11,11 +11,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The Bouquet has its own lines: Ruth reacts to lost petals, and the rider jokes about pothole damage.
 - The Bouquet is on the Dispatch board after Russian Hill, and START SHIFT now runs all three deliveries.
 - Telegraph Hill has a landmark on its route, Pioneer Park.
+- The Bouquet's route is longer, about 40 seconds for a typical ride, with two pedestrians on the way down to Ruth's door.
 - Free Ride's cargo row offers BOUQUET, and the title's best line shows your best bouquet run.
 
 ### Changed
 - `?delivery=3` starts the shift at The Bouquet, the way `?delivery=2` starts the cake.
 - The progress bar says "to the bouquet drop" on the new delivery.
+- Gusts on The Bouquet's route no longer shed petals at low speed, so a careful rider keeps more petals than a fast one.
 - Best-tip and high-score records now carry a format version (`v: 1`). Older records still read as before.
 
 ### Fixed

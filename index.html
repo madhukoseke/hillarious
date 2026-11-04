@@ -863,7 +863,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   // The gust blows against the rider; bouquet petals go first when it catches them at speed.
   function buildTelegraphHill() {
     const C = emptyCourse('telegraph');
-    Object.assign(C, { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 26, seed: 2027 });
+    Object.assign(C, { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 43, seed: 2027 });
     const b = new CourseBuilder(-60, 0);
     b.straight(60);
     C.start = 3;
@@ -877,7 +877,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     b.straight(40); b.ease(0, 6);
     b.pothole(b.x + 6, 1.0, 0.22);
     b.straight(120);
+    // The long run-down to Ruth's door (D-12): a second grade, a flat, and pedestrians on the sidewalk.
+    const pedA = b.x + 30; b.straight(30); b.ease(-0.12, 6); b.straight(110); b.ease(0, 6); b.straight(50);
+    const pedB = b.x - 40; b.straight(40);
     const fin = b.x; b.straight(90);
+    C.pedestrians = [{ x: pedA, kind: 'tourist' }, { x: pedB, kind: 'dog' }];
     C.finishX = fin + 6; C.doorX = fin + 18;
     C.venue = { x0: fin + 7, x1: fin + 34, arch: fin + 18 };
     C.terrain = b.build();
@@ -1681,7 +1685,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   // Bouquet (Telegraph Hill, 1.4 prototype): no liquid or swinging mass. Petals are lost to gusts at speed, rough
   // landings, bumps, and crashes. Same interface as the other cargo; `update` also takes the wind for the gust rule.
-  const BOUQUET = { windMin: 2.5, windRate: 1.4, windSpeed: 8, landMin: 6, landPct: 3, bumpMin: 2, bumpPct: 0.8, crashBase: 12, crashExtra: 20 };
+  const BOUQUET = { windMin: 2.5, windRate: 1.4, windFloor: 6, windSpeed: 8, landMin: 6, landPct: 3, bumpMin: 2, bumpPct: 0.8, crashBase: 12, crashExtra: 20 };
   // Player-facing words for each cargo, so labels and HUD text stay in step.
   const CARGO_WORDS = {
     coffee: { name: 'LATTE', short: 'Latte', noun: 'Coffee', unit: '% latte', condition: 'Coffee remaining', lost: 'Coffee lost' },
@@ -1701,7 +1705,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     get sloshV() { return 0; }
     update(dt, b, frozen, wind = 0) {
       let dmg = 0;
-      const gust = Math.max(0, Math.abs(wind) - BOUQUET.windMin) * Math.min(1, Math.abs(b.vx) / BOUQUET.windSpeed);
+      // Gusts shed nothing below windFloor (so a careful rider keeps their petals) and ramp up to full force above it.
+      const gust = Math.max(0, Math.abs(wind) - BOUQUET.windMin) * clamp((Math.abs(b.vx) - BOUQUET.windFloor) / BOUQUET.windSpeed, 0, 1);
       if (gust > 0 && !frozen) dmg += gust * BOUQUET.windRate * dt;
       dmg = Math.min(this.amount, dmg);
       this.amount -= dmg;

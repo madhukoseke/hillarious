@@ -376,25 +376,29 @@ test('storage: localStorage failures are handled gracefully', () => {
   assert.equal(corrupt.get('best', 7), 7);
 });
 
-test('gameplay: both deliveries are finishable by every rider; typical runs fit the 2-minute demo', () => {
+test('gameplay: every delivery is finishable by every rider; typical runs fit the demo', () => {
   const rows = [];
+  const careful = {}, typical = {};
   let typicalTotal = 0;
   for (const build of COURSES) {
     for (const p of ['careful', 'typical', 'fast', 'reckless']) {
       const { w, r } = rideProfile(p, 160, build);
       assert.equal(w.state, 'done', `${build}/${p} did not finish`);
       rows.push(`${build.slice(5).padEnd(11)} ${p.padEnd(9)} ${r.time.toFixed(1).padStart(5)} s  cargo ${r.condition.toFixed(1).padStart(5)}%  crashes ${r.crashes}  tip $${r.tip.toFixed(2)}`);
-      // Telegraph Hill's pace and careful-cargo bands wait on D-12 (F-25), so only the original routes are held to them here.
-      if (!LANDMARK_COURSES.includes(build)) continue;
       if (p === 'typical') {
         typicalTotal += r.time;
         assert.ok(r.time >= 35 && r.time <= 46, `${build} typical time ${r.time.toFixed(1)} s`);
         assert.ok(r.condition >= 65 && r.condition <= 92, `${build} typical cargo ${r.condition.toFixed(1)}%`);
       }
       if (p === 'careful') assert.ok(r.condition >= 85, `${build} careful cargo ${r.condition.toFixed(1)}%`);
+      if (p === 'careful') careful[build] = r.condition;
+      if (p === 'typical') typical[build] = r.condition;
     }
   }
-  assert.ok(typicalTotal <= 92, `typical riding total ${typicalTotal.toFixed(1)} s leaves room for menus in 2 minutes`);
+  // D-12: on Telegraph Hill the slower, careful rider keeps more petals in the gust than the typical rider does.
+  assert.ok(careful.buildTelegraphHill > typical.buildTelegraphHill, `careful ${careful.buildTelegraphHill} should keep more petals than typical ${typical.buildTelegraphHill}`);
+  // Three deliveries now (1.4): the typical riding total must leave room for the menus in a 2.5-minute demo.
+  assert.ok(typicalTotal <= 130, `typical riding total ${typicalTotal.toFixed(1)} s leaves room for menus in a 2.5-minute demo`);
   console.log('\n  Autopilot results:\n  ' + rows.join('\n  '));
 });
 
@@ -885,6 +889,12 @@ test('records: best-tip records are versioned, and corrupt saves are dropped', (
   assert.equal(H.cleanBest({ tip: 5 }), null, 'missing time');
   assert.deepEqual(plain(H.cleanBest({ tip: 5, time: 40 })), { v: 1, tip: 5, condition: 0, time: 40 }, 'legacy record reads with defaults');
   assert.deepEqual(plain(H.cleanBest({ v: 1, tip: 5, condition: 88, time: 40 })), { v: 1, tip: 5, condition: 88, time: 40 });
+});
+
+test('bouquet gust: a careful rider below the speed floor keeps every petal; speed past the floor costs more', () => {
+  const gusty = (vx) => { const c = new H.BouquetCargo(); for (let i = 0; i < 240; i++) c.update(1 / 120, { vx, vy: 0, w: 0, a: 0 }, false, -6); return c.amount; };
+  assert.equal(gusty(5), 100, 'below the floor the gust takes nothing');
+  assert.ok(gusty(12) < gusty(9) && gusty(9) < 100, 'more speed in the gust sheds more petals');
 });
 
 test('bouquet prototype: wind sheds petals only at speed, rough hits knock petals loose, unbreakable keeps them', () => {
