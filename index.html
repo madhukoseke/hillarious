@@ -757,10 +757,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     'large-gothic-cathedral': 24, 'trees-and-park-fence': 18, 'historic-brick-building': 15,
     'tree-lined-lane': 12, 'hillside-park': 20, 'winding-street-backdrop': 26,
   };
+  // Hand-written landmarks for routes the Apify export doesn't cover (D-10). Kept apart so the pinned export stays unchanged.
+  const HAND_LANDMARKS = {
+    source: 'hand', routes: [
+      { id: 'telegraph-hill', landmarks: [{ id: 'pioneer-park', name: 'Pioneer Park', type: 'park', gameX: 480, visual: 'hillside-park' }] },
+    ],
+  };
   function landmarkCount(data) { return (data.routes || []).reduce((n, r) => n + ((r.landmarks && r.landmarks.length) || 0), 0); }
   function landmarksFor(routeId, C, data) {
     const curated = data || LANDMARK_DATA, src = landmarkCount(curated) >= 4 ? curated : FALLBACK_LANDMARKS;
-    const route = src.routes.find((r) => r.id === routeId);
+    const route = src.routes.find((r) => r.id === routeId) || HAND_LANDMARKS.routes.find((r) => r.id === routeId);
     if (!route) return [];
     const len = C.doorX - C.start;
     return route.landmarks.map((lm) => {
@@ -884,6 +890,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       messages: ['Every petal counts. Do not let the wind win.', 'Gusts are not an excuse. Well, a little.'],
       cargoNote: 'Cargo: one hand-tied bouquet. Petals only.', cargoLabel: 'Petals left',
     };
+    C.landmarks = landmarksFor('telegraph-hill', C);
     return C;
   }
 
@@ -2773,7 +2780,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill,
-    buildTitleCourse, makeTestCourse, LANDMARK_DATA, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, BOUQUET, World, Score,
+    buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,

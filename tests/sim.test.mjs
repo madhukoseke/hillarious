@@ -984,3 +984,12 @@ test('cargo ids: Free Ride and saves accept the three cargoes; anything else, ev
   assert.equal(H.cargoWords('bouquet').short, 'Bouquet');
   assert.equal(H.cargoWords('cake').noun, 'Cake');
 });
+
+test('landmarks: Telegraph Hill has its hand-written park inside the route, and the Apify export stays pinned', () => {
+  const C = H.buildTelegraphHill();
+  assert.equal(C.landmarks.length, 1);
+  const [pk] = C.landmarks;
+  assert.equal(pk.name, 'Pioneer Park');
+  assert.ok(pk.x > C.start && pk.x < C.doorX && pk.x0 < pk.x1, 'the park sits on the route');
+  assert.ok(!plain(H.LANDMARK_DATA).routes.some((r) => r.id === 'telegraph-hill'), 'the pinned export is not edited');
+});
