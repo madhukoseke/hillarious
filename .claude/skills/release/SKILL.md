@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut a new HILLARIOUS version. Picks the semver number, turns the CHANGELOG's Unreleased section into a dated version, stamps the version into tech_debt.md, checks the README, runs the tests, then commits and tags. Use when the user says release, ship, cut or bump a version, or tag.
+description: Cut a new HILLARIOUS version. Picks the semver number, turns the CHANGELOG's Unreleased section into a dated version, stamps the version into tech_debt.md and kanban.md, checks the README, runs the tests, then commits and tags. Use when the user says release, ship, cut or bump a version, or tag.
 ---
 
 # Release a HILLARIOUS version
@@ -28,14 +28,14 @@ Run these steps in order from the repository root. Stop and report if a step fai
    - At the bottom, add `[X.Y.Z]: https://github.com/madhukoseke/hillarious/compare/vPREV...vX.Y.Z` above the existing version links.
    - Change the `[Unreleased]` link to compare `vX.Y.Z...HEAD`.
 
-4. **Update `tech_debt.md`.** It is local and gitignored; skip this step if it is missing.
-   - Replace every `Unreleased` in the Status column and in the "Implemented" table with `vX.Y.Z`.
-   - Check that the "Current baseline" facts are still true.
+4. **Update `tech_debt.md` and `kanban.md`.** Both are local and gitignored; skip any that is missing.
+   - In `tech_debt.md`, replace every `Unreleased` (in statuses and checklists) with `vX.Y.Z`. Add the release to the Shipped table, mark it shipped in "Plan of record", and check that the "Current baseline" facts are still true.
+   - In `kanban.md`, replace `Unreleased` with `vX.Y.Z` on the Completed cards, fold them into one card for the release, and update the date.
 
 5. **Check `README.md`.** If the release changes player-facing features, controls, commands, or links, update it.
 
 6. **Commit and tag.**
-   - Stage only the release files: `git add CHANGELOG.md README.md` plus any code that belongs in the release. Never stage `tech_debt.md`.
+   - Stage only the release files: `git add CHANGELOG.md README.md` plus any code that belongs in the release. Never stage `tech_debt.md` or `kanban.md`.
    - Commit with the subject `Release X.Y.Z: <short summary>`. In the body, list the main changelog bullets.
    - Tag it: `git tag -a vX.Y.Z -m "HILLARIOUS X.Y.Z: <short summary>"`.
 
