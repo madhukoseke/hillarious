@@ -33,6 +33,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Port check: `tests/golden/ports.json` records how every course builds and plays, including every cargo on every route; `tests/ports.test.mjs` fails on any change. Rewrite it with `node tests/golden/update.mjs` only for an intended gameplay change.
 - One cargo interface: `CARGO_TYPES` (engine) and `CARGO_VIEW` (drawing, sounds, HUD) replace every cargo-type branch. A new cargo adds its class and one entry in each table.
 - Fairness check: `tests/fairness.test.mjs` runs all four riders on every route and drill in `ROUTES` and `DRILLS`.
+- Routes as data: Nob Hill, Russian Hill, and Telegraph Hill are `ROUTE_DATA` entries built by `buildRoute`, with positions written as a named mark plus offsets (`"blockB+44"`). The port check confirms they build and play exactly as before.
 
 ## [1.3.0] - 2026-11-01
 

@@ -801,202 +801,208 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     };
   }
 
-  // Delivery 1: California St, eastbound from the top of Nob Hill to the Financial District.
-  function buildNobHill() {
-    const C = emptyCourse('nobHill');
-    Object.assign(C, { index: 1, title: 'THE $9 LATTE', hood: 'NOB HILL', street: 'CALIFORNIA', theme: 'nob', cargo: 'coffee', par: 46, seed: 1873 });
-    const b = new CourseBuilder(-70, 0);
-    b.straight(88);                                          // Taylor St plateau (start)
-    C.start = 4;
-    C.park = { x0: -70, x1: 3 };
-    C.intersections.push({ x0: 6, x1: 18, name: 'TAYLOR ST' });
-    b.ease(-0.1, 5).straight(58);                            // Block A: 10%, the learning block
-    b.ease(0, 6);
-    const mason = b.x; b.straight(12);
-    C.intersections.push({ x0: mason, x1: b.x, name: 'MASON ST' });
-    b.ease(0.1, 1.6); const lipA = b.x; b.ease(-0.18, 1.1);  // raised crosswalk, small lip
-    C.lips.push({ x: lipA, big: false });
-    C.crosswalks.push({ x0: lipA - 1.6, x1: lipA });
-    const blockB = b.x; b.straight(78);                      // Block B: 18%, parked robot car
-    b.ease(0, 7);
-    const powell = b.x; b.straight(13);
-    C.intersections.push({ x0: powell, x1: b.x, name: 'POWELL ST' });
-    b.ease(0.26, 1.8).straight(1.2); const lipB = b.x; b.ease(-0.34, 1.0); // raised-crosswalk kicker: the big lip
-    C.lips.push({ x: lipB, big: true });
-    C.crosswalks.push({ x0: lipB - 3.0, x1: lipB });
-    const blockC = b.x; b.straight(62);                      // Block C: 34%, absurd
-    b.ease(0, 9);
-    const stockton = b.x; b.straight(12);
-    C.intersections.push({ x0: stockton, x1: b.x, name: 'STOCKTON ST' });
-    b.ease(0.06, 1.2); const lipC = b.x; b.ease(-0.12, 1.2);
-    C.lips.push({ x: lipC, big: false });
-    C.crosswalks.push({ x0: lipC - 1.2, x1: lipC });
-    const blockD = b.x; b.straight(62);                      // Block D: 12%
-    b.ease(0, 6);
-    const grant = b.x; b.straight(12);
-    C.intersections.push({ x0: grant, x1: b.x, name: 'GRANT AVE' });
-    b.ease(0.06, 1.2); const lipD = b.x; b.ease(-0.08, 1.2);
-    C.lips.push({ x: lipD, big: false });
-    C.crosswalks.push({ x0: lipD - 1.2, x1: lipD });
-    const blockE = b.x; b.straight(50);                      // Block E: 8%, the home stretch
-    b.ease(0, 6);
-    const fin = b.x; b.straight(140);
-    C.finishX = fin + 6; C.doorX = fin + 18;
-    C.office = { x0: fin + 12, x1: fin + 30 };
-    b.pothole(46, 1.3, 0.2).pothole(blockD + 26, 1.5, 0.24);
-    b.bump(blockC + 30, 0.9, 0.07).bump(blockC + 34, 0.9, 0.07);
-    C.terrain = b.build();
-    C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
-    C.cones = [blockB + 37.5, blockE + 22, blockE + 23.3];
-    C.cars = [{ x: blockB + 44, plank: true }];
-    C.crossers = [{ kind: 'cablecar', x: powell + 6.5, trigger: powell - 30, lead: 2.9, sign: 'POWELL & MASON' }];
-    C.powerups = [{ kind: 'bubble', x: blockB + 28 }, { kind: 'espresso', x: powell + 10 }];
-    C.pedestrians = [
-      { x: lipA + 7, kind: 'dog' }, { x: lipB + 11, kind: 'tech' }, { x: blockD + 14, kind: 'fitness' }, { x: lipD + 6, kind: 'tourist' },
-    ];
-    C.checkpoints = [C.start, mason + 2, blockB + 18, blockB + 52, powell + 2, stockton + 2, blockD + 32, grant + 2].map((x) => ({ x }));
-    C.hints = [
-      { x: -1e9, id: 'pedal', actions: ['pedal'], text: 'Hold to pedal' },
-      { x: 28, id: 'hop', actions: ['hop'], text: 'Hop the pothole. Hold for higher.' },
-      { x: 64, id: 'brake', actions: ['brake'], text: 'Tap to brake. Hold it and the latte surges forward.' },
-      { x: blockB + 24, id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
-      { x: powell - 30, id: 'cable', actions: ['brake'], text: 'DING DING: cable car crossing! Brake, or beat it.' },
-      { x: powell + 8, id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Hop at the lip for BIG AIR. Lean to land level.' },
-    ];
-    C.customer = {
-      name: 'Skyler', role: 'Founder & CEO, Meetingless', avatar: 'founder', brand: 'MEETINGLESS HQ',
-      order: 'ORDER #0009 · OAT LATTE (L) · NO LID', route: 'Down California Street to the Financial District',
-      messages: ["Please don't ring the bell. I'm in a meeting about reducing unnecessary meetings.", "Also: no lid. We're reducing single-use plastics."],
-      cargoNote: 'Cargo: one large oat-milk latte. Lidless. Brimming.', cargoLabel: 'Coffee remaining',
-    };
-    C.length = C.doorX - C.start;
-    C.landmarks = landmarksFor('nob-hill', C);
-    return C;
-  }
+  // Routes as data (F-26). Each entry is the whole route: course facts, the road as a list of steps, features, and
+  // every object. Positions are numbers or a named mark plus offsets ("blockB+44", "larkin-6-1.4"), applied left to
+  // right, so a block can be resized without breaking the objects on it. buildRoute turns an entry into a course.
+  //   Path steps: ['straight', len] · ['ease', grade, len] · ['mark', name, offset?] (the current x, plus offset)
+  //   ['street', name, len, mark?] (an intersection) · ['intersection', x0, x1, name] · ['lip', mark, big, crosswalk?]
+  //   ['gust', fromMark, wind] (from the mark to here)
+  //   Features: ['pothole', at, width, depth] · ['bump', at, width, height] · ['stairs', at, n, tread, rise]
+  const ROUTE_DATA = {
+    nobHill: {
+      meta: { index: 1, title: 'THE $9 LATTE', hood: 'NOB HILL', street: 'CALIFORNIA', theme: 'nob', cargo: 'coffee', par: 46, seed: 1873 },
+      origin: [-70, 0], start: 4, park: { x0: -70, x1: 3 },
+      path: [
+        ['straight', 88],                                                    // Taylor St plateau (start)
+        ['intersection', 6, 18, 'TAYLOR ST'],
+        ['ease', -0.1, 5], ['straight', 58], ['ease', 0, 6],                 // Block A: 10%, the learning block
+        ['street', 'MASON ST', 12, 'mason'],
+        ['ease', 0.1, 1.6], ['mark', 'lipA'], ['ease', -0.18, 1.1], ['lip', 'lipA', false, 1.6], // raised crosswalk, small lip
+        ['mark', 'blockB'], ['straight', 78], ['ease', 0, 7],                // Block B: 18%, parked robot car
+        ['street', 'POWELL ST', 13, 'powell'],
+        ['ease', 0.26, 1.8], ['straight', 1.2], ['mark', 'lipB'], ['ease', -0.34, 1.0], ['lip', 'lipB', true, 3.0], // the big lip
+        ['mark', 'blockC'], ['straight', 62], ['ease', 0, 9],                // Block C: 34%, absurd
+        ['street', 'STOCKTON ST', 12, 'stockton'],
+        ['ease', 0.06, 1.2], ['mark', 'lipC'], ['ease', -0.12, 1.2], ['lip', 'lipC', false, 1.2],
+        ['mark', 'blockD'], ['straight', 62], ['ease', 0, 6],                // Block D: 12%
+        ['street', 'GRANT AVE', 12, 'grant'],
+        ['ease', 0.06, 1.2], ['mark', 'lipD'], ['ease', -0.08, 1.2], ['lip', 'lipD', false, 1.2],
+        ['mark', 'blockE'], ['straight', 50], ['ease', 0, 6],                // Block E: 8%, the home stretch
+        ['mark', 'fin'], ['straight', 140],
+      ],
+      features: [['pothole', 46, 1.3, 0.2], ['pothole', 'blockD+26', 1.5, 0.24], ['bump', 'blockC+30', 0.9, 0.07], ['bump', 'blockC+34', 0.9, 0.07]],
+      finish: { at: 'fin', office: { x0: 12, x1: 30 } },
+      cones: ['blockB+37.5', 'blockE+22', 'blockE+23.3'],
+      cars: [{ x: 'blockB+44', plank: true }],
+      crossers: [{ kind: 'cablecar', x: 'powell+6.5', trigger: 'powell-30', lead: 2.9, sign: 'POWELL & MASON' }],
+      powerups: [{ kind: 'bubble', x: 'blockB+28' }, { kind: 'espresso', x: 'powell+10' }],
+      pedestrians: [{ x: 'lipA+7', kind: 'dog' }, { x: 'lipB+11', kind: 'tech' }, { x: 'blockD+14', kind: 'fitness' }, { x: 'lipD+6', kind: 'tourist' }],
+      checkpoints: ['start', 'mason+2', 'blockB+18', 'blockB+52', 'powell+2', 'stockton+2', 'blockD+32', 'grant+2'],
+      hints: [
+        { x: -1e9, id: 'pedal', actions: ['pedal'], text: 'Hold to pedal' },
+        { x: 28, id: 'hop', actions: ['hop'], text: 'Hop the pothole. Hold for higher.' },
+        { x: 64, id: 'brake', actions: ['brake'], text: 'Tap to brake. Hold it and the latte surges forward.' },
+        { x: 'blockB+24', id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
+        { x: 'powell-30', id: 'cable', actions: ['brake'], text: 'DING DING: cable car crossing! Brake, or beat it.' },
+        { x: 'powell+8', id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Hop at the lip for BIG AIR. Lean to land level.' },
+      ],
+      customer: {
+        name: 'Skyler', role: 'Founder & CEO, Meetingless', avatar: 'founder', brand: 'MEETINGLESS HQ',
+        order: 'ORDER #0009 · OAT LATTE (L) · NO LID', route: 'Down California Street to the Financial District',
+        messages: ["Please don't ring the bell. I'm in a meeting about reducing unnecessary meetings.", "Also: no lid. We're reducing single-use plastics."],
+        cargoNote: 'Cargo: one large oat-milk latte. Lidless. Brimming.', cargoLabel: 'Coffee remaining',
+      },
+      length: true, landmarks: 'nob-hill',
+    },
+    russianHill: {
+      meta: { index: 2, title: 'THE WEDDING CAKE', hood: 'RUSSIAN HILL', street: 'GREEN', theme: 'russian', cargo: 'cake', par: 48, seed: 2026, streetTrees: true },
+      origin: [-70, 0], start: 3, park: { x0: -70, x1: 1 }, dropLabel: ' m to the wedding',
+      path: [
+        ['straight', 84],                                                    // Jones St summit (start)
+        ['intersection', 3, 14, 'JONES ST'],
+        ['ease', -0.16, 5], ['straight', 40],                                // Block 1: 16%, the big pothole
+        ['ease', -0.22 / 0.75, 3],                                           // the Macondray Lane steps' grade (rise / tread)
+        ['mark', 'stairsX', 1.5], ['straight', 1.5 + 7 * 0.75 + 3],          // the steps ride on their own grade
+        ['ease', 0, 6],
+        ['street', 'LEAVENWORTH ST', 12, 'leav'],
+        ['ease', 0.08, 1.4], ['mark', 'lipA'], ['ease', -0.3, 1.2], ['lip', 'lipA', false, 1.4],
+        ['mark', 'block2'], ['straight', 60], ['ease', 0, 7],                // Block 2: 30%, Ina Coolbrith Park
+        ['street', 'HYDE ST', 14, 'hyde'],
+        ['ease', 0.06, 1.2], ['mark', 'lipB'], ['ease', -0.36, 1.0], ['lip', 'lipB', true, 1.2],
+        ['mark', 'block3'], ['straight', 52], ['ease', -0.12, 8],            // Block 3: 36%, the dramatic one
+        ['mark', 'cz'], ['straight', 40], ['ease', 0, 5],                    // construction zone: 12%
+        ['street', 'LARKIN ST', 14, 'larkin'],
+        ['ease', 0.05, 1.2], ['mark', 'lipC'], ['ease', -0.1, 1.2], ['lip', 'lipC', false, 1.2],
+        ['mark', 'block4'], ['straight', 60], ['ease', 0, 6],                // Block 4: 10%, Lombard Street backdrop
+        ['mark', 'fin'], ['straight', 140],
+      ],
+      features: [['pothole', 36, 2.0, 0.28], ['stairs', 'stairsX', 7, 0.75, 0.22], ['bump', 'block3+26', 0.9, 0.07], ['bump', 'block3+30', 0.9, 0.07]],
+      marks: { rampX: 'larkin-6' },
+      finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
+      ramps: [{ x: 'rampX' }],
+      cones: ['rampX-1.4', 'cz+9', 'cz+10.3', 'block4+34', 'block4+35.3'],
+      crossers: [
+        { kind: 'cablecar', x: 'hyde+7', trigger: 'hyde-45', lead: 3.6, sign: 'POWELL & HYDE' },
+        { kind: 'maybemo', x: 'rampX+7.6', trigger: 'larkin-45' },
+      ],
+      powerups: [{ kind: 'bubble', x: 'leav+6' }, { kind: 'espresso', x: 'larkin+11' }],
+      pedestrians: [
+        { x: 9, kind: 'tourist' }, { x: 'stairsX+2.5', kind: 'fitness' }, { x: 'block2+24', kind: 'dog' },
+        { x: 'block3+14', kind: 'tech' }, { x: 'block4+18', kind: 'tourist' },
+      ],
+      checkpoints: ['start', 'stairsX+5.25+4', 'leav+2', 'block2+12', 'hyde+2', 'block3+20', 'cz-2', 'larkin+6', 'block4+24'],
+      hints: [
+        { x: -1e9, id: 'cake', actions: ['pedal'], text: 'Wedding cake on board. Smooth is fast.' },
+        { x: 22, id: 'pothole', actions: ['hop'], text: 'Big pothole. Hop it!' },
+        { x: 'stairsX-12', id: 'stairs', actions: ['brake'], text: 'Macondray Lane steps. Slow down... or hop.' },
+        { x: 'hyde-45', id: 'cable', actions: ['brake'], text: 'Cable car on Hyde! Brake early on this slope.' },
+        { x: 'larkin-30', id: 'ramp', actions: ['pedal', 'hop'], text: 'A robot car is stalling at Larkin. Jump the ramp!' },
+      ],
+      customer: {
+        name: 'Gwen', role: 'Wedding planner, Frost & Tiers Events', avatar: 'planner', brand: 'FROST & TIERS EVENTS',
+        order: 'ORDER #0002 · 3-TIER CAKE · HANDLE WITH CARE', route: 'Across Russian Hill to Lombard Gardens',
+        messages: ["Please keep it upright. Unlike the groom's finances.", 'Three tiers. Fondant. Zero "creative interpretations."'],
+        cargoNote: 'Cargo: one three-tier wedding cake, strapped to the rack with optimism.', cargoLabel: 'Cake integrity',
+      },
+      length: true, landmarks: 'russian-hill',
+    },
+    // Telegraph Hill: a steep block with one exposed downhill gust, and the sheltered Napier Lane boardwalk above it.
+    telegraph: {
+      meta: { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 48, seed: 2027 },
+      origin: [-60, 0], start: 3, park: { x0: -60, x1: 1 },
+      path: [
+        ['straight', 90],                                                    // a run-up, to choose road or boardwalk before the gust
+        ['intersection', 3, 12, 'KEARNY ST'],
+        ['ease', -0.14, 6],
+        ['mark', 'gust0'], ['straight', 40], ['gust', 'gust0', -6],
+        ['ease', 0, 5],
+        ['mark', 'lipA', 2], ['straight', 4], ['ease', 0.07, 1.2], ['ease', -0.1, 1.2], ['lip', 'lipA', false],
+        ['straight', 40], ['ease', 0, 6],
+        ['mark', 'potholeX', 6], ['straight', 120],
+        // The long run-down to Ruth's door (D-12): a second grade, a flat, and pedestrians on the sidewalk.
+        ['mark', 'pedA', 30], ['straight', 30], ['ease', -0.12, 6], ['straight', 110], ['ease', 0, 6], ['straight', 50],
+        ['mark', 'pedB', -40], ['straight', 40],
+        ['mark', 'fin'], ['straight', 90],
+      ],
+      features: [['pothole', 'potholeX', 1.0, 0.22]],
+      finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
+      pedestrians: [{ x: 'pedA', kind: 'tourist' }, { x: 'pedB', kind: 'dog' }],
+      checkpoints: ['start', 'gust0+10', 'lipA+2', 'fin-10'],
+      // The safe approach (D-12, D-17): hop up to Napier Lane's boardwalk, out of the gust and over the lip and pothole.
+      // It is one-way, so a rider who doesn't hop stays on the road underneath. "ground" is the road height there.
+      boardwalk: { name: 'NAPIER LANE', x0: 'gust0-18-3', x1: 'potholeX+62', speedLimit: 8.5, pts: [['gust0-18-3', 0.25], ['gust0-18', 0.55], ['gust0', 0.45], ['potholeX+62', 'ground-0.1']] },
+      hints: [
+        { x: 6, id: 'boardwalk', actions: ['hop'], text: 'Hop up to the boardwalk: no gust, but slower.' },
+        { x: 'gust0-8', id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
+      ],
+      customer: {
+        name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
+        order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',
+        messages: ['Every petal counts. Do not let the wind win.', 'Napier Lane is sheltered, if you can hop up to it. Gusts are not an excuse.'],
+        cargoNote: 'Cargo: one hand-tied bouquet. Petals only.', cargoLabel: 'Petals left',
+      },
+      landmarks: 'telegraph-hill',
+    },
+  };
 
-  // Delivery 2: across Russian Hill, from Jones St down to a garden wedding below Lombard Street.
-  // Delivery 3: Telegraph Hill, a steep block with one exposed downhill gust zone and a sheltered boardwalk above it.
-  // The gust blows against the rider; bouquet petals go first when it catches them at speed.
-  function buildTelegraphHill() {
-    const C = emptyCourse('telegraph');
-    Object.assign(C, { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 48, seed: 2027 });
-    const b = new CourseBuilder(-60, 0);
-    b.straight(90); // a run-up, so there is time to choose the road or the boardwalk before the gust
-    C.start = 3;
-    C.park = { x0: -60, x1: 1 };
-    C.intersections.push({ x0: 3, x1: 12, name: 'KEARNY ST' });
-    b.ease(-0.14, 6);
-    const gust0 = b.x; b.straight(40); C.gusts = [{ x0: gust0, x1: b.x, wind: -6 }];
-    b.ease(0, 5);
-    const lipA = b.x + 2; b.straight(4); b.ease(0.07, 1.2); b.ease(-0.1, 1.2);
-    C.lips.push({ x: lipA, big: false });
-    b.straight(40); b.ease(0, 6);
-    const potholeX = b.x + 6; b.pothole(potholeX, 1.0, 0.22);
-    b.straight(120);
-    // The long run-down to Ruth's door (D-12): a second grade, a flat, and pedestrians on the sidewalk.
-    const pedA = b.x + 30; b.straight(30); b.ease(-0.12, 6); b.straight(110); b.ease(0, 6); b.straight(50);
-    const pedB = b.x - 40; b.straight(40);
-    const fin = b.x; b.straight(90);
-    C.pedestrians = [{ x: pedA, kind: 'tourist' }, { x: pedB, kind: 'dog' }];
+  // Turns a ROUTE_DATA entry into a course. Marks are read left to right with their offsets, so the arithmetic (and so
+  // every position) is exactly what the hand-written builders produced; the port check (F-28) holds it to that.
+  const POS_KEYS = new Set(['x', 'x0', 'x1', 'trigger', 'arch']);
+  function buildRoute(id) {
+    const R = ROUTE_DATA[id], C = emptyCourse(id), marks = { start: R.start };
+    Object.assign(C, R.meta);
+    const at = (p) => {
+      if (typeof p === 'number') return p;
+      const m = /^([A-Za-z]\w*)((?:[+-]\d+(?:\.\d+)?)*)$/.exec(p);
+      if (!m || !(m[1] in marks)) throw new Error(`route ${id}: unknown position "${p}"`);
+      let v = marks[m[1]];
+      for (const t of m[2].match(/[+-]\d+(?:\.\d+)?/g) || []) v = t[0] === '+' ? v + Number(t.slice(1)) : v - Number(t.slice(1));
+      return v;
+    };
+    const place = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, POS_KEYS.has(k) ? at(v) : v]));
+    const b = new CourseBuilder(R.origin[0], R.origin[1]);
+    C.start = R.start; C.park = { ...R.park };
+    for (const [op, ...a] of R.path) {
+      if (op === 'straight') b.straight(a[0]);
+      else if (op === 'ease') b.ease(a[0], a[1]);
+      else if (op === 'mark') marks[a[0]] = a[1] === undefined ? b.x : b.x + a[1];
+      else if (op === 'intersection') C.intersections.push({ x0: a[0], x1: a[1], name: a[2] });
+      else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
+      else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
+      else if (op === 'gust') (C.gusts || (C.gusts = [])).push({ x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else throw new Error(`route ${id}: unknown path step "${op}"`);
+    }
+    for (const [name, p] of Object.entries(R.marks || {})) marks[name] = at(p);
+    const F = R.finish, fin = marks[F.at];
     C.finishX = fin + 6; C.doorX = fin + 18;
-    C.venue = { x0: fin + 7, x1: fin + 34, arch: fin + 18 };
+    if (F.office) C.office = { x0: fin + F.office.x0, x1: fin + F.office.x1 };
+    if (F.venue) C.venue = { x0: fin + F.venue.x0, x1: fin + F.venue.x1, arch: fin + F.venue.arch };
+    for (const [type, p, ...a] of R.features || []) b[type](at(p), ...a);
     C.terrain = b.build();
     C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
-    C.checkpoints = [C.start, gust0 + 10, lipA + 2, fin - 10].map((x) => ({ x }));
-    // The safe approach (D-12): hop up to Napier Lane's boardwalk, out of the gust and over the lip and pothole. It is
-    // one-way, so a rider who doesn't hop stays on the road underneath. Gentler than the road, so it costs time.
-    const walk0 = gust0 - 18, walkEnd = potholeX + 62;
-    C.boardwalk = { name: 'NAPIER LANE', x0: walk0 - 3, x1: walkEnd, speedLimit: 8.5, pts: [[walk0 - 3, 0.25], [walk0, 0.55], [gust0, 0.45], [walkEnd, C.terrain.height(walkEnd) - 0.1]] };
-    C.hints = [
-      { x: 6, id: 'boardwalk', actions: ['hop'], text: 'Hop up to the boardwalk: no gust, but slower.' },
-      { x: gust0 - 8, id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
-    ];
-    C.customer = {
-      name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
-      order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',
-      messages: ['Every petal counts. Do not let the wind win.', 'Napier Lane is sheltered, if you can hop up to it. Gusts are not an excuse.'],
-      cargoNote: 'Cargo: one hand-tied bouquet. Petals only.', cargoLabel: 'Petals left',
-    };
-    C.landmarks = landmarksFor('telegraph-hill', C);
+    C.stairs = b.features.filter((f) => f.type === 'stairs').map((f) => ({ x0: f.x0, x1: f.x1, n: f.n, tread: f.tread, rise: f.rise }));
+    if (R.ramps) C.ramps = R.ramps.map(place);
+    if (R.cones) C.cones = R.cones.map(at);
+    if (R.cars) C.cars = R.cars.map(place);
+    if (R.crossers) C.crossers = R.crossers.map(place);
+    if (R.powerups) C.powerups = R.powerups.map(place);
+    if (R.pedestrians) C.pedestrians = R.pedestrians.map(place);
+    C.checkpoints = R.checkpoints.map((p) => ({ x: at(p) }));
+    if (R.boardwalk) {
+      const W = R.boardwalk;
+      C.boardwalk = { ...place(W), pts: W.pts.map(([x, y]) => { const px = at(x); return [px, typeof y === 'number' ? y : C.terrain.height(px) - Number(/^ground-(\d+(?:\.\d+)?)$/.exec(y)[1])]; }) };
+    }
+    C.hints = R.hints.map(place);
+    C.customer = { ...R.customer, messages: R.customer.messages.slice() };
+    if (R.length) C.length = C.doorX - C.start;
+    C.landmarks = landmarksFor(R.landmarks, C);
     return C;
   }
+  function buildNobHill() { return buildRoute('nobHill'); }
+  function buildRussianHill() { return buildRoute('russianHill'); }
+  function buildTelegraphHill() { return buildRoute('telegraph'); }
 
-  function buildRussianHill() {
-    const C = emptyCourse('russianHill');
-    Object.assign(C, { index: 2, title: 'THE WEDDING CAKE', hood: 'RUSSIAN HILL', street: 'GREEN', theme: 'russian', cargo: 'cake', par: 48, seed: 2026, streetTrees: true });
-    const RISE = 0.22, TREAD = 0.75, STEPS = 7;
-    const b = new CourseBuilder(-70, 0);
-    b.straight(84);                                          // Jones St summit (start)
-    C.start = 3;
-    C.park = { x0: -70, x1: 1 };
-    C.intersections.push({ x0: 3, x1: 14, name: 'JONES ST' });
-    b.ease(-0.16, 5).straight(40);                           // Block 1: 16%, the big pothole
-    b.ease(-RISE / TREAD, 3);
-    const stairsX = b.x + 1.5;
-    b.straight(1.5 + STEPS * TREAD + 3);                     // Macondray Lane steps ride on their own grade
-    b.ease(0, 6);
-    const leav = b.x; b.straight(12);
-    C.intersections.push({ x0: leav, x1: b.x, name: 'LEAVENWORTH ST' });
-    b.ease(0.08, 1.4); const lipA = b.x; b.ease(-0.3, 1.2);
-    C.lips.push({ x: lipA, big: false });
-    C.crosswalks.push({ x0: lipA - 1.4, x1: lipA });
-    const block2 = b.x; b.straight(60);                      // Block 2: 30%, Ina Coolbrith Park
-    b.ease(0, 7);
-    const hyde = b.x; b.straight(14);
-    C.intersections.push({ x0: hyde, x1: b.x, name: 'HYDE ST' });
-    b.ease(0.06, 1.2); const lipB = b.x; b.ease(-0.36, 1.0);
-    C.lips.push({ x: lipB, big: true });
-    C.crosswalks.push({ x0: lipB - 1.2, x1: lipB });
-    const block3 = b.x; b.straight(52);                      // Block 3: 36%, the dramatic one
-    b.ease(-0.12, 8);
-    const cz = b.x; b.straight(40);                          // construction zone: 12%
-    b.ease(0, 5);
-    const larkin = b.x; b.straight(14);
-    C.intersections.push({ x0: larkin, x1: b.x, name: 'LARKIN ST' });
-    b.ease(0.05, 1.2); const lipC = b.x; b.ease(-0.1, 1.2);
-    C.lips.push({ x: lipC, big: false });
-    C.crosswalks.push({ x0: lipC - 1.2, x1: lipC });
-    const block4 = b.x; b.straight(60);                      // Block 4: 10%, Lombard Street backdrop
-    b.ease(0, 6);
-    const fin = b.x; b.straight(140);
-    C.finishX = fin + 6; C.doorX = fin + 18;
-    C.venue = { x0: fin + 7, x1: fin + 34, arch: fin + 18 };
-    b.pothole(36, 2.0, 0.28);
-    b.stairs(stairsX, STEPS, TREAD, RISE);
-    b.bump(block3 + 26, 0.9, 0.07).bump(block3 + 30, 0.9, 0.07);
-    C.terrain = b.build();
-    C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
-    C.stairs = [{ x0: stairsX, x1: stairsX + STEPS * TREAD, n: STEPS, tread: TREAD, rise: RISE }];
-    const rampX = larkin - 6;
-    C.ramps = [{ x: rampX }];
-    C.cones = [rampX - 1.4, cz + 9, cz + 10.3, block4 + 34, block4 + 35.3];
-    C.crossers = [
-      { kind: 'cablecar', x: hyde + 7, trigger: hyde - 45, lead: 3.6, sign: 'POWELL & HYDE' },
-      { kind: 'maybemo', x: rampX + 7.6, trigger: larkin - 45 },
-    ];
-    C.powerups = [{ kind: 'bubble', x: leav + 6 }, { kind: 'espresso', x: larkin + 11 }];
-    C.pedestrians = [
-      { x: 9, kind: 'tourist' }, { x: stairsX + 2.5, kind: 'fitness' }, { x: block2 + 24, kind: 'dog' },
-      { x: block3 + 14, kind: 'tech' }, { x: block4 + 18, kind: 'tourist' },
-    ];
-    C.checkpoints = [C.start, stairsX + STEPS * TREAD + 4, leav + 2, block2 + 12, hyde + 2, block3 + 20, cz - 2, larkin + 6, block4 + 24].map((x) => ({ x }));
-    C.hints = [
-      { x: -1e9, id: 'cake', actions: ['pedal'], text: 'Wedding cake on board. Smooth is fast.' },
-      { x: 22, id: 'pothole', actions: ['hop'], text: 'Big pothole. Hop it!' },
-      { x: stairsX - 12, id: 'stairs', actions: ['brake'], text: 'Macondray Lane steps. Slow down... or hop.' },
-      { x: hyde - 45, id: 'cable', actions: ['brake'], text: 'Cable car on Hyde! Brake early on this slope.' },
-      { x: larkin - 30, id: 'ramp', actions: ['pedal', 'hop'], text: 'A robot car is stalling at Larkin. Jump the ramp!' },
-    ];
-    C.customer = {
-      name: 'Gwen', role: 'Wedding planner, Frost & Tiers Events', avatar: 'planner', brand: 'FROST & TIERS EVENTS',
-      order: 'ORDER #0002 · 3-TIER CAKE · HANDLE WITH CARE', route: 'Across Russian Hill to Lombard Gardens',
-      messages: ["Please keep it upright. Unlike the groom's finances.", 'Three tiers. Fondant. Zero "creative interpretations."'],
-      cargoNote: 'Cargo: one three-tier wedding cake, strapped to the rack with optimism.', cargoLabel: 'Cake integrity',
-    };
-    C.length = C.doorX - C.start;
-    C.landmarks = landmarksFor('russian-hill', C);
-    return C;
-  }
+
 
   // Title backdrop: a plateau that tips into an absurd descent.
   function buildTitleCourse() {
@@ -2860,7 +2866,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill,
+    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -4147,7 +4153,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       hudIcon: (game, ctx, x, top, u, frac) => game.drawCupIcon(ctx, x, top + u * 0.55, u * 2.4, frac),
       meter: (c) => ({ label: 'SLOSH ', value: Math.abs(c.slosh) / Math.max(0.05, c.thr) }),
       debug: (c) => 'slosh ' + c.slosh.toFixed(2) + '  thr ' + c.thr.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  latte ' + c.amount.toFixed(1) + '%',
-      pauseLine: 'The latte is getting cold. And judgmental.',
+      pauseLine: 'The latte is getting cold. And judgmental.', dropLabel: ' m to the latte drop',
       arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
       splashSound: 'splash', bits: cupBits, onSpill: cupSpill, spillLine: true, condNote: () => '',
     },
@@ -4159,7 +4165,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       hudIcon: (game, ctx, x, top, u, frac) => game.drawCakeIcon(ctx, x, top + u * 0.5, u * 2.6, frac),
       meter: (c) => ({ label: 'WOBBLE ', value: Math.abs(c.angle) / CAKE.maxAngle }),
       debug: (c) => 'cake angle ' + c.angle.toFixed(2) + '  w ' + c.angVel.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  integrity ' + c.amount.toFixed(1) + '%',
-      pauseLine: 'The cake is sweating. And judgmental.',
+      pauseLine: 'The cake is sweating. And judgmental.', dropLabel: ' m to the latte drop', // as before F-27; a cake off Russian Hill only happens in Free Ride
       arrival: { bell: false, bride: true, reviewAfter: 4.4, success: false },
       splashSound: 'wobble', bits: cakeBits, onSpill: (game) => { if (Math.random() < 0.5) game.spawnCargoBits(2, false); }, spillLine: false,
       condNote: (r) => (r.decorLeft !== null ? ' · ' + r.decorLeft + '/' + CAKE_DECOR.length + ' decor' : ''),
@@ -4172,7 +4178,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       hudIcon: (game, ctx, x, top, u, frac) => game.drawBouquetIcon(ctx, x, top + u * 0.55, u * 2.4, frac),
       meter: (c) => ({ label: 'PETALS LOST ', value: (100 - c.amount) / 100 }),
       debug: (c) => 'petals ' + c.amount.toFixed(1) + '%  spilling ' + c.spilling.toFixed(2),
-      pauseLine: 'The petals are holding on. Barely. And judgmental.',
+      pauseLine: 'The petals are holding on. Barely. And judgmental.', dropLabel: ' m to the bouquet drop',
       arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
       splashSound: 'splash', bits: cupBits, onSpill: cupSpill, spillLine: true, condNote: () => '',
     },
@@ -4803,10 +4809,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
       fillScoreList(document.getElementById('title-board'), this.store.get('shifts', []));
-      const a = cleanBest(this.store.get('best:nobHill', null)), b = cleanBest(this.store.get('best:russianHill', null)), t = cleanBest(this.store.get('best:telegraph', null));
-      if (a) parts.push('Latte ' + fmtMoney(a.tip) + ' (' + Math.round(a.condition) + '%)');
-      if (b) parts.push('Cake ' + fmtMoney(b.tip) + ' (' + Math.round(b.condition) + '%)');
-      if (t) parts.push('Bouquet ' + fmtMoney(t.tip) + ' (' + Math.round(t.condition) + '%)');
+      for (const R of ROUTES) {
+        const best = cleanBest(this.store.get('best:' + R.id, null));
+        if (best) parts.push(cargoWords(ROUTE_DATA[R.id].meta.cargo).short + ' ' + fmtMoney(best.tip) + ' (' + Math.round(best.condition) + '%)');
+      }
       el.textContent = parts.join('  ·  ');
     }
     action(a, data) {
@@ -5695,7 +5701,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.beginPath(); ctx.moveTo(bx + bw + u * 0.42, by - u * 0.55); ctx.lineTo(bx + bw + u * 1.2, by - u * 0.3); ctx.lineTo(bx + bw + u * 0.42, by - u * 0.05); ctx.fill();
       ctx.textAlign = 'center'; ctx.font = '800 ' + (u * 0.8).toFixed(1) + 'px ' + FONT_BODY;
       const left = Math.max(0, Math.round(endX - W.bike.x));
-      const label = left + (C.loop ? ' m to the bottom' : this.mode === 'drill' ? ' m to the Academy' : C.id === 'russianHill' ? ' m to the wedding' : C.cargo === 'bouquet' ? ' m to the bouquet drop' : ' m to the latte drop');
+      const RD = ROUTE_DATA[C.id], label = left + (C.loop ? ' m to the bottom' : this.mode === 'drill' ? ' m to the Academy' : RD && RD.dropLabel ? RD.dropLabel : cargoView(C.cargo).dropLabel);
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,246,229,0.9)'; ctx.strokeText(label, Wd / 2, by + u * 1.45);
       ctx.fillStyle = 'rgba(45,42,50,0.9)'; ctx.fillText(label, Wd / 2, by + u * 1.45);
       const rw = u * 9.2, rx = Wd - pad - rw;

@@ -1097,3 +1097,27 @@ test('boardwalk: a crash on the deck respawns on the road, and the road is clear
   assert.equal(w.result().crashes, 1);
   assert.ok(!events.some((e) => e.type === 'SANITY'), 'no silent respawn');
 });
+
+/* --------------------------- routes as data (F-26) --------------------------- */
+
+test('routes: every route in ROUTES is a ROUTE_DATA entry, and its builder is the generic one', () => {
+  for (const R of H.ROUTES) {
+    assert.ok(H.ROUTE_DATA[R.id], `${R.id} has a data entry`);
+    assert.equal(JSON.stringify(R.build()), JSON.stringify(H.buildRoute(R.id)), `${R.id} builds from its entry`);
+  }
+});
+
+test('routes: positions are a mark plus offsets, read left to right; an unknown mark or step fails loudly', () => {
+  const C = H.buildRussianHill(), larkin = C.intersections.find((i) => i.name === 'LARKIN ST').x0;
+  assert.equal(C.cones[0], larkin - 6 - 1.4, '"rampX-1.4" with rampX = "larkin-6"');
+  const saved = H.ROUTE_DATA.nobHill.cones;
+  try {
+    H.ROUTE_DATA.nobHill.cones = ['nowhere+3'];
+    assert.throws(() => H.buildNobHill(), /unknown position "nowhere\+3"/);
+  } finally { H.ROUTE_DATA.nobHill.cones = saved; }
+  const path = H.ROUTE_DATA.telegraph.path;
+  try {
+    H.ROUTE_DATA.telegraph.path = [...path, ['teleport', 9]];
+    assert.throws(() => H.buildTelegraphHill(), /unknown path step "teleport"/);
+  } finally { H.ROUTE_DATA.telegraph.path = path; }
+});
