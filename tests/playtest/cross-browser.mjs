@@ -60,7 +60,7 @@ async function run(name, engine, sizeName, size) {
     // Full autopilot shift to the final review.
     const t0 = Date.now();
     await page.goto(URL + '?autopilot=typical');
-    await page.waitForFunction(() => window.HILL && HILL.game && HILL.game.state === 'final', null, { timeout: 240000, polling: 500 });
+    await page.waitForFunction(() => window.HILL && HILL.game && HILL.game.state === 'final', null, { timeout: 420000, polling: 500 });
     r.shiftSeconds = Math.round((Date.now() - t0) / 1000);
     Object.assign(r, await page.evaluate(() => ({
       tips: HILL.game.results.filter(Boolean).map((x) => x.tip),
@@ -76,6 +76,8 @@ async function run(name, engine, sizeName, size) {
   return r;
 }
 
-const jobs = [];
-for (const [name, engine] of Object.entries(engines)) for (const [sizeName, size] of Object.entries(sizes)) jobs.push(run(name, engine, sizeName, size));
-console.log(JSON.stringify(await Promise.all(jobs), null, 1));
+// One at a time: a shift runs in real time, so browsers competing for the CPU can miss the timeout.
+const results = [];
+for (const [name, engine] of Object.entries(engines)) for (const [sizeName, size] of Object.entries(sizes)) results.push(await run(name, engine, sizeName, size));
+console.log(JSON.stringify(results, null, 1));
+if (results.some((r) => r.errors.length)) process.exitCode = 1;
