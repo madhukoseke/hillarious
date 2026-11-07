@@ -1003,3 +1003,94 @@ test('landmarks: Telegraph Hill has its hand-written park inside the route, and 
   assert.ok(pk.x > C.start && pk.x < C.doorX && pk.x0 < pk.x1, 'the park sits on the route');
   assert.ok(!plain(H.LANDMARK_DATA).routes.some((r) => r.id === 'telegraph-hill'), 'the pinned export is not edited');
 });
+
+/* ------------------------- Telegraph Hill: boardwalk ------------------------- */
+
+// Ride a profile on Telegraph Hill, hopping once at hopAt (null stays on the road), and optionally holding a speed through the gust.
+function rideTelegraph(profile, { hopAt = null, gustV = 0 } = {}) {
+  const C = H.buildTelegraphHill(), w = new H.World(C), ap = new H.Autopilot(profile), events = [];
+  let hopped = false, hold = 0, deckV = 0;
+  while (w.t < 170 && w.state !== 'done') {
+    const i = ap.input(w), b = w.bike;
+    if (hopAt !== null && !hopped && b.x >= hopAt && b.grounded) { hopped = true; hold = 0.2; i.jumpPressed = true; }
+    if (hold > 0) { i.jumpHeld = true; hold -= H.STEP; }
+    if (gustV && b.x > C.gusts[0].x0 - 14 && b.x < C.gusts[0].x1) { i.pedal = b.vx < gustV - 0.5; i.brake = b.vx > gustV; }
+    w.step(i);
+    events.push(...w.drain());
+    if (w.bike.x > C.gusts[0].x1 && w.bike.x < C.boardwalk.x1 - 5 && w.bike.wheels.every((wh) => wh.surf && wh.surf.owner === w.obstacles.boardwalk)) deckV = Math.max(deckV, w.bike.vx);
+  }
+  return { w, C, events, deckV, r: w.result() };
+}
+const entered = (events) => events.some((e) => e.type === 'BOARDWALK');
+
+test('boardwalk: a rider who does not hop stays on the road, on every profile', () => {
+  for (const p of ['careful', 'typical', 'fast', 'reckless']) {
+    const { w, events, r } = rideTelegraph(p);
+    assert.equal(w.state, 'done', `${p} road rider must finish`);
+    assert.ok(!entered(events), `${p} never joined the boardwalk`);
+    assert.ok(r.gustLoss > 0, `${p} rode through the gust`);
+    assert.ok(!events.some((e) => e.type === 'SANITY'), `${p} did not respawn`);
+  }
+});
+
+test('boardwalk: the safe approach keeps the petals, shelters from the gust, and costs time', () => {
+  const road = rideTelegraph('typical').r, { events, deckV, C, r } = rideTelegraph('typical', { hopAt: 24 });
+  assert.ok(entered(events), 'the hop lands on the boardwalk');
+  assert.equal(r.gustLoss, 0, 'no gust up here');
+  assert.ok(r.condition > road.condition + 10, `${r.condition} vs road ${road.condition}`);
+  assert.ok(r.time > road.time + 3, `${r.time} should cost time against road ${road.time}`);
+  assert.ok(deckV > 0 && deckV < C.boardwalk.speedLimit + 1, `held to a pace on the boards: ${deckV}`);
+  assert.deepEqual(plain(H.routeGoals('telegraph', r)), [true, true, false], 'two goals: the third belongs to the road');
+});
+
+test('boardwalk: hopping anywhere along the entry gets on, with no crash or petal cost', () => {
+  for (const hopAt of [14, 18, 24, 30]) {
+    const { events, r } = rideTelegraph('typical', { hopAt });
+    assert.ok(entered(events), `hop at ${hopAt}`);
+    assert.equal(r.crashes, 0, `hop at ${hopAt} crashed`);
+    assert.ok(r.condition > 99, `hop at ${hopAt} kept ${r.condition}%`);
+  }
+});
+
+test('boardwalk: all three goals are still reachable, by riding the gust carefully on the road', () => {
+  const { events, r } = rideTelegraph('typical', { gustV: 7.5 });
+  assert.ok(!entered(events));
+  assert.deepEqual(plain(H.routeGoals('telegraph', r)), [true, true, true], `time ${r.time}, gust ${r.gustLoss}`);
+});
+
+test('boardwalk: the wind depends on height; road below the deck is exposed, the deck is not', () => {
+  const C = H.buildTelegraphHill(), w = new H.World(C), x = C.gusts[0].x0 + 10, deck = C.boardwalk.pts[2][1];
+  assert.equal(w.windAt(x, C.terrain.height(x) + H.RIDE_H), C.gusts[0].wind, 'on the road');
+  assert.equal(w.windAt(x, deck + 2), 0, 'on the deck');
+  assert.equal(new H.World(H.buildNobHill()).windAt(50, 99), 0, 'routes with no boardwalk are unaffected');
+});
+
+test('boardwalk: a hard landing does not fall through the deck', () => {
+  const C = H.buildTelegraphHill(), w = new H.World(C), x = C.gusts[0].x1 + 10, p = C.boardwalk.pts, s = (p[3][1] - p[2][1]) / (p[3][0] - p[2][0]);
+  const deck = p[2][1] + (x - p[2][0]) * s;
+  w.bike.reset(x, deck + H.RIDE_H + 4, 0, 6);
+  w.bike.vy = -9;
+  for (let i = 0; i < 240; i++) {
+    w.step(input());
+    if (w.state !== 'riding') break;
+    const dx = w.bike.x - p[2][0];
+    assert.ok(w.bike.y > p[2][1] + dx * s, `fell through at step ${i}`);
+  }
+});
+
+test('boardwalk: a crash on the deck respawns on the road, and the road is clear from there', () => {
+  const C = H.buildTelegraphHill(), w = new H.World(C), ap = new H.Autopilot('typical'), events = [];
+  let hopped = false, hold = 0, crashed = false, onDeckAtCrash = false;
+  while (w.t < 170 && w.state !== 'done') {
+    const i = ap.input(w), b = w.bike;
+    if (!hopped && b.x >= 24 && b.grounded) { hopped = true; hold = 0.2; i.jumpPressed = true; }
+    if (hold > 0) { i.jumpHeld = true; hold -= H.STEP; }
+    if (!crashed && b.x > 60 && w.state === 'riding') { crashed = true; onDeckAtCrash = w.obstacles.boardwalk.surface.active; w.crash('test', 0.5); }
+    w.step(i);
+    events.push(...w.drain());
+  }
+  assert.ok(onDeckAtCrash, 'the crash happened on the boardwalk');
+  assert.equal(w.state, 'done', 'the rider still finishes');
+  assert.equal(w.result().crashes, 1);
+  assert.ok(!events.some((e) => e.type === 'SANITY'), 'no silent respawn');
+});

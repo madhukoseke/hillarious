@@ -781,7 +781,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       start: 0, finishX: 1e9, doorX: 1e9 + 12, terrain: null, checkpoints: [{ x: 0 }],
       potholes: [], cones: [], cars: [], ramps: [], crossers: [], powerups: [], stairs: [], lips: [], intersections: [],
       crosswalks: [], pedestrians: [], hints: [], landmarks: [], park: null, office: null, venue: null, customer: null,
-      streetTrees: false, stopZones: [], loop: false, dialogue: null,
+      streetTrees: false, stopZones: [], loop: false, dialogue: null, boardwalk: null,
     };
   }
 
@@ -859,13 +859,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   // Delivery 2: across Russian Hill, from Jones St down to a garden wedding below Lombard Street.
-  // Telegraph Hill (1.4 prototype, not in the shift yet): a steep block with one exposed downhill gust zone.
+  // Delivery 3: Telegraph Hill, a steep block with one exposed downhill gust zone and a sheltered boardwalk above it.
   // The gust blows against the rider; bouquet petals go first when it catches them at speed.
   function buildTelegraphHill() {
     const C = emptyCourse('telegraph');
-    Object.assign(C, { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 43, seed: 2027 });
+    Object.assign(C, { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 48, seed: 2027 });
     const b = new CourseBuilder(-60, 0);
-    b.straight(60);
+    b.straight(90); // a run-up, so there is time to choose the road or the boardwalk before the gust
     C.start = 3;
     C.park = { x0: -60, x1: 1 };
     C.intersections.push({ x0: 3, x1: 12, name: 'KEARNY ST' });
@@ -875,7 +875,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const lipA = b.x + 2; b.straight(4); b.ease(0.07, 1.2); b.ease(-0.1, 1.2);
     C.lips.push({ x: lipA, big: false });
     b.straight(40); b.ease(0, 6);
-    b.pothole(b.x + 6, 1.0, 0.22);
+    const potholeX = b.x + 6; b.pothole(potholeX, 1.0, 0.22);
     b.straight(120);
     // The long run-down to Ruth's door (D-12): a second grade, a flat, and pedestrians on the sidewalk.
     const pedA = b.x + 30; b.straight(30); b.ease(-0.12, 6); b.straight(110); b.ease(0, 6); b.straight(50);
@@ -887,11 +887,18 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     C.terrain = b.build();
     C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
     C.checkpoints = [C.start, gust0 + 10, lipA + 2, fin - 10].map((x) => ({ x }));
-    C.hints = [{ x: gust0 - 12, id: 'pedal', actions: ['brake'], text: 'Gust on the downhill. Petals go first. Ease off!' }];
+    // The safe approach (D-12): hop up to Napier Lane's boardwalk, out of the gust and over the lip and pothole. It is
+    // one-way, so a rider who doesn't hop stays on the road underneath. Gentler than the road, so it costs time.
+    const walk0 = gust0 - 18, walkEnd = potholeX + 62;
+    C.boardwalk = { name: 'NAPIER LANE', x0: walk0 - 3, x1: walkEnd, speedLimit: 8.5, pts: [[walk0 - 3, 0.25], [walk0, 0.55], [gust0, 0.45], [walkEnd, C.terrain.height(walkEnd) - 0.1]] };
+    C.hints = [
+      { x: 6, id: 'boardwalk', actions: ['hop'], text: 'Hop up to the boardwalk: no gust, but slower.' },
+      { x: gust0 - 8, id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
+    ];
     C.customer = {
       name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
       order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',
-      messages: ['Every petal counts. Do not let the wind win.', 'Gusts are not an excuse. Well, a little.'],
+      messages: ['Every petal counts. Do not let the wind win.', 'Napier Lane is sheltered, if you can hop up to it. Gusts are not an excuse.'],
       cargoNote: 'Cargo: one hand-tied bouquet. Petals only.', cargoLabel: 'Petals left',
     };
     C.landmarks = landmarksFor('telegraph-hill', C);
@@ -1404,6 +1411,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         }
         const Fr = Math.min(P.rollCrr * F, (0.5 * m * Math.abs(vt)) / dt);
         Ft -= vt > 0 ? Fr : -Fr;
+        const limit = wh.surf && wh.surf.owner && wh.surf.owner.speedLimit; // the boardwalk's narrow boards hold you to a pace
+        if (limit && vt > limit) Ft -= Math.min(m * 4 * (vt - limit), fric);
         fx += Ft * tx; fy += Ft * ty;
         tau += P.pitchCoupling * (rx * Ft * ty - ry * Ft * tx);
       }
@@ -1749,6 +1758,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     return { pts: flat, n: pts.length, minX, maxX, minY, maxY, owner, hazard, active: true };
   }
 
+  // Height of a left-to-right polyline at x, clamped to its ends.
+  function polylineY(pts, x) {
+    for (let i = 1; i < pts.length; i++) {
+      if (x <= pts[i][0]) { const a = pts[i - 1], c = pts[i]; return a[1] + ((c[1] - a[1]) * clamp((x - a[0]) / (c[0] - a[0]), 0, 1)); }
+    }
+    return pts[pts.length - 1][1];
+  }
+
   // D1's stalled prototype, parked on the slope with a builder's plank leaned on its hatch.
   class ParkedMaybeMo {
     constructor(cd, T, obs) {
@@ -1894,6 +1911,18 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.powerups = C.powerups.map((pu) => ({ kind: pu.kind, x: pu.x, y: T.height(pu.x) + 1.15, taken: false }));
       this.potholes = C.potholes.map((ph) => ({ x0: ph.x0, x1: ph.x1, depth: ph.depth, hit: false }));
       this.stairs = C.stairs.map((st) => Object.assign({ entered: false }, st));
+      this.boardwalk = C.boardwalk ? Object.assign({ kind: 'boardwalk', entered: false }, C.boardwalk) : null;
+      if (this.boardwalk) { this.boardwalk.surface = this.addSurface(C.boardwalk.pts, this.boardwalk, false); this.boardwalk.surface.active = false; }
+    }
+    // The boardwalk is solid only once both wheels are above it. One-way contact alone isn't enough: a road rider's
+    // body sticks up through the deck, counts as on top of it, and would hang there. Once on, it stays solid through
+    // a hard landing's suspension travel; a respawn on the road clears it.
+    updateBoardwalk(b) {
+      const walk = this.boardwalk;
+      if (!walk) return;
+      const ca = Math.cos(b.a), sa = Math.sin(b.a), gy = b.y - RIDE_H;
+      const margin = walk.surface.active && b.x >= walk.x0 ? 0.6 : 0;
+      walk.surface.active = b.wheels.every((wh) => gy + wh.lx * sa > polylineY(walk.pts, b.x + wh.lx * ca) - margin);
     }
     addSurface(pts, owner, hazard) { const S = makeSurface(pts, owner, hazard); this.surfaces.push(S); return S; }
     // A-frame construction ramp: launches you at speed, rolls you over gently when slow.
@@ -1948,6 +1977,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         }
       }
       for (const st of this.stairs) if (!st.entered && b.x > st.x0 - 1.5) { st.entered = true; W.emit('STAIRS', { x: st.x0 }); }
+      const walk = this.boardwalk;
+      if (walk && !walk.entered && b.x < walk.x1 - 5 && b.wheels.some((wh) => wh.contact && wh.surf && wh.surf.owner === walk)) { walk.entered = true; W.emit('BOARDWALK', { x: b.x }); }
     }
     // Things that move on their own, in every world state.
     updateDynamic(dt) { for (const c of this.crossers) c.update(dt, this.w); }
@@ -1974,6 +2005,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
     }
     onRespawn(x) {
+      if (this.boardwalk) this.boardwalk.surface.active = false; // back on the road
       for (const car of this.cars) car.onRespawn(x);
       for (const c of this.crossers) c.onRespawn(x);
       for (const ph of this.potholes) if (ph.x0 > x) ph.hit = false;
@@ -2321,6 +2353,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // Customer texts (phone channel)
     { id: 'c-gps', trigger: 'CARGO_HALF', speaker: 'customer', text: 'Why does your GPS show you 12 feet above the road?', priority: 3, cargo: 'coffee', duration: 3.6 },
     { id: 'c-tier', trigger: 'CARGO_HALF', speaker: 'customer', text: 'Please tell me the second tier is just running late.', priority: 3, cargo: 'cake', duration: 3.6 },
+    { id: 'b-walk-r', trigger: 'BOARDWALK', speaker: 'rider', text: 'Napier Lane: no wind, no hurry.', priority: 2, cargo: 'bouquet' },
     { id: 'b-pot-r', trigger: 'POTHOLE', speaker: 'rider', text: 'Pothole: 1. Petals: 0.', priority: 1, cargo: 'bouquet' },
     { id: 'b-half-r', trigger: 'CARGO_HALF', speaker: 'rider', text: 'Losing petals, one bloom at a time.', priority: 2, cargo: 'bouquet' },
     { id: 'b-half-c', trigger: 'CARGO_HALF', speaker: 'customer', text: 'Are those petals or confetti? Be honest.', priority: 3, cargo: 'bouquet', duration: 3.4 },
@@ -2478,11 +2511,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (this.invuln > 0) this.invuln -= dt;
       b.boost = this.boostT > 0 ? 1.6 : 1;
       if (this.boostT > 0) this.boostT = Math.max(0, this.boostT - dt);
+      this.obstacles.updateBoardwalk(b);
       switch (this.state) {
         case 'riding': {
           b.step(dt, inp, this, this.t);
           if (this.state !== 'riding') break;
-          const windDmg = this.cargo.update(dt, b, !!this.opts.unbreakable, this.windAt(b.x));
+          const windDmg = this.cargo.update(dt, b, !!this.opts.unbreakable, this.windAt(b.x, b.y));
           if (this.cargo.kind === 'bouquet') this.feats.gustLoss += windDmg || 0; // petals the gust took, for the goal
           this.trackDamage(windDmg, dt);
           this.drainCargo();
@@ -2669,7 +2703,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.obstacles.onRespawn(x); this.obstacles.resetProps();
       this.emit('LAP', { laps: this.laps, x });
     }
-    windAt(x) { for (const g of this.course.gusts || []) if (x >= g.x0 && x <= g.x1) return g.wind; return 0; }
+    // The wind at a position. Pass the height too: anything on or above the boardwalk is sheltered from it.
+    windAt(x, y = -Infinity) {
+      const walk = this.course.boardwalk;
+      if (walk && x >= walk.x0 && x <= walk.x1 && y - RIDE_H > polylineY(walk.pts, x) - 0.3) return 0;
+      for (const g of this.course.gusts || []) if (x >= g.x0 && x <= g.x1) return g.wind;
+      return 0;
+    }
     result() {
       const s = this.score, C = this.course, O = this.obstacles;
       const stats = { condition: this.cargo.amount, time: s.time, par: s.par, crashes: s.crashes, nearMisses: s.nearMisses, cleanLandings: s.cleanLandings, kind: this.cargo.kind };
@@ -3512,6 +3552,33 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.strokeStyle = '#b07a4b'; ctx.lineWidth = 0.05;
       ctx.beginPath(); ctx.moveTo(p[0][0], p[0][1] - 0.02); ctx.lineTo(p[1][0], p[1][1] - 0.02); ctx.lineTo(p[2][0], p[2][1] - 0.02); ctx.stroke();
     }
+  }
+  // Napier Lane's raised boardwalk: piers down to the sidewalk, a plank deck, and a planted rail for the shelter.
+  function drawBoardwalk(ctx, walk, T, xa, xb, t) {
+    const x0 = Math.max(walk.x0, xa - 2), x1 = Math.min(walk.x1, xb + 2);
+    if (x1 <= x0) return;
+    const deck = (x) => polylineY(walk.pts, x), first = Math.ceil(x0 / 5) * 5;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#6e4a2e'; ctx.lineWidth = 0.16;
+    for (let x = first; x <= x1; x += 5) {
+      const y = deck(x), foot = T.height(x) + ROAD.walk;
+      if (y - foot > 0.2) { ctx.beginPath(); ctx.moveTo(x, y - 0.1); ctx.lineTo(x, foot); ctx.stroke(); }
+    }
+    ctx.strokeStyle = '#8a6a48'; ctx.lineWidth = 0.05;
+    for (let x = first; x <= x1; x += 5) { ctx.beginPath(); ctx.moveTo(x, deck(x)); ctx.lineTo(x, deck(x) + 1.25); ctx.stroke(); }
+    for (let x = first + 2.5; x <= x1; x += 5) { // planters on the rail: the reason there is no wind up here
+      const y = deck(x) + 1.25, sway = Math.sin(t * 1.6 + x) * 0.03;
+      ctx.fillStyle = '#5f8f55'; ctx.beginPath(); ctx.ellipse(x + sway, y + 0.2, 1.05, 0.42, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#7dae6b'; ctx.beginPath(); ctx.ellipse(x - 0.3 + sway, y + 0.3, 0.55, 0.24, 0, 0, TAU); ctx.fill();
+    }
+    const line = (off, col, w) => {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+      for (let i = 0; i < walk.pts.length; i++) { const q = walk.pts[i]; if (i) ctx.lineTo(q[0], q[1] + off); else ctx.moveTo(q[0], q[1] + off); }
+      ctx.stroke();
+    };
+    line(1.25, '#8a6a48', 0.07);
+    line(-0.08, '#8a5c36', 0.16);
+    line(-0.015, '#c79a68', 0.05);
   }
   // Pedestrians: tech worker, tourist, dog walker, fitness enthusiast (the cable car operator rides along).
   const PED_LOOK = {
@@ -5200,6 +5267,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           const b = W.bike; this.cam.snap(b.x, b.y, b.vx); this.scarf.ok = false; this.particles.clear();
           break;
         }
+        case 'BOARDWALK': this.say('BOARDWALK'); break;
         case 'BIG_AIR': this.react('cheer', 1.6); this.say('BIG_JUMP'); break;
         case 'HARD_BRAKE': this.say('HARD_BRAKE'); break;
         case 'CARGO_HALF': this.say('CARGO_HALF'); break;
@@ -5337,6 +5405,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       R.drawRoad(W, xa, xb);
       const front = [];
       for (const cc of O.crossers) { if (!vis(cc.cx, 4)) continue; if (crosserView(cc).zf > 0.2) drawCrosser(ctx, cc, t); else front.push(cc); }
+      if (O.boardwalk) drawBoardwalk(ctx, O.boardwalk, W.terrain, xa, xb, t);
       R.drawPedestrians(W, xa, xb, t);
       this.particles.drawStains(ctx);
       for (const r of O.ramps) if (vis(r.x, 6)) drawRamp(ctx, r);
@@ -5392,6 +5461,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = '#c2584a'; ctx.fillText('LOMBARD GARDENS', p.x, p.y - S * 0.06);
         ctx.font = '800 ' + Math.max(7, S * 0.15).toFixed(1) + 'px ' + FONT_BODY; ctx.fillStyle = COL.ink; ctx.fillText('WEDDING TODAY · CAKE ENTRANCE →', p.x, p.y + S * 0.33);
+      }
+      const walk = W.obstacles && W.obstacles.boardwalk;
+      if (walk && walk.x0 + 5 > xa - 6 && walk.x0 + 5 < xb + 6) {
+        R.toScreen(cam, walk.x0 + 5, polylineY(walk.pts, walk.x0 + 5) + 3.1, p);
+        ctx.font = '900 ' + (S * 0.3).toFixed(1) + 'px ' + FONT_DISPLAY;
+        const tw = ctx.measureText(walk.name).width + S * 0.6;
+        ctx.fillStyle = 'rgba(255,246,229,0.95)'; rrect(ctx, p.x - tw / 2, p.y - S * 0.32, tw, S * 0.82, S * 0.12); ctx.fill();
+        ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#6e4a2e'; ctx.fillText(walk.name, p.x, p.y - S * 0.06);
+        ctx.font = '800 ' + Math.max(7, S * 0.14).toFixed(1) + 'px ' + FONT_BODY; ctx.fillStyle = COL.ink; ctx.fillText('NO WIND · HOP UP', p.x, p.y + S * 0.28);
       }
       const box = (str, wx, wy, size, fg) => {
         R.toScreen(cam, wx, wy, p);

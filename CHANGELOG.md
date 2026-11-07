@@ -11,7 +11,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The Bouquet has its own lines: Ruth reacts to lost petals, and the rider jokes about pothole damage.
 - The Bouquet is on the Dispatch board after Russian Hill, and START SHIFT now runs all three deliveries.
 - Telegraph Hill has a landmark on its route, Pioneer Park.
-- The Bouquet's route is longer, about 40 seconds for a typical ride, with two pedestrians on the way down to Ruth's door.
+- The Bouquet's route is longer, about 45 seconds for a typical ride, with two pedestrians on the way down to Ruth's door.
+- A safe way down on The Bouquet: hop up to the Napier Lane boardwalk at the top of the hill. It keeps you out of the gust and above the lip and pothole, but its narrow boards hold you to a slower pace. It keeps nearly every petal, but beating par takes the road.
 - Free Ride's cargo row offers BOUQUET, and the title's best line shows your best bouquet run.
 
 ### Changed
