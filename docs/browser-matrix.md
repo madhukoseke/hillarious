@@ -20,6 +20,12 @@ Each run starts a shift as a player (the intro must wait for input), rides, then
 | 2026-10-31 | Unreleased | Firefox 142 | Landscape phone 844×390, touch | Pass | New screens open; no errors. |
 | 2026-10-31 | Unreleased | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | New screens open; no errors. Same tips as Chromium. |
 | 2026-10-31 | Unreleased | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | New screens open; no errors. |
+| 2026-11-07 | 1.4.0 | Chromium 141 | Desktop 1280×720, keyboard | Pass | Three-delivery shift to the final review in 154 s; no console or page errors. Tips $5.04 / $4.85 / $4.70. |
+| 2026-11-07 | 1.4.0 | Chromium 141 | Landscape phone 844×390, touch | Pass | Pass; touch labels shown. Save form and share links ready. |
+| 2026-11-07 | 1.4.0 | Firefox 142 | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
+| 2026-11-07 | 1.4.0 | Firefox 142 | Landscape phone 844×390, touch | Pass | No errors. Same tips as Chromium. |
+| 2026-11-07 | 1.4.0 | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
+| 2026-11-07 | 1.4.0 | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | No errors. Same tips as Chromium. |
 
 All six runs produced identical tips, so the simulation is deterministic across engines.
 

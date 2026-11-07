@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-07
+
 ### Added
 - A third delivery, THE BOUQUET, from Telegraph Hill. Ruth's fragile bouquet sheds petals in an exposed downhill gust and when it lands roughly or crashes. Unbreakable cargo keeps every petal.
 - Three goals for The Bouquet: deliver at least 90% of the petals, lose under 5% to the gust, and beat par with no crashes. Its receipt has its own star lines.
@@ -113,7 +115,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Keyboard, touch, and gamepad controls.
 - A single offline `index.html` with no build step.
 
-[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/madhukoseke/hillarious/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/madhukoseke/hillarious/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/madhukoseke/hillarious/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/madhukoseke/hillarious/compare/v1.1.0...v1.1.1
