@@ -5,6 +5,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+- The bouquet now sheds pink petals when it loses petals, instead of coffee droplets that never appeared.
+- After a cake or bouquet crash, the rack and basket are empty while the cargo flies, instead of showing a coffee cup.
+- In Free Ride, a cake on Nob Hill or Telegraph Hill says "m to the cake drop" instead of "latte drop".
+- SKIP on the final review shows one "not saved" message instead of two.
+- A gamepad can reach the music and effects sliders: move to them with the d-pad and nudge them left or right.
+- On landscape phones, the keyboard legend no longer covers the title's Press SPACE line and volume sliders. How to play still lists the controls.
+
+### Developer
+- Port check: `tests/golden/ports.json` records how every course builds and plays, including every cargo on every route; `tests/ports.test.mjs` fails on any change. Rewrite it with `node tests/golden/update.mjs` only for an intended gameplay change.
+- One cargo interface: `CARGO_TYPES` (engine) and `CARGO_VIEW` (drawing, sounds, HUD) replace every cargo-type branch. A new cargo adds its class and one entry in each table.
+- Fairness check: `tests/fairness.test.mjs` runs all four riders on every route and drill in `ROUTES` and `DRILLS`.
+- Routes as data: Nob Hill, Russian Hill, and Telegraph Hill are `ROUTE_DATA` entries built by `buildRoute`, with positions written as a named mark plus offsets (`"blockB+44"`). The port check confirms they build and play exactly as before.
+
 ## [1.4.0] - 2026-11-07
 
 ### Added
@@ -30,18 +44,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The save-your-score form on the final review is more compact on landscape phones, so less of the review needs scrolling to reach it.
 - Corrupt or half-written best-tip records are ignored instead of breaking the receipt or Dispatch board.
 - High-score rows no longer run the time into the X handle ("2:07.9@name").
-- The bouquet now sheds pink petals when it loses petals, instead of coffee droplets that never appeared.
-- After a cake or bouquet crash, the rack and basket are empty while the cargo flies, instead of showing a coffee cup.
-- In Free Ride, a cake on Nob Hill or Telegraph Hill says "m to the cake drop" instead of "latte drop".
-- SKIP on the final review shows one "not saved" message instead of two.
-- A gamepad can reach the music and effects sliders: move to them with the d-pad and nudge them left or right.
-- On landscape phones, the keyboard legend no longer covers the title's Press SPACE line and volume sliders. How to play still lists the controls.
-
-### Developer
-- Port check: `tests/golden/ports.json` records how every course builds and plays, including every cargo on every route; `tests/ports.test.mjs` fails on any change. Rewrite it with `node tests/golden/update.mjs` only for an intended gameplay change.
-- One cargo interface: `CARGO_TYPES` (engine) and `CARGO_VIEW` (drawing, sounds, HUD) replace every cargo-type branch. A new cargo adds its class and one entry in each table.
-- Fairness check: `tests/fairness.test.mjs` runs all four riders on every route and drill in `ROUTES` and `DRILLS`.
-- Routes as data: Nob Hill, Russian Hill, and Telegraph Hill are `ROUTE_DATA` entries built by `buildRoute`, with positions written as a named mark plus offsets (`"blockB+44"`). The port check confirms they build and play exactly as before.
 
 ## [1.3.0] - 2026-11-01
 
