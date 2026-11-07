@@ -802,6 +802,111 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     };
   }
 
+  // Set pieces (F-30). A route is a list of pieces; each piece returns a fragment of ROUTE_DATA (path steps, features,
+  // objects) plus what it is: its length and grades (measured from its path), difficulty 1–5, and the hazards it adds.
+  // Inside a piece, a number is an offset from the piece's own mark and a string is any position ("larkin-6").
+  // Pieces never round positions, so a route built from pieces is identical to the same route written by hand.
+  const rel = (mark, ...offs) => mark + offs.map((o) => (o < 0 ? '-' + -o : '+' + o)).join('');
+  const HAZARD_HINTS = {
+    car: { id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
+  };
+  function fragment(kind, mark, p) {
+    const f = { kind, mark, difficulty: p.difficulty || 1, hazards: [], path: [], features: [], marks: { ...(p.marks || {}) },
+      cones: [], cars: [], ramps: [], crossers: [], powerups: [], pedestrians: [], checkpoints: [], hints: [] };
+    const at = (v) => (typeof v === 'string' || mark === null ? v : rel(mark, v)); // the plateau has no mark: absolute
+    f.at = at;
+    for (const c of p.cones || []) f.cones.push(at(c));
+    for (const u of p.powerups || []) f.powerups.push({ kind: u.kind, x: at(u.at) });
+    for (const w of p.pedestrians || []) f.pedestrians.push({ x: at(w.at), kind: w.kind });
+    for (const c of p.checkpoints || []) f.checkpoints.push(at(c));
+    return f;
+  }
+  const hint = (f, h) => f.hints.push({ x: f.at(h.at), id: h.id, actions: h.actions, text: h.text });
+  const PIECES = {
+    // The start: a flat run-up and the first intersection. Positions here are absolute.
+    plateau(p) {
+      const f = fragment('plateau', null, p);
+      f.path.push(['straight', p.len], ['intersection', ...p.street]);
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
+    // A block of road: an optional grade change in, a straight, an optional grade change out, and its hazards.
+    block(p) {
+      const f = fragment('block', p.mark, p);
+      f.path.push(['mark', p.mark]);
+      if (p.enter) f.path.push(['ease', ...p.enter]);
+      f.path.push(['straight', p.len]);
+      if (p.exit) f.path.push(['ease', ...p.exit]);
+      for (const [x, w, d] of p.potholes || []) { f.features.push(['pothole', f.at(x), w, d]); f.hazards.push('pothole'); }
+      for (const [x, w, h] of p.bumps || []) { f.features.push(['bump', f.at(x), w, h]); f.hazards.push('bump'); }
+      if (p.car) { f.cars.push({ x: f.at(p.car.at), plank: p.car.plank }); f.hazards.push(p.car.plank ? 'car-plank' : 'car'); }
+      if (p.ramp) { f.ramps.push({ x: f.at(p.ramp) }); f.hazards.push('ramp'); }
+      for (const c of p.crossers || []) { f.crossers.push({ kind: c.kind, x: f.at(c.at), trigger: f.at(c.trigger) }); f.hazards.push(c.kind); }
+      for (const h of p.hints || []) hint(f, { ...(HAZARD_HINTS[h.hazard] || {}), ...h });
+      return f;
+    },
+    // A flight of stairs on its own grade, with a run-out back to level.
+    stairs(p) {
+      const f = fragment('stairs', p.mark, p);
+      f.path.push(['ease', -p.rise / p.tread, p.approach], ['mark', p.mark, p.lead], ['straight', p.lead + p.n * p.tread + p.runout], ['ease', ...p.exit]);
+      f.features.push(['stairs', p.mark, p.n, p.tread, p.rise]);
+      f.hazards.push('stairs');
+      for (const c of p.checkpointsAfter || []) f.checkpoints.push(rel(p.mark, p.n * p.tread, c)); // offsets past the last step
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
+    // An intersection, optionally with a raised-crosswalk lip on the way out and a cable car across it.
+    crossing(p) {
+      const f = fragment('crossing', p.mark, p);
+      f.path.push(['street', p.name, p.len, p.mark]);
+      if (p.lip) {
+        const L = p.lip;
+        f.path.push(['ease', ...L.up]);
+        if (L.flat) f.path.push(['straight', L.flat]);
+        f.path.push(['mark', L.mark], ['ease', ...L.down], ['lip', L.mark, L.big, L.crosswalk]);
+        f.hazards.push(L.big ? 'big-lip' : 'lip');
+      }
+      if (p.cablecar) { const c = p.cablecar; f.crossers.push({ kind: 'cablecar', x: f.at(c.at), trigger: f.at(c.trigger), lead: c.lead, sign: c.sign }); f.hazards.push('cablecar'); }
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
+    // The last straight to the customer's door.
+    finish(p) { const f = fragment('finish', p.mark, p); f.path.push(['mark', p.mark], ['straight', p.len]); return f; },
+  };
+  // Measures a piece from its path: length, and the grade it starts and ends on (given the grade it is entered at).
+  function pieceShape(path, entry) {
+    let length = 0, grade = entry;
+    for (const [op, a, b] of path) {
+      if (op === 'straight') length += a;
+      else if (op === 'ease') { length += b; grade = a; }
+      else if (op === 'street') length += b; // ['street', name, len, mark]
+    }
+    return { entry, exit: grade, length };
+  }
+  // Joins a route's pieces into the ROUTE_DATA shape. Features keep the order the hand-written routes used:
+  // potholes, then stairs, then bumps.
+  const FEATURE_ORDER = ['pothole', 'stairs', 'bump'];
+  function joinPieces(R) {
+    const out = { ...R, path: [], features: [], marks: {}, cones: [], cars: [], ramps: [], crossers: [], powerups: [], pedestrians: [], checkpoints: [], hints: [] };
+    const shapes = [];
+    let grade = 0;
+    for (const [kind, p] of R.pieces) {
+      const make = PIECES[kind];
+      if (!make) throw new Error(`route ${R.meta.title}: unknown piece "${kind}"`);
+      const f = make(p), shape = pieceShape(f.path, grade);
+      grade = shape.exit;
+      shapes.push({ kind, mark: f.mark, difficulty: f.difficulty, hazards: f.hazards, ...shape });
+      for (const k of ['path', 'cones', 'cars', 'ramps', 'crossers', 'powerups', 'pedestrians', 'checkpoints', 'hints']) out[k].push(...f[k]);
+      out.features.push(...f.features);
+      Object.assign(out.marks, f.marks);
+    }
+    out.features.sort((a, b) => FEATURE_ORDER.indexOf(a[0]) - FEATURE_ORDER.indexOf(b[0])); // stable: route order within a type
+    for (const k of ['cars', 'ramps', 'crossers', 'powerups']) if (!out[k].length) delete out[k];
+    delete out.pieces;
+    out.pieceShapes = shapes;
+    return out;
+  }
+
   // Routes as data (F-26). Each entry is the whole route: course facts, the road as a list of steps, features, and
   // every object. Positions are numbers or a named mark plus offsets ("blockB+44", "larkin-6-1.4"), applied left to
   // right, so a block can be resized without breaking the objects on it. buildRoute turns an entry into a course.
@@ -813,40 +918,23 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     nobHill: {
       meta: { index: 1, title: 'THE $9 LATTE', hood: 'NOB HILL', street: 'CALIFORNIA', theme: 'nob', cargo: 'coffee', par: 46, seed: 1873 },
       origin: [-70, 0], start: 4, park: { x0: -70, x1: 3 },
-      path: [
-        ['straight', 88],                                                    // Taylor St plateau (start)
-        ['intersection', 6, 18, 'TAYLOR ST'],
-        ['ease', -0.1, 5], ['straight', 58], ['ease', 0, 6],                 // Block A: 10%, the learning block
-        ['street', 'MASON ST', 12, 'mason'],
-        ['ease', 0.1, 1.6], ['mark', 'lipA'], ['ease', -0.18, 1.1], ['lip', 'lipA', false, 1.6], // raised crosswalk, small lip
-        ['mark', 'blockB'], ['straight', 78], ['ease', 0, 7],                // Block B: 18%, parked robot car
-        ['street', 'POWELL ST', 13, 'powell'],
-        ['ease', 0.26, 1.8], ['straight', 1.2], ['mark', 'lipB'], ['ease', -0.34, 1.0], ['lip', 'lipB', true, 3.0], // the big lip
-        ['mark', 'blockC'], ['straight', 62], ['ease', 0, 9],                // Block C: 34%, absurd
-        ['street', 'STOCKTON ST', 12, 'stockton'],
-        ['ease', 0.06, 1.2], ['mark', 'lipC'], ['ease', -0.12, 1.2], ['lip', 'lipC', false, 1.2],
-        ['mark', 'blockD'], ['straight', 62], ['ease', 0, 6],                // Block D: 12%
-        ['street', 'GRANT AVE', 12, 'grant'],
-        ['ease', 0.06, 1.2], ['mark', 'lipD'], ['ease', -0.08, 1.2], ['lip', 'lipD', false, 1.2],
-        ['mark', 'blockE'], ['straight', 50], ['ease', 0, 6],                // Block E: 8%, the home stretch
-        ['mark', 'fin'], ['straight', 140],
+      pieces: [
+        ['plateau', { len: 88, street: [6, 18, 'TAYLOR ST'], checkpoints: ['start'], hints: [{ at: -1e9, id: 'pedal', actions: ['pedal'], text: 'Hold to pedal' }] }],
+        ['block', { mark: 'blockA', enter: [-0.1, 5], len: 58, exit: [0, 6], difficulty: 1, potholes: [[28, 1.3, 0.2]], // the learning block, 10%
+          hints: [{ at: 10, id: 'hop', actions: ['hop'], text: 'Hop the pothole. Hold for higher.' }, { at: 46, id: 'brake', actions: ['brake'], text: 'Tap to brake. Hold it and the latte surges forward.' }] }],
+        ['crossing', { name: 'MASON ST', len: 12, mark: 'mason', lip: { up: [0.1, 1.6], mark: 'lipA', down: [-0.18, 1.1], big: false, crosswalk: 1.6 }, pedestrians: [{ at: 'lipA+7', kind: 'dog' }], checkpoints: [2] }],
+        ['block', { mark: 'blockB', len: 78, exit: [0, 7], difficulty: 2, car: { at: 44, plank: true }, cones: [37.5], powerups: [{ kind: 'bubble', at: 28 }], checkpoints: [18, 52], hints: [{ hazard: 'car', at: 24 }] }], // 18%, parked robot car
+        ['crossing', { name: 'POWELL ST', len: 13, mark: 'powell', difficulty: 4, lip: { up: [0.26, 1.8], flat: 1.2, mark: 'lipB', down: [-0.34, 1.0], big: true, crosswalk: 3.0 },
+          cablecar: { at: 6.5, trigger: -30, lead: 2.9, sign: 'POWELL & MASON' }, powerups: [{ kind: 'espresso', at: 10 }], pedestrians: [{ at: 'lipB+11', kind: 'tech' }], checkpoints: [2],
+          hints: [{ at: -30, id: 'cable', actions: ['brake'], text: 'DING DING: cable car crossing! Brake, or beat it.' }, { at: 8, id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Hop at the lip for BIG AIR. Lean to land level.' }] }],
+        ['block', { mark: 'blockC', len: 62, exit: [0, 9], difficulty: 4, bumps: [[30, 0.9, 0.07], [34, 0.9, 0.07]] }], // 34%, absurd
+        ['crossing', { name: 'STOCKTON ST', len: 12, mark: 'stockton', lip: { up: [0.06, 1.2], mark: 'lipC', down: [-0.12, 1.2], big: false, crosswalk: 1.2 }, checkpoints: [2] }],
+        ['block', { mark: 'blockD', len: 62, exit: [0, 6], difficulty: 2, potholes: [[26, 1.5, 0.24]], pedestrians: [{ at: 14, kind: 'fitness' }], checkpoints: [32] }], // 12%
+        ['crossing', { name: 'GRANT AVE', len: 12, mark: 'grant', lip: { up: [0.06, 1.2], mark: 'lipD', down: [-0.08, 1.2], big: false, crosswalk: 1.2 }, pedestrians: [{ at: 'lipD+6', kind: 'tourist' }], checkpoints: [2] }],
+        ['block', { mark: 'blockE', len: 50, exit: [0, 6], cones: [22, 23.3] }], // 8%, the home stretch
+        ['finish', { mark: 'fin', len: 140 }],
       ],
-      features: [['pothole', 46, 1.3, 0.2], ['pothole', 'blockD+26', 1.5, 0.24], ['bump', 'blockC+30', 0.9, 0.07], ['bump', 'blockC+34', 0.9, 0.07]],
       finish: { at: 'fin', office: { x0: 12, x1: 30 } },
-      cones: ['blockB+37.5', 'blockE+22', 'blockE+23.3'],
-      cars: [{ x: 'blockB+44', plank: true }],
-      crossers: [{ kind: 'cablecar', x: 'powell+6.5', trigger: 'powell-30', lead: 2.9, sign: 'POWELL & MASON' }],
-      powerups: [{ kind: 'bubble', x: 'blockB+28' }, { kind: 'espresso', x: 'powell+10' }],
-      pedestrians: [{ x: 'lipA+7', kind: 'dog' }, { x: 'lipB+11', kind: 'tech' }, { x: 'blockD+14', kind: 'fitness' }, { x: 'lipD+6', kind: 'tourist' }],
-      checkpoints: ['start', 'mason+2', 'blockB+18', 'blockB+52', 'powell+2', 'stockton+2', 'blockD+32', 'grant+2'],
-      hints: [
-        { x: -1e9, id: 'pedal', actions: ['pedal'], text: 'Hold to pedal' },
-        { x: 28, id: 'hop', actions: ['hop'], text: 'Hop the pothole. Hold for higher.' },
-        { x: 64, id: 'brake', actions: ['brake'], text: 'Tap to brake. Hold it and the latte surges forward.' },
-        { x: 'blockB+24', id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
-        { x: 'powell-30', id: 'cable', actions: ['brake'], text: 'DING DING: cable car crossing! Brake, or beat it.' },
-        { x: 'powell+8', id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Hop at the lip for BIG AIR. Lean to land level.' },
-      ],
       customer: {
         name: 'Skyler', role: 'Founder & CEO, Meetingless', avatar: 'founder', brand: 'MEETINGLESS HQ',
         order: 'ORDER #0009 · OAT LATTE (L) · NO LID', route: 'Down California Street to the Financial District',
@@ -858,47 +946,23 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     russianHill: {
       meta: { index: 2, title: 'THE WEDDING CAKE', hood: 'RUSSIAN HILL', street: 'GREEN', theme: 'russian', cargo: 'cake', par: 48, seed: 2026, streetTrees: true },
       origin: [-70, 0], start: 3, park: { x0: -70, x1: 1 }, dropLabel: ' m to the wedding',
-      path: [
-        ['straight', 84],                                                    // Jones St summit (start)
-        ['intersection', 3, 14, 'JONES ST'],
-        ['ease', -0.16, 5], ['straight', 40],                                // Block 1: 16%, the big pothole
-        ['ease', -0.22 / 0.75, 3],                                           // the Macondray Lane steps' grade (rise / tread)
-        ['mark', 'stairsX', 1.5], ['straight', 1.5 + 7 * 0.75 + 3],          // the steps ride on their own grade
-        ['ease', 0, 6],
-        ['street', 'LEAVENWORTH ST', 12, 'leav'],
-        ['ease', 0.08, 1.4], ['mark', 'lipA'], ['ease', -0.3, 1.2], ['lip', 'lipA', false, 1.4],
-        ['mark', 'block2'], ['straight', 60], ['ease', 0, 7],                // Block 2: 30%, Ina Coolbrith Park
-        ['street', 'HYDE ST', 14, 'hyde'],
-        ['ease', 0.06, 1.2], ['mark', 'lipB'], ['ease', -0.36, 1.0], ['lip', 'lipB', true, 1.2],
-        ['mark', 'block3'], ['straight', 52], ['ease', -0.12, 8],            // Block 3: 36%, the dramatic one
-        ['mark', 'cz'], ['straight', 40], ['ease', 0, 5],                    // construction zone: 12%
-        ['street', 'LARKIN ST', 14, 'larkin'],
-        ['ease', 0.05, 1.2], ['mark', 'lipC'], ['ease', -0.1, 1.2], ['lip', 'lipC', false, 1.2],
-        ['mark', 'block4'], ['straight', 60], ['ease', 0, 6],                // Block 4: 10%, Lombard Street backdrop
-        ['mark', 'fin'], ['straight', 140],
+      pieces: [
+        ['plateau', { len: 84, street: [3, 14, 'JONES ST'], pedestrians: [{ at: 9, kind: 'tourist' }], checkpoints: ['start'], hints: [{ at: -1e9, id: 'cake', actions: ['pedal'], text: 'Wedding cake on board. Smooth is fast.' }] }],
+        ['block', { mark: 'block1', enter: [-0.16, 5], len: 40, difficulty: 2, potholes: [[22, 2.0, 0.28]], hints: [{ at: 8, id: 'pothole', actions: ['hop'], text: 'Big pothole. Hop it!' }] }], // 16%, the big pothole
+        ['stairs', { mark: 'stairsX', rise: 0.22, tread: 0.75, n: 7, approach: 3, lead: 1.5, runout: 3, exit: [0, 6], difficulty: 3, // Macondray Lane
+          pedestrians: [{ at: 2.5, kind: 'fitness' }], checkpointsAfter: [4], hints: [{ at: -12, id: 'stairs', actions: ['brake'], text: 'Macondray Lane steps. Slow down... or hop.' }] }],
+        ['crossing', { name: 'LEAVENWORTH ST', len: 12, mark: 'leav', lip: { up: [0.08, 1.4], mark: 'lipA', down: [-0.3, 1.2], big: false, crosswalk: 1.4 }, powerups: [{ kind: 'bubble', at: 6 }], checkpoints: [2] }],
+        ['block', { mark: 'block2', len: 60, exit: [0, 7], difficulty: 3, pedestrians: [{ at: 24, kind: 'dog' }], checkpoints: [12] }], // 30%, Ina Coolbrith Park
+        ['crossing', { name: 'HYDE ST', len: 14, mark: 'hyde', difficulty: 4, lip: { up: [0.06, 1.2], mark: 'lipB', down: [-0.36, 1.0], big: true, crosswalk: 1.2 },
+          cablecar: { at: 7, trigger: -45, lead: 3.6, sign: 'POWELL & HYDE' }, checkpoints: [2], hints: [{ at: -45, id: 'cable', actions: ['brake'], text: 'Cable car on Hyde! Brake early on this slope.' }] }],
+        ['block', { mark: 'block3', len: 52, exit: [-0.12, 8], difficulty: 5, bumps: [[26, 0.9, 0.07], [30, 0.9, 0.07]], pedestrians: [{ at: 14, kind: 'tech' }], checkpoints: [20] }], // 36%, the dramatic one
+        ['block', { mark: 'cz', len: 40, exit: [0, 5], difficulty: 4, marks: { rampX: 'larkin-6' }, ramp: 'rampX', cones: ['rampX-1.4', 9, 10.3], // construction zone: 12%
+          crossers: [{ kind: 'maybemo', at: 'rampX+7.6', trigger: 'larkin-45' }], checkpoints: [-2], hints: [{ at: 'larkin-30', id: 'ramp', actions: ['pedal', 'hop'], text: 'A robot car is stalling at Larkin. Jump the ramp!' }] }],
+        ['crossing', { name: 'LARKIN ST', len: 14, mark: 'larkin', lip: { up: [0.05, 1.2], mark: 'lipC', down: [-0.1, 1.2], big: false, crosswalk: 1.2 }, powerups: [{ kind: 'espresso', at: 11 }], checkpoints: [6] }],
+        ['block', { mark: 'block4', len: 60, exit: [0, 6], cones: [34, 35.3], pedestrians: [{ at: 18, kind: 'tourist' }], checkpoints: [24] }], // 10%, Lombard Street backdrop
+        ['finish', { mark: 'fin', len: 140 }],
       ],
-      features: [['pothole', 36, 2.0, 0.28], ['stairs', 'stairsX', 7, 0.75, 0.22], ['bump', 'block3+26', 0.9, 0.07], ['bump', 'block3+30', 0.9, 0.07]],
-      marks: { rampX: 'larkin-6' },
       finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
-      ramps: [{ x: 'rampX' }],
-      cones: ['rampX-1.4', 'cz+9', 'cz+10.3', 'block4+34', 'block4+35.3'],
-      crossers: [
-        { kind: 'cablecar', x: 'hyde+7', trigger: 'hyde-45', lead: 3.6, sign: 'POWELL & HYDE' },
-        { kind: 'maybemo', x: 'rampX+7.6', trigger: 'larkin-45' },
-      ],
-      powerups: [{ kind: 'bubble', x: 'leav+6' }, { kind: 'espresso', x: 'larkin+11' }],
-      pedestrians: [
-        { x: 9, kind: 'tourist' }, { x: 'stairsX+2.5', kind: 'fitness' }, { x: 'block2+24', kind: 'dog' },
-        { x: 'block3+14', kind: 'tech' }, { x: 'block4+18', kind: 'tourist' },
-      ],
-      checkpoints: ['start', 'stairsX+5.25+4', 'leav+2', 'block2+12', 'hyde+2', 'block3+20', 'cz-2', 'larkin+6', 'block4+24'],
-      hints: [
-        { x: -1e9, id: 'cake', actions: ['pedal'], text: 'Wedding cake on board. Smooth is fast.' },
-        { x: 22, id: 'pothole', actions: ['hop'], text: 'Big pothole. Hop it!' },
-        { x: 'stairsX-12', id: 'stairs', actions: ['brake'], text: 'Macondray Lane steps. Slow down... or hop.' },
-        { x: 'hyde-45', id: 'cable', actions: ['brake'], text: 'Cable car on Hyde! Brake early on this slope.' },
-        { x: 'larkin-30', id: 'ramp', actions: ['pedal', 'hop'], text: 'A robot car is stalling at Larkin. Jump the ramp!' },
-      ],
       customer: {
         name: 'Gwen', role: 'Wedding planner, Frost & Tiers Events', avatar: 'planner', brand: 'FROST & TIERS EVENTS',
         order: 'ORDER #0002 · 3-TIER CAKE · HANDLE WITH CARE', route: 'Across Russian Hill to Lombard Gardens',
@@ -950,7 +1014,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   // every position) is exactly what the hand-written builders produced; the port check (F-28) holds it to that.
   const POS_KEYS = new Set(['x', 'x0', 'x1', 'trigger', 'arch']);
   function buildRoute(id) {
-    const R = ROUTE_DATA[id], C = emptyCourse(id), marks = { start: R.start };
+    const R = ROUTE_DATA[id].pieces ? joinPieces(ROUTE_DATA[id]) : ROUTE_DATA[id], C = emptyCourse(id), marks = { start: R.start };
     Object.assign(C, R.meta);
     const at = (p) => {
       if (typeof p === 'number') return p;
@@ -2867,7 +2931,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute,
+    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,

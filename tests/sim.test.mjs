@@ -1110,14 +1110,48 @@ test('routes: every route in ROUTES is a ROUTE_DATA entry, and its builder is th
 test('routes: positions are a mark plus offsets, read left to right; an unknown mark or step fails loudly', () => {
   const C = H.buildRussianHill(), larkin = C.intersections.find((i) => i.name === 'LARKIN ST').x0;
   assert.equal(C.cones[0], larkin - 6 - 1.4, '"rampX-1.4" with rampX = "larkin-6"');
-  const saved = H.ROUTE_DATA.nobHill.cones;
+  const saved = H.ROUTE_DATA.telegraph.pedestrians;
   try {
-    H.ROUTE_DATA.nobHill.cones = ['nowhere+3'];
-    assert.throws(() => H.buildNobHill(), /unknown position "nowhere\+3"/);
-  } finally { H.ROUTE_DATA.nobHill.cones = saved; }
+    H.ROUTE_DATA.telegraph.pedestrians = [{ x: 'nowhere+3', kind: 'dog' }];
+    assert.throws(() => H.buildTelegraphHill(), /unknown position "nowhere\+3"/);
+  } finally { H.ROUTE_DATA.telegraph.pedestrians = saved; }
   const path = H.ROUTE_DATA.telegraph.path;
   try {
     H.ROUTE_DATA.telegraph.path = [...path, ['teleport', 9]];
     assert.throws(() => H.buildTelegraphHill(), /unknown path step "teleport"/);
   } finally { H.ROUTE_DATA.telegraph.path = path; }
+});
+
+/* ----------------------------- set pieces (F-30) ----------------------------- */
+
+const PIECE_ROUTES = Object.keys(H.ROUTE_DATA).filter((id) => H.ROUTE_DATA[id].pieces);
+
+test('pieces: Nob Hill and Russian Hill are built from set pieces', () => {
+  assert.deepEqual(plain(PIECE_ROUTES), ['nobHill', 'russianHill']);
+});
+
+for (const id of PIECE_ROUTES) {
+  test(`pieces ${id}: pieces join without a grade jump, add up to the whole road, and declare difficulty and hazards`, () => {
+    const R = H.ROUTE_DATA[id], shapes = H.joinPieces(R).pieceShapes, C = H.buildRoute(id);
+    for (let i = 1; i < shapes.length; i++) assert.equal(shapes[i].entry, shapes[i - 1].exit, `${shapes[i].mark || shapes[i].kind} starts on the grade ${shapes[i - 1].kind} ends on`);
+    const total = shapes.reduce((s, p) => s + p.length, 0);
+    assert.ok(Math.abs(R.origin[0] + total - C.terrain.maxX) < 1e-9, `pieces cover ${total} m; the road ends at ${C.terrain.maxX}`);
+    for (const p of shapes) assert.ok(Number.isInteger(p.difficulty) && p.difficulty >= 1 && p.difficulty <= 5, `${p.kind} difficulty ${p.difficulty}`);
+    assert.equal(shapes[0].kind, 'plateau'); assert.equal(shapes.at(-1).kind, 'finish');
+    const hazards = new Set(shapes.flatMap((p) => p.hazards));
+    if (C.potholes.length) assert.ok(hazards.has('pothole'));
+    if (C.stairs.length) assert.ok(hazards.has('stairs'));
+    if (C.cars.length) assert.ok(hazards.has('car-plank') || hazards.has('car'));
+    if (C.ramps.length) assert.ok(hazards.has('ramp'));
+    if (C.lips.some((l) => l.big)) assert.ok(hazards.has('big-lip'));
+    for (const c of C.crossers) assert.ok(hazards.has(c.kind), `${c.kind} is a declared hazard`);
+  });
+}
+
+test('pieces: an unknown piece fails loudly', () => {
+  const pieces = H.ROUTE_DATA.nobHill.pieces;
+  try {
+    H.ROUTE_DATA.nobHill.pieces = [...pieces.slice(0, -1), ['loopTheLoop', {}], pieces.at(-1)];
+    assert.throws(() => H.buildNobHill(), /unknown piece "loopTheLoop"/);
+  } finally { H.ROUTE_DATA.nobHill.pieces = pieces; }
 });
