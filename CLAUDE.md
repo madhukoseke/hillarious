@@ -5,6 +5,8 @@ A single-file browser game. Everything ships in `index.html`. The engine section
 ## Commands
 
 - Tests: `node --test "tests/*.test.mjs"` (Node.js 22+; a bare `tests/` directory argument fails on Node 22).
+- Port check: `tests/ports.test.mjs` compares every course and ride against `tests/golden/ports.json`. Refactors must pass it unchanged. Only an intended gameplay change may rewrite it (`node tests/golden/update.mjs`), and the commit must say so.
+- Cargo: each type is a class plus one entry in `CARGO_TYPES` (engine) and `CARGO_VIEW` (presentation). Do not branch on `cargo.kind` elsewhere.
 - Serve: `python3 -m http.server 8765` in this folder, then open http://127.0.0.1:8765/. The Playwright scripts in `tests/playtest/` expect that port.
 - Cross-browser: `tests/playtest/cross-browser.mjs` (setup in its header). Record results in `docs/browser-matrix.md`.
 - Autopilot demo: `?autopilot=typical` (also `careful`, `fast`, `reckless`). Jump to the cake: `?delivery=2`. Open every order and drill: `?unlock=all`.
