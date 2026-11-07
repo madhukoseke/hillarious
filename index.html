@@ -308,6 +308,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   .title-board li:nth-child(n + 4) { display: none; } /* medals only on the title; the final review lists all five */
   .title-board .hs-rank, .title-board .hs-social { width: 19px; height: 19px; }
   .title-wrap:has(.title-board li) .sub { display: none; } /* room for the medals */
+  #title-keys { display: none; } /* it covered Press SPACE and the sliders; How to play lists the controls */
   .title-wrap .best { margin-top: 4px; font-size: 11px; }
   .card { padding: 14px 18px; max-height: 96vh; }
   .card h2 { font-size: 22px; margin-bottom: 6px; }
@@ -4120,7 +4121,6 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   // How each cargo looks and sounds (F-27). The engine half of the contract is CARGO_TYPES; this is the presentation half.
   // A new cargo adds one entry here: rack or basket drawing, crash flight, HUD icon, meters, lines, and spill effects.
-  // The bouquet still borrows the latte's spill particles and sounds, as it did before this table existed.
   function cupBits(game, n, burst) {
     const W = game.world, b = W.bike, P = game.particles, rim = b.localToWorld(CARGO.mountX + 0.02, 0.3, { x: 0, y: 0 });
     const dir = W.cargo.lastSpillDir, ca = Math.cos(b.a), sa = Math.sin(b.a);
@@ -4143,6 +4143,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       p.stain = i % 3 ? 'rgba(251,243,230,0.85)' : 'rgba(243,167,184,0.8)';
     }
   }
+  function petalBits(game, n, burst) {
+    const W = game.world, b = W.bike, P = game.particles, rim = b.localToWorld(CARGO.mountX + 0.02, 0.4, { x: 0, y: 0 });
+    const ca = Math.cos(b.a), sa = Math.sin(b.a);
+    for (let i = 0; i < n; i++) {
+      const out = (Math.random() - 0.5) * (burst ? 3 : 1.6), up = 0.8 + Math.random() * (burst ? 2.4 : 1.2);
+      const vx = b.vx * 0.7 + out * ca - up * sa, vy = b.vy * 0.7 + out * sa + up * ca;
+      P.spawn(PK.CONFETTI, rim.x + (Math.random() - 0.5) * 0.2, rim.y, vx, vy, 1.8, 0.03 + Math.random() * 0.02, i % 3 ? '#f29ab0' : '#fff2f5');
+    }
+  }
   const cupSpill = (game, e) => { game.audio.play('slosh'); game.spawnCargoBits(Math.min(9, 2 + Math.round(e.amount * 4)), false); };
   const CARGO_VIEW = {
     coffee: {
@@ -4153,7 +4162,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       hudIcon: (game, ctx, x, top, u, frac) => game.drawCupIcon(ctx, x, top + u * 0.55, u * 2.4, frac),
       meter: (c) => ({ label: 'SLOSH ', value: Math.abs(c.slosh) / Math.max(0.05, c.thr) }),
       debug: (c) => 'slosh ' + c.slosh.toFixed(2) + '  thr ' + c.thr.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  latte ' + c.amount.toFixed(1) + '%',
-      pauseLine: 'The latte is getting cold. And judgmental.', dropLabel: ' m to the latte drop',
+      pauseLine: 'The latte is getting cold. And judgmental.', dropLabel: ' m to the latte drop', leavesCup: true, // the cup stays in the basket when the latte flies
       arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
       splashSound: 'splash', bits: cupBits, onSpill: cupSpill, spillLine: true, condNote: () => '',
     },
@@ -4165,7 +4174,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       hudIcon: (game, ctx, x, top, u, frac) => game.drawCakeIcon(ctx, x, top + u * 0.5, u * 2.6, frac),
       meter: (c) => ({ label: 'WOBBLE ', value: Math.abs(c.angle) / CAKE.maxAngle }),
       debug: (c) => 'cake angle ' + c.angle.toFixed(2) + '  w ' + c.angVel.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  integrity ' + c.amount.toFixed(1) + '%',
-      pauseLine: 'The cake is sweating. And judgmental.', dropLabel: ' m to the latte drop', // as before F-27; a cake off Russian Hill only happens in Free Ride
+      pauseLine: 'The cake is sweating. And judgmental.', dropLabel: ' m to the cake drop',
       arrival: { bell: false, bride: true, reviewAfter: 4.4, success: false },
       splashSound: 'wobble', bits: cakeBits, onSpill: (game) => { if (Math.random() < 0.5) game.spawnCargoBits(2, false); }, spillLine: false,
       condNote: (r) => (r.decorLeft !== null ? ' · ' + r.decorLeft + '/' + CAKE_DECOR.length + ' decor' : ''),
@@ -4180,10 +4189,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       debug: (c) => 'petals ' + c.amount.toFixed(1) + '%  spilling ' + c.spilling.toFixed(2),
       pauseLine: 'The petals are holding on. Barely. And judgmental.', dropLabel: ' m to the bouquet drop',
       arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
-      splashSound: 'splash', bits: cupBits, onSpill: cupSpill, spillLine: true, condNote: () => '',
+      splashSound: 'wobble', bits: petalBits, onSpill: (game, e) => game.spawnCargoBits(Math.min(6, 1 + Math.round(e.amount * 3)), false),
+      spillLine: true, condNote: () => '',
     },
   };
   function cargoView(kind) { return CARGO_VIEW[cleanCargo(kind)]; }
+  const EMPTY_RACK = {}; // nothing on the rack or in the basket
 
   /* ---------- 19. SCENERY (seeded, per course) ---------- */
   const ACCENTS = ['#6b4f7a', '#3f6f73', '#b8564a', '#5b7d4a', '#a8702f', '#4a5f8a'];
@@ -4661,7 +4672,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         for (let i = 0; i < S.n; i++) { const dx = S.x[i] - P.x, dy = S.y[i] - P.y; L.x[i] = dx * ca + dy * sa; L.y[i] = -dx * sa + dy * ca; }
         P.scarf = L;
       }
-      if (b.crashed && world.cup.on) { P.view = CARGO_VIEW.coffee; P.cg = EMPTY_CUP; P.shield = false; } // an empty cup stays on the rack
+      if (b.crashed && world.cup.on) { // the cargo is in the air: an empty cup stays in the basket, otherwise nothing
+        if (cargoView(world.cargo.kind).leavesCup) { P.view = CARGO_VIEW.coffee; P.cg = EMPTY_CUP; } else P.view = EMPTY_RACK;
+        P.shield = false;
+      }
       ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.a);
       if (rider) drawBikeBack(ctx, P, pose);
       drawBikeBody(ctx, P, game.time);
@@ -4753,10 +4767,17 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     menuFocus(dir) {
       const scr = this.shown && this.screens[this.shown];
       if (!scr) return;
-      const els = Array.from(scr.querySelectorAll('button, a[href]')).filter((e) => !e.disabled && e.offsetParent !== null);
+      const els = Array.from(scr.querySelectorAll('button, a[href], input[type="range"]')).filter((e) => !e.disabled && e.offsetParent !== null);
       if (!els.length) return;
       const i = els.indexOf(document.activeElement);
       els[i < 0 ? 0 : (i + dir + els.length) % els.length].focus();
+    }
+    // Gamepad left / right on a focused slider: one step, through the same input event a mouse drag sends.
+    nudgeSlider(r, dir) {
+      const step = Number(r.step) || 1, v = clamp(Number(r.value) + dir * step, Number(r.min) || 0, Number(r.max) || 100);
+      if (v === Number(r.value)) return;
+      r.value = String(v);
+      r.dispatchEvent(new Event('input', { bubbles: true }));
     }
     focusedButton() {
       const el = document.activeElement, scr = this.shown && this.screens[this.shown];
@@ -5169,7 +5190,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     skipShift() {
       this.pendingShift = null;
-      this.lockShiftForm('Not saved.');
+      this.lockShiftForm('');
       this.renderBoard('Shift not saved to the high scores.');
     }
     handleKeys() {
@@ -5177,6 +5198,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const a of this.input.takeActions()) {
         if (a === 'mute') { this.toggleMute(); continue; }
         if (this.state !== 'riding' && this.state !== 'delivered') { // menus: move focus, or press the focused button
+          const slider = document.activeElement && document.activeElement.matches && document.activeElement.matches('input[type="range"]') ? document.activeElement : null;
+          if (slider && (a === 'navLeft' || a === 'navRight')) { this.nudgeSlider(slider, a === 'navRight' ? 1 : -1); continue; }
           if (NAV[a]) { this.menuFocus(NAV[a]); continue; }
           const btn = a === 'confirm' && this.focusedButton();
           if (btn) { btn.click(); continue; }
