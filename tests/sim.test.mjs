@@ -1155,3 +1155,30 @@ test('pieces: an unknown piece fails loudly', () => {
     assert.throws(() => H.buildNobHill(), /unknown piece "loopTheLoop"/);
   } finally { H.ROUTE_DATA.nobHill.pieces = pieces; }
 });
+
+/* ------------------------- physics per world (TD-10) ------------------------- */
+
+test('physics per world: Earth is the default and matches the globals; another planet changes how a world rides', () => {
+  const earth = H.physicsFor(undefined);
+  assert.equal(earth, H.physicsFor('earth'));
+  assert.equal(earth.g, H.PHYS.g); assert.equal(earth.sag, H.SAG); assert.equal(earth.rideH, H.RIDE_H);
+  assert.equal(H.physicsFor('nowhere'), earth, 'an unknown planet falls back to Earth');
+  H.PLANETS.testMoon = { ...H.PHYS, g: H.PHYS.g * 0.38 };
+  try {
+    const hop = (planet) => {
+      const C = H.makeTestCourse('flat'); C.planet = planet;
+      const w = new H.World(C);
+      settle(w, 1.5);
+      const rest = w.bike.y - C.terrain.height(w.bike.x);
+      w.step(input({ jumpPressed: true, jumpHeld: true }));
+      let air = 0;
+      for (let i = 0; i < 1200; i++) { w.step(input({ jumpHeld: i < 20 })); if (!w.bike.grounded) air += H.STEP; else if (air > 0.1) break; }
+      return { w, rest, air };
+    };
+    const e = hop(undefined), m = hop('testMoon');
+    assert.equal(m.w.phys.g, H.PHYS.g * 0.38);
+    assert.ok(Math.abs(e.rest - H.RIDE_H) < 0.02, `Earth bike rests at ${e.rest.toFixed(3)}`);
+    assert.ok(Math.abs(m.rest - m.w.phys.rideH) < 0.02 && m.w.phys.rideH > H.RIDE_H, 'the Moon bike rests at its own, higher ride height (less sag)');
+    assert.ok(m.air > e.air * 2, `low gravity hangs longer: ${m.air.toFixed(2)} s vs ${e.air.toFixed(2)} s`);
+  } finally { delete H.PLANETS.testMoon; }
+});
