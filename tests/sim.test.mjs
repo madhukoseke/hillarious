@@ -545,15 +545,18 @@ test('final review: verdict bands and lines match the brief', () => {
   assert.equal(H.shiftSummary([]).band, 'poor');
 });
 
-test('high scores: the three best shifts are kept, ranked by tips then time', () => {
+test('high scores: the five best shifts are kept, ranked by tips then time', () => {
+  assert.equal(H.TOP_SHIFTS, 5);
   let list = [];
   const add = (tips, time) => { const r = H.recordShift(list, { tips, time }); list = r.list; return r.rank; };
   assert.equal(add(8, 90), 1);
   assert.equal(add(10, 95), 1);
   assert.equal(add(9, 80), 2);
-  assert.equal(add(7, 70), 0, 'fourth place is not kept');
+  assert.equal(add(6, 70), 4);
+  assert.equal(add(5, 70), 5);
+  assert.equal(add(4, 70), 0, 'sixth place is not kept');
   assert.equal(add(10, 85), 1, 'same tips, faster time wins');
-  assert.deepEqual([...list.map((e) => e.tips)], [10, 10, 9]);
+  assert.deepEqual([...list.map((e) => e.tips)], [10, 10, 9, 8, 6]);
   assert.equal(H.recordShift('garbage', { tips: 1, time: 1 }).rank, 1, 'corrupt storage is ignored');
 });
 

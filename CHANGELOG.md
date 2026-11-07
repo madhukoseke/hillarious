@@ -14,9 +14,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The Bouquet's route is longer, about 45 seconds for a typical ride, with two pedestrians on the way down to Ruth's door.
 - A safe way down on The Bouquet: hop up to the Napier Lane boardwalk at the top of the hill. It keeps you out of the gust and above the lip and pothole, but its narrow boards hold you to a slower pace. It keeps nearly every petal, but beating par takes the road.
 - Free Ride's cargo row offers BOUQUET, and the title's best line shows your best bouquet run.
+- The title screen shows the high scores: gold, silver, and bronze medals for the top three, then numbers, with X and LinkedIn icons that open each player's profile. Short landscape phones show the three medal rows.
 
 ### Changed
 - `?delivery=3` starts the shift at The Bouquet, the way `?delivery=2` starts the cake.
+- The high-score board keeps your five best shifts instead of three, and the final review uses the same medal list.
 - The progress bar says "to the bouquet drop" on the new delivery.
 - Gusts on The Bouquet's route no longer shed petals at low speed, so a careful rider keeps more petals than a fast one.
 - Best-tip and high-score records now carry a format version (`v: 1`). Older records still read as before.
@@ -25,6 +27,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The HR review and the screen reader now say "Bouquet" for bouquet runs instead of "Latte" or "Coffee".
 - The save-your-score form on the final review is more compact on landscape phones, so less of the review needs scrolling to reach it.
 - Corrupt or half-written best-tip records are ignored instead of breaking the receipt or Dispatch board.
+- High-score rows no longer run the time into the X handle ("2:07.9@name").
 
 ## [1.3.0] - 2026-11-01
 

@@ -202,10 +202,19 @@ blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
 .hs-form input:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
 .hs-form button:disabled { opacity: 0.5; }
 .hs-status { margin: 0; min-height: 1em; font: 700 13px var(--body); color: var(--coral-deep); }
-.hs-board { margin: 8px 0 12px; padding-left: 22px; font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
-.hs-board li { margin: 2px 0; }
-.hs-board b { color: var(--ink); margin-right: 8px; }
-.hs-board a { color: var(--coral-deep); margin-right: 8px; font-weight: 700; }
+.hs-board { margin: 8px 0 12px; padding: 0; list-style: none; font-family: var(--mono); font-size: 13px; color: var(--ink-soft); }
+.hs-board:empty { display: none; }
+.hs-board li { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.hs-board b { color: var(--ink); }
+.hs-rank { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font: 800 12px var(--mono); color: var(--ink); }
+.hs-rank.r1 { background: #f2c94c; box-shadow: inset 0 0 0 2px #b8862b; }
+.hs-rank.r2 { background: #d9dde3; box-shadow: inset 0 0 0 2px #8f97a3; }
+.hs-rank.r3 { background: #e0a46e; box-shadow: inset 0 0 0 2px #9c6233; }
+.hs-social { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: #fff; background: var(--ink); }
+.hs-social.li { background: #0a66c2; }
+.hs-social svg { width: 13px; height: 13px; fill: currentColor; }
+.hs-social:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+.title-board { margin: 12px 4px 0; padding: 0.4em 0.7em; background: rgba(255, 246, 229, 0.86); border-radius: 8px; font-weight: 700; }
 /* Dispatch board, Training and Free Ride */
 .board .eyebrow, .train .eyebrow, .free .eyebrow { font-family: var(--mono); font-weight: 800; font-size: 12px; letter-spacing: 0.12em; color: var(--coral-deep); }
 .board h2, .train h2, .free h2 { margin: 4px 0 10px; }
@@ -294,6 +303,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 }
 /* Short landscape screens (phones): cards go two-column so nothing needs scrolling */
 @media (max-height: 520px) and (min-width: 600px) {
+  .title-board { margin-top: 6px; padding: 0.2em 0.6em; font-size: 12px; }
+  .title-board li { margin: 1px 0; }
+  .title-board li:nth-child(n + 4) { display: none; } /* medals only on the title; the final review lists all five */
+  .title-board .hs-rank, .title-board .hs-social { width: 19px; height: 19px; }
+  .title-wrap:has(.title-board li) .sub { display: none; } /* room for the medals */
+  .title-wrap .best { margin-top: 4px; font-size: 11px; }
   .card { padding: 14px 18px; max-height: 96vh; }
   .card h2 { font-size: 22px; margin-bottom: 6px; }
   .intro h2 { font-size: 26px; }
@@ -362,6 +377,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         <button class="btn" data-act="board">DISPATCH</button>
         <button class="btn" data-act="train">TRAINING</button>
       </div>
+      <ol class="hs-board title-board" id="title-board" aria-label="High scores"></ol>
       <p class="best" id="title-best"></p>
       <div class="title-mini"><span class="press" id="title-press">Press <b>SPACE</b> to ride</span><button class="chip" data-act="howto">How to play</button><button class="chip" data-act="mute" id="title-mute" aria-pressed="false">Sound: on</button></div>
       <div class="vol" aria-label="Volume">
@@ -2094,10 +2110,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     };
   }
   // Keeps the three best shifts (most tips, then fastest). Returns the new list and the shift's rank (0 = unranked).
+  const TOP_SHIFTS = 5; // shifts kept on the high-score board
   function recordShift(list, entry) {
     const all = (Array.isArray(list) ? list.filter((e) => e && Number.isFinite(e.tips) && Number.isFinite(e.time)) : []).concat([entry]);
     all.sort((a, b) => b.tips - a.tips || a.time - b.time);
-    const top = all.slice(0, 3);
+    const top = all.slice(0, TOP_SHIFTS);
     return { list: top, rank: top.indexOf(entry) + 1 };
   }
   // Stored record format version. Version 1 adds `v` to best-tip and shift records; records without `v` still read.
@@ -2826,7 +2843,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, BOUQUET, World, Score,
-    cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
+    cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
@@ -3580,6 +3597,37 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     line(-0.08, '#8a5c36', 0.16);
     line(-0.015, '#c79a68', 0.05);
   }
+  // High-score rows, shared by the title screen and the final review: a gold, silver, or bronze medal for the top three,
+  // a plain number after that, then the name, tips, time, and X / LinkedIn icons. Handles are cleaned again here because
+  // localStorage can be edited by hand; names go in with textContent.
+  const SOCIAL_ICONS = {
+    x: 'M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.65l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23zm-1.16 17.52h1.83L7.08 4.13H5.12z',
+    li: 'M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z',
+  };
+  function socialLink(kind, href, label) {
+    const a = document.createElement('a'), NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), path = document.createElementNS(NS, 'path');
+    a.className = 'hs-social ' + kind; a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.title = label; a.setAttribute('aria-label', label);
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); path.setAttribute('d', SOCIAL_ICONS[kind]);
+    svg.appendChild(path); a.appendChild(svg);
+    return a;
+  }
+  function fillScoreList(ol, list) {
+    ol.textContent = '';
+    const rows = (Array.isArray(list) ? list : []).filter((e) => e && Number.isFinite(e.tips)).slice(0, TOP_SHIFTS);
+    rows.forEach((e, i) => {
+      const li = document.createElement('li'), rank = document.createElement('span'), who = document.createElement('b'), tips = document.createElement('span');
+      rank.className = 'hs-rank' + (i < 3 ? ' r' + (i + 1) : ''); rank.textContent = String(i + 1);
+      rank.setAttribute('aria-label', ['1st', '2nd', '3rd'][i] || (i + 1) + 'th');
+      who.textContent = String(e.name || 'Anonymous').slice(0, 20);
+      tips.textContent = fmtMoney(e.tips) + (Number.isFinite(e.time) ? ' · ' + fmtTime(e.time) : '');
+      li.append(rank, who, tips);
+      const x = cleanHandle(e.x || '', 15), linkedin = cleanHandle(e.linkedin || '', 60), name = who.textContent;
+      if (x) li.append(socialLink('x', 'https://x.com/' + x, name + ' on X (@' + x + ')'));
+      if (linkedin) li.append(socialLink('li', 'https://www.linkedin.com/in/' + linkedin, name + ' on LinkedIn'));
+      ol.appendChild(li);
+    });
+  }
+
   // Pedestrians: tech worker, tourist, dog walker, fitness enthusiast (the cable car operator rides along).
   const PED_LOOK = {
     tech: { top: '#3d5a80', vest: '#7a8796', pants: '#4a4a55', hair: '#3b2a20', skin: '#e0b48c', voice: 0.6 },
@@ -4671,8 +4719,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
-      const shifts = this.store.get('shifts', []), a = cleanBest(this.store.get('best:nobHill', null)), b = cleanBest(this.store.get('best:russianHill', null)), t = cleanBest(this.store.get('best:telegraph', null));
-      if (Array.isArray(shifts) && shifts[0] && Number.isFinite(shifts[0].tips)) parts.push('Best shift ' + fmtMoney(shifts[0].tips) + (shifts[0].name ? ' by ' + shifts[0].name : ''));
+      fillScoreList(document.getElementById('title-board'), this.store.get('shifts', []));
+      const a = cleanBest(this.store.get('best:nobHill', null)), b = cleanBest(this.store.get('best:russianHill', null)), t = cleanBest(this.store.get('best:telegraph', null));
       if (a) parts.push('Latte ' + fmtMoney(a.tip) + ' (' + Math.round(a.condition) + '%)');
       if (b) parts.push('Cake ' + fmtMoney(b.tip) + ' (' + Math.round(b.condition) + '%)');
       if (t) parts.push('Bouquet ' + fmtMoney(t.tip) + ' (' + Math.round(t.condition) + '%)');
@@ -4997,7 +5045,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       form.hidden = !rank;
       $('hs-name').value = profile.name || ''; $('hs-x').value = profile.x ? '@' + profile.x : ''; $('hs-li').value = profile.linkedin || '';
       $('hs-status').textContent = '';
-      this.renderBoard(rank ? 'Top-3 shift! Add your name to save it.' : 'Not a top-3 shift. HR noticed.');
+      this.renderBoard(rank ? 'Top-' + TOP_SHIFTS + ' shift! Add your name to save it.' : 'Not a top-' + TOP_SHIFTS + ' shift. HR noticed.');
       this.audio.play(S.band === 'poor' ? 'trombone' : 'success');
       this.audio.setMusic('title');
       this.show('final');
@@ -5009,15 +5057,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     renderBoard(headline) {
       const $ = (id) => document.getElementById(id), list = this.store.get('shifts', []), ol = $('hs-board');
       $('fr-best').textContent = headline;
-      ol.textContent = '';
-      for (const e of Array.isArray(list) ? list : []) {
-        const li = document.createElement('li'), who = document.createElement('b'), tips = document.createElement('span');
-        who.textContent = e.name || 'Anonymous'; tips.textContent = fmtMoney(e.tips) + (e.time ? ' · ' + fmtTime(e.time) : '');
-        li.append(who, tips);
-        if (e.x) { const a = document.createElement('a'); a.href = 'https://x.com/' + e.x; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = '@' + e.x; li.append(a); }
-        if (e.linkedin) { const a = document.createElement('a'); a.href = 'https://www.linkedin.com/in/' + e.linkedin; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'LinkedIn'; li.append(a); }
-        ol.appendChild(li);
-      }
+      fillScoreList(ol, list);
     }
     submitShift(e) {
       e.preventDefault();
