@@ -1,0 +1,945 @@
+{
+ "buildNobHill": {
+  "terrain": "195120383d814dda",
+  "course": "f889923f91babdf9",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 45.541666666664725,
+    "condition": 94.89221962495273,
+    "crashes": 0,
+    "tip": 5.28,
+    "style": 100,
+    "result": "782e8608d9cc6f08",
+    "trace": "c5ef644b3ce3f55c",
+    "events": "5c6d0caeeba486e7"
+   },
+   "typical": {
+    "state": "done",
+    "time": 41.19166666666497,
+    "condition": 82.08522589153024,
+    "crashes": 0,
+    "tip": 5.04,
+    "style": 475,
+    "result": "3a49fd89f18d6f84",
+    "trace": "0627654c75263114",
+    "events": "eb5fbbaa1ce504cd"
+   },
+   "fast": {
+    "state": "done",
+    "time": 37.033333333331875,
+    "condition": 75.93359522152065,
+    "crashes": 0,
+    "tip": 5.28,
+    "style": 875,
+    "result": "482247d34c602641",
+    "trace": "71fce94b6189cd56",
+    "events": "e16f27f570c44e32"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 42.69166666666489,
+    "condition": 43.31718648916352,
+    "crashes": 1,
+    "tip": 2.89,
+    "style": 675,
+    "result": "163c7e0dd0c54aee",
+    "trace": "c595561eff0523e3",
+    "events": "b9b45acf900c3136"
+   }
+  }
+ },
+ "buildRussianHill": {
+  "terrain": "b53c6481c297e0ee",
+  "course": "b2fe533be4307ce2",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 40.39166666666502,
+    "condition": 91.76837418167132,
+    "crashes": 0,
+    "tip": 6.5,
+    "style": 200,
+    "result": "6187874e245c309f",
+    "trace": "61b63e86c0772d11",
+    "events": "928538a98d5039d8"
+   },
+   "typical": {
+    "state": "done",
+    "time": 42.05833333333159,
+    "condition": 70.65063247161726,
+    "crashes": 0,
+    "tip": 4.85,
+    "style": 450,
+    "result": "7a7ecfc36acb7b39",
+    "trace": "95ccedbcf2d8b7da",
+    "events": "de5c0dcb233014da"
+   },
+   "fast": {
+    "state": "done",
+    "time": 26.01666666666583,
+    "condition": 84.2836430918304,
+    "crashes": 0,
+    "tip": 5.93,
+    "style": 750,
+    "result": "b8b9866b3da86b78",
+    "trace": "c591f4542d733dd8",
+    "events": "96ad07e9b0f9956c"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 30.841666666665557,
+    "condition": 59.15821843763146,
+    "crashes": 1,
+    "tip": 4.11,
+    "style": 700,
+    "result": "899c1d47d2a7410f",
+    "trace": "9370097c0ce4c117",
+    "events": "a9cf1377a1f5fd84"
+   }
+  }
+ },
+ "buildTelegraphHill": {
+  "terrain": "b83b352db488adfe",
+  "course": "887e11729d5b5e8f",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 58.93333333333063,
+    "condition": 90.19703093153792,
+    "crashes": 0,
+    "tip": 3.96,
+    "style": 50,
+    "result": "701ae68d17abd4e3",
+    "trace": "93cf64876ff77c59",
+    "events": "633eb9f1e2e08b62"
+   },
+   "typical": {
+    "state": "done",
+    "time": 44.28333333333146,
+    "condition": 87.04546316298794,
+    "crashes": 0,
+    "tip": 4.7,
+    "style": 50,
+    "result": "6dcd0506b9917011",
+    "trace": "2eab755aed958f26",
+    "events": "5ac223caf856416b"
+   },
+   "fast": {
+    "state": "done",
+    "time": 43.0499999999982,
+    "condition": 86.78459165474463,
+    "crashes": 0,
+    "tip": 4.94,
+    "style": 300,
+    "result": "e526e20ec04c1286",
+    "trace": "4183dcf3b2c7713e",
+    "events": "0c4dd063f3a922f1"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 44.174999999998136,
+    "condition": 85.23611140587687,
+    "crashes": 0,
+    "tip": 4.62,
+    "style": 150,
+    "result": "a8cacd9ceaa22f12",
+    "trace": "aa1f0219f38e2691",
+    "events": "0a456a13f63d02f4"
+   }
+  }
+ },
+ "buildTitleCourse": {
+  "terrain": "801e934344129b9a",
+  "course": "da0aaab9ed300bfd",
+  "rides": {
+   "careful": {
+    "state": "riding",
+    "time": 180.00000000000063,
+    "condition": 96.86357628129403,
+    "crashes": 0,
+    "tip": 2.87,
+    "style": 0,
+    "result": "b1be492061a2bcc4",
+    "trace": "d9189ac00e4a0bf0",
+    "events": "0c86048235f22f11"
+   },
+   "typical": {
+    "state": "riding",
+    "time": 180.00000000000063,
+    "condition": 93.31556290307411,
+    "crashes": 0,
+    "tip": 2.72,
+    "style": 0,
+    "result": "69687b649ed64985",
+    "trace": "e1dc4281e9fae171",
+    "events": "ae88d3a3d006281a"
+   },
+   "fast": {
+    "state": "riding",
+    "time": 178.5333333333353,
+    "condition": 60.3061283750497,
+    "crashes": 1,
+    "tip": 0.81,
+    "style": 0,
+    "result": "9392fb908cd934b9",
+    "trace": "b29d99ad9c2a3a79",
+    "events": "3473a6ee3c0be72c"
+   },
+   "reckless": {
+    "state": "riding",
+    "time": 178.5333333333353,
+    "condition": 56.482594944816235,
+    "crashes": 1,
+    "tip": 0.65,
+    "style": 0,
+    "result": "7834edd83a342aa5",
+    "trace": "f0b4eae80691665f",
+    "events": "cbecf9c953741589"
+   }
+  }
+ },
+ "buildDrillBrake": {
+  "terrain": "01467a6c0c1d94e0",
+  "course": "be62537f0f3771dd",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 19.499999999999535,
+    "condition": 93.39680304794824,
+    "crashes": 0,
+    "tip": 5.72,
+    "style": 0,
+    "result": "a7bfbe4e76a4bdd0",
+    "trace": "66553f24f9459894",
+    "events": "ab174e5e4a8d2ed9"
+   },
+   "typical": {
+    "state": "done",
+    "time": 17.09999999999967,
+    "condition": 91.32401125620387,
+    "crashes": 0,
+    "tip": 5.63,
+    "style": 0,
+    "result": "a1f54548fc837a39",
+    "trace": "5208281a94590048",
+    "events": "a4bbc79e4442ac8e"
+   },
+   "fast": {
+    "state": "done",
+    "time": 16.941666666666347,
+    "condition": 89.40321750082713,
+    "crashes": 0,
+    "tip": 4.55,
+    "style": 0,
+    "result": "c83a597a9eebc2fe",
+    "trace": "7dd4cc3ddf5215cc",
+    "events": "aab5eac945559a1d"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 16.941666666666347,
+    "condition": 89.40321750082713,
+    "crashes": 0,
+    "tip": 4.55,
+    "style": 0,
+    "result": "c83a597a9eebc2fe",
+    "trace": "7dd4cc3ddf5215cc",
+    "events": "aab5eac945559a1d"
+   }
+  }
+ },
+ "buildDrillHop": {
+  "terrain": "cf276f69f0556f0f",
+  "course": "3eb35a16afa63679",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 11.283333333333333,
+    "condition": 100,
+    "crashes": 0,
+    "tip": 6.75,
+    "style": 150,
+    "result": "d8d292ab7400d90f",
+    "trace": "12c137a243e7f8f2",
+    "events": "8ad6dec6e86cb9a5"
+   },
+   "typical": {
+    "state": "done",
+    "time": 9.791666666666751,
+    "condition": 96.03433980534655,
+    "crashes": 0,
+    "tip": 6.58,
+    "style": 450,
+    "result": "e6299a82054c92f0",
+    "trace": "9a7a4dd792adf9b2",
+    "events": "63fbdca79c05a844"
+   },
+   "fast": {
+    "state": "done",
+    "time": 9.475000000000103,
+    "condition": 95.89043169946503,
+    "crashes": 0,
+    "tip": 6.58,
+    "style": 450,
+    "result": "08cc2eefdfefea0e",
+    "trace": "77d9160f1fb902c4",
+    "events": "63fbdca79c05a844"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 10.291666666666723,
+    "condition": 92.8139902273169,
+    "crashes": 0,
+    "tip": 5.69,
+    "style": 0,
+    "result": "c5f9e839382d2362",
+    "trace": "8dc9fe281016d4e7",
+    "events": "ea0a4424cff1a177"
+   }
+  }
+ },
+ "buildDrillLip": {
+  "terrain": "75f261f760482d66",
+  "course": "482180ce5d9bd552",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 13.51666666666654,
+    "condition": 100,
+    "crashes": 0,
+    "tip": 6,
+    "style": 0,
+    "result": "63e5fef3e2112732",
+    "trace": "634a79b80250292f",
+    "events": "777c4a1a46f7c7c5"
+   },
+   "typical": {
+    "state": "done",
+    "time": 12.399999999999936,
+    "condition": 88.23428071528686,
+    "crashes": 0,
+    "tip": 4.5,
+    "style": 100,
+    "result": "bcc6df37182d838f",
+    "trace": "52784aea12bc132e",
+    "events": "f1d1fafb77d2d0c5"
+   },
+   "fast": {
+    "state": "done",
+    "time": 11.283333333333333,
+    "condition": 91.03380514250888,
+    "crashes": 0,
+    "tip": 5.62,
+    "style": 100,
+    "result": "92e8751a972ea316",
+    "trace": "51568b1716d39920",
+    "events": "c47f3ee353586b6a"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 14.791666666666467,
+    "condition": 60.11581051729219,
+    "crashes": 1,
+    "tip": 2.8,
+    "style": 200,
+    "result": "8ab92845c16b209a",
+    "trace": "9012135f1625ab54",
+    "events": "400e32410eae5eb8"
+   }
+  }
+ },
+ "buildDrillStairs": {
+  "terrain": "cc386338c0df279c",
+  "course": "831efee3d5dd62ad",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 14.999999999999789,
+    "condition": 99.2282212761269,
+    "crashes": 0,
+    "tip": 5.97,
+    "style": 0,
+    "result": "44da274b812addd7",
+    "trace": "eb002f9dd2a4a488",
+    "events": "e3a9a798c4297803"
+   },
+   "typical": {
+    "state": "done",
+    "time": 14.91666666666646,
+    "condition": 98.09197710862684,
+    "crashes": 0,
+    "tip": 5.92,
+    "style": 0,
+    "result": "dcfbb852a19929aa",
+    "trace": "1ed3561f3ef6383c",
+    "events": "e7b47e2d2c572e9c"
+   },
+   "fast": {
+    "state": "done",
+    "time": 12.924999999999907,
+    "condition": 94.76372301876096,
+    "crashes": 0,
+    "tip": 6.03,
+    "style": 150,
+    "result": "9bf0141d3c993bf5",
+    "trace": "9a539a86aae7ba3f",
+    "events": "341ef1e6d406c161"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 13.174999999999892,
+    "condition": 94.38176328690746,
+    "crashes": 0,
+    "tip": 5.76,
+    "style": 0,
+    "result": "3677c8b7645d65ab",
+    "trace": "821a7dc763fff6b8",
+    "events": "1707ef7ba909be5a"
+   }
+  }
+ },
+ "buildDrillCable": {
+  "terrain": "278bc80d35e79098",
+  "course": "11211fe71f43d704",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 16.5999999999997,
+    "condition": 95.55655143952022,
+    "crashes": 0,
+    "tip": 5.11,
+    "style": 75,
+    "result": "df7389bf58d52a9e",
+    "trace": "d2308a3d1ebc7bf1",
+    "events": "d6dadc0ba15ca86b"
+   },
+   "typical": {
+    "state": "done",
+    "time": 14.849999999999797,
+    "condition": 95.99352814962717,
+    "crashes": 0,
+    "tip": 6.13,
+    "style": 75,
+    "result": "a2f7c2961f6793b8",
+    "trace": "e61ca9c0cbde25b5",
+    "events": "00a9fbe89b052a5c"
+   },
+   "fast": {
+    "state": "done",
+    "time": 15.224999999999776,
+    "condition": 93.53753429410958,
+    "crashes": 0,
+    "tip": 6.03,
+    "style": 75,
+    "result": "067c59946f883a9c",
+    "trace": "0e291f5f262fa502",
+    "events": "6db0a573610139db"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 15.224999999999776,
+    "condition": 93.53753429410958,
+    "crashes": 0,
+    "tip": 6.03,
+    "style": 75,
+    "result": "067c59946f883a9c",
+    "trace": "0e291f5f262fa502",
+    "events": "6db0a573610139db"
+   }
+  }
+ },
+ "buildDrillExam": {
+  "terrain": "693a474566e9272d",
+  "course": "448c293a056f39dd",
+  "rides": {
+   "careful": {
+    "state": "done",
+    "time": 32.108333333332155,
+    "condition": 94.59315839392178,
+    "crashes": 0,
+    "tip": 6.02,
+    "style": 50,
+    "result": "aa8d34cf4e1d4d3c",
+    "trace": "fc0d3c48fe32750d",
+    "events": "44effea07592b56e"
+   },
+   "typical": {
+    "state": "done",
+    "time": 29.608333333332293,
+    "condition": 85.38497628295733,
+    "crashes": 0,
+    "tip": 4.93,
+    "style": 325,
+    "result": "b20839799cb2ebbe",
+    "trace": "3a5472f60045605b",
+    "events": "5ff7399e44df1445"
+   },
+   "fast": {
+    "state": "done",
+    "time": 27.374999999999087,
+    "condition": 85.52594765490602,
+    "crashes": 0,
+    "tip": 5.18,
+    "style": 475,
+    "result": "f8928d5b4a5eb3d6",
+    "trace": "b660319435ea8dee",
+    "events": "71edf7033c07c39a"
+   },
+   "reckless": {
+    "state": "done",
+    "time": 30.933333333332218,
+    "condition": 50.75429556510417,
+    "crashes": 1,
+    "tip": 2.71,
+    "style": 375,
+    "result": "ebb33d4a4d52f491",
+    "trace": "5b736ee0a92a61ca",
+    "events": "5eb0b6f89076d7a2"
+   }
+  }
+ },
+ "buildTestHill": {
+  "terrain": "008fa8d4163bc82e",
+  "course": "e9425c67968d8be7",
+  "rides": {}
+ },
+ "cargoRides": {
+  "buildNobHill coffee careful": {
+   "state": "done",
+   "time": 45.541666666664725,
+   "condition": 94.89221962495273,
+   "crashes": 0,
+   "tip": 5.28,
+   "style": 100,
+   "result": "782e8608d9cc6f08",
+   "trace": "c5ef644b3ce3f55c",
+   "events": "5c6d0caeeba486e7"
+  },
+  "buildNobHill coffee typical": {
+   "state": "done",
+   "time": 41.19166666666497,
+   "condition": 82.08522589153024,
+   "crashes": 0,
+   "tip": 5.04,
+   "style": 475,
+   "result": "3a49fd89f18d6f84",
+   "trace": "0627654c75263114",
+   "events": "eb5fbbaa1ce504cd"
+  },
+  "buildNobHill coffee fast": {
+   "state": "done",
+   "time": 37.033333333331875,
+   "condition": 75.93359522152065,
+   "crashes": 0,
+   "tip": 5.28,
+   "style": 875,
+   "result": "482247d34c602641",
+   "trace": "71fce94b6189cd56",
+   "events": "e16f27f570c44e32"
+  },
+  "buildNobHill coffee reckless": {
+   "state": "done",
+   "time": 42.69166666666489,
+   "condition": 43.31718648916352,
+   "crashes": 1,
+   "tip": 2.89,
+   "style": 675,
+   "result": "163c7e0dd0c54aee",
+   "trace": "c595561eff0523e3",
+   "events": "b9b45acf900c3136"
+  },
+  "buildNobHill cake careful": {
+   "state": "done",
+   "time": 45.541666666664725,
+   "condition": 97.94426860259414,
+   "crashes": 0,
+   "tip": 5.41,
+   "style": 100,
+   "result": "1adc8fca332d352b",
+   "trace": "a215e6e7ce9cc3bb",
+   "events": "4f710607db00fafb"
+  },
+  "buildNobHill cake typical": {
+   "state": "done",
+   "time": 41.19166666666497,
+   "condition": 88.31318181924362,
+   "crashes": 0,
+   "tip": 5.3,
+   "style": 475,
+   "result": "2933e940c4d93a30",
+   "trace": "d288567b495bd887",
+   "events": "94eb049ef9a0446b"
+  },
+  "buildNobHill cake fast": {
+   "state": "done",
+   "time": 37.033333333331875,
+   "condition": 78.03015939968004,
+   "crashes": 0,
+   "tip": 5.37,
+   "style": 875,
+   "result": "8c1ec7f5b88f080c",
+   "trace": "dd8f45b333329a65",
+   "events": "f438dfb1031aed6b"
+  },
+  "buildNobHill cake reckless": {
+   "state": "done",
+   "time": 42.69166666666489,
+   "condition": 37.843856443270504,
+   "crashes": 1,
+   "tip": 2.66,
+   "style": 675,
+   "result": "22bc31c955ce5466",
+   "trace": "bcd6b10582551ff4",
+   "events": "02c6ac982d4a0dee"
+  },
+  "buildNobHill bouquet careful": {
+   "state": "done",
+   "time": 45.541666666664725,
+   "condition": 100,
+   "crashes": 0,
+   "tip": 5.5,
+   "style": 100,
+   "result": "ec2bd72454829719",
+   "trace": "5ab85b92e63aa7cd",
+   "events": "1fecd748774a85ba"
+  },
+  "buildNobHill bouquet typical": {
+   "state": "done",
+   "time": 41.19166666666497,
+   "condition": 88.44047722924651,
+   "crashes": 0,
+   "tip": 5.31,
+   "style": 475,
+   "result": "f0d0950535fd6967",
+   "trace": "dd7a09576a8b3589",
+   "events": "8cbbdf9b777c9691"
+  },
+  "buildNobHill bouquet fast": {
+   "state": "done",
+   "time": 37.033333333331875,
+   "condition": 75.18133244726424,
+   "crashes": 0,
+   "tip": 5.25,
+   "style": 875,
+   "result": "6c4fb1898935d88a",
+   "trace": "b586b0728d39196f",
+   "events": "dd44fe1b7ebea128"
+  },
+  "buildNobHill bouquet reckless": {
+   "state": "done",
+   "time": 42.69166666666489,
+   "condition": 44.76838363569702,
+   "crashes": 1,
+   "tip": 2.95,
+   "style": 675,
+   "result": "c60aa795c47e1bd4",
+   "trace": "7c6518e56a688501",
+   "events": "0abf3eeab6bc8da1"
+  },
+  "buildRussianHill coffee careful": {
+   "state": "done",
+   "time": 40.39166666666502,
+   "condition": 83.66221496376201,
+   "crashes": 0,
+   "tip": 5.16,
+   "style": 200,
+   "result": "abdf057b674c04b7",
+   "trace": "2161417397a2cdc8",
+   "events": "af2944ace8711537"
+  },
+  "buildRussianHill coffee typical": {
+   "state": "done",
+   "time": 42.05833333333159,
+   "condition": 67.80804890567543,
+   "crashes": 0,
+   "tip": 4.73,
+   "style": 450,
+   "result": "4de4fd692b23951c",
+   "trace": "102269ec8ef68308",
+   "events": "de0025f3d0828d31"
+  },
+  "buildRussianHill coffee fast": {
+   "state": "done",
+   "time": 26.01666666666583,
+   "condition": 80.88045308519966,
+   "crashes": 0,
+   "tip": 5.79,
+   "style": 750,
+   "result": "5778e476d101a1ad",
+   "trace": "7827756bd0293c63",
+   "events": "15b90960e97db2e8"
+  },
+  "buildRussianHill coffee reckless": {
+   "state": "done",
+   "time": 30.841666666665557,
+   "condition": 47.40955251460755,
+   "crashes": 1,
+   "tip": 3.61,
+   "style": 700,
+   "result": "34cff25dda90913a",
+   "trace": "5f6ec213a9faf479",
+   "events": "2095690d0046b04e"
+  },
+  "buildRussianHill cake careful": {
+   "state": "done",
+   "time": 40.39166666666502,
+   "condition": 91.76837418167132,
+   "crashes": 0,
+   "tip": 6.5,
+   "style": 200,
+   "result": "6187874e245c309f",
+   "trace": "61b63e86c0772d11",
+   "events": "928538a98d5039d8"
+  },
+  "buildRussianHill cake typical": {
+   "state": "done",
+   "time": 42.05833333333159,
+   "condition": 70.65063247161726,
+   "crashes": 0,
+   "tip": 4.85,
+   "style": 450,
+   "result": "7a7ecfc36acb7b39",
+   "trace": "95ccedbcf2d8b7da",
+   "events": "de5c0dcb233014da"
+  },
+  "buildRussianHill cake fast": {
+   "state": "done",
+   "time": 26.01666666666583,
+   "condition": 84.2836430918304,
+   "crashes": 0,
+   "tip": 5.93,
+   "style": 750,
+   "result": "b8b9866b3da86b78",
+   "trace": "c591f4542d733dd8",
+   "events": "96ad07e9b0f9956c"
+  },
+  "buildRussianHill cake reckless": {
+   "state": "done",
+   "time": 30.841666666665557,
+   "condition": 59.15821843763146,
+   "crashes": 1,
+   "tip": 4.11,
+   "style": 700,
+   "result": "899c1d47d2a7410f",
+   "trace": "9370097c0ce4c117",
+   "events": "a9cf1377a1f5fd84"
+  },
+  "buildRussianHill bouquet careful": {
+   "state": "done",
+   "time": 40.39166666666502,
+   "condition": 100,
+   "crashes": 0,
+   "tip": 6.85,
+   "style": 200,
+   "result": "e677c63ae35cf69b",
+   "trace": "3eea0fe3cd5896d7",
+   "events": "3d3fd9b8d0076f08"
+  },
+  "buildRussianHill bouquet typical": {
+   "state": "done",
+   "time": 42.05833333333159,
+   "condition": 82.94189760405708,
+   "crashes": 0,
+   "tip": 5.38,
+   "style": 450,
+   "result": "1db21d8e6aeff98d",
+   "trace": "f87c3ee3043210cd",
+   "events": "5bb580047f51519a"
+  },
+  "buildRussianHill bouquet fast": {
+   "state": "done",
+   "time": 26.01666666666583,
+   "condition": 79.95456042697572,
+   "crashes": 0,
+   "tip": 5.75,
+   "style": 750,
+   "result": "d0cf4fe2cc4a3a0d",
+   "trace": "e841d319e13d0d64",
+   "events": "6235beb1c3321122"
+  },
+  "buildRussianHill bouquet reckless": {
+   "state": "done",
+   "time": 30.841666666665557,
+   "condition": 82.00550989003779,
+   "crashes": 1,
+   "tip": 5.09,
+   "style": 700,
+   "result": "5a738bc788d22dba",
+   "trace": "22aa066b66c5edf9",
+   "events": "976dbf0ad89f0abf"
+  },
+  "buildTelegraphHill coffee careful": {
+   "state": "done",
+   "time": 58.93333333333063,
+   "condition": 100,
+   "crashes": 0,
+   "tip": 4.38,
+   "style": 50,
+   "result": "0b73188acce736a8",
+   "trace": "0181be56cd8ad6ae",
+   "events": "a7d383d43c3e444a"
+  },
+  "buildTelegraphHill coffee typical": {
+   "state": "done",
+   "time": 44.28333333333146,
+   "condition": 98.38787010518874,
+   "crashes": 0,
+   "tip": 5.18,
+   "style": 50,
+   "result": "9c492d5a0aeae924",
+   "trace": "9a77ffe754651118",
+   "events": "9c280212e144039c"
+  },
+  "buildTelegraphHill coffee fast": {
+   "state": "done",
+   "time": 43.0499999999982,
+   "condition": 97.20022202175068,
+   "crashes": 0,
+   "tip": 6.38,
+   "style": 300,
+   "result": "55a6fc1d9f0a9a13",
+   "trace": "a9e33b5dd9315270",
+   "events": "4cb0d98d2c56ae79"
+  },
+  "buildTelegraphHill coffee reckless": {
+   "state": "done",
+   "time": 44.174999999998136,
+   "condition": 96.67682096473435,
+   "crashes": 0,
+   "tip": 5.11,
+   "style": 150,
+   "result": "75fa59127235dacb",
+   "trace": "b7be03194754728b",
+   "events": "58dec8f0bad24e01"
+  },
+  "buildTelegraphHill cake careful": {
+   "state": "done",
+   "time": 58.93333333333063,
+   "condition": 100,
+   "crashes": 0,
+   "tip": 4.38,
+   "style": 50,
+   "result": "c508ca35e3e8aa52",
+   "trace": "0181be56cd8ad6ae",
+   "events": "a7d383d43c3e444a"
+  },
+  "buildTelegraphHill cake typical": {
+   "state": "done",
+   "time": 44.28333333333146,
+   "condition": 98.70687467577511,
+   "crashes": 0,
+   "tip": 5.2,
+   "style": 50,
+   "result": "c7883898a029defa",
+   "trace": "0eb05deae49deac6",
+   "events": "6a93361482936b33"
+  },
+  "buildTelegraphHill cake fast": {
+   "state": "done",
+   "time": 43.0499999999982,
+   "condition": 97.52271435771017,
+   "crashes": 0,
+   "tip": 6.39,
+   "style": 300,
+   "result": "e0ec68f346c15e6f",
+   "trace": "62115ea7e73eb45e",
+   "events": "4cb0d98d2c56ae79"
+  },
+  "buildTelegraphHill cake reckless": {
+   "state": "done",
+   "time": 44.174999999998136,
+   "condition": 97.71061978701393,
+   "crashes": 0,
+   "tip": 5.15,
+   "style": 150,
+   "result": "4da2fc03cc139275",
+   "trace": "b0f57177353789de",
+   "events": "92adf8ce07c565c3"
+  },
+  "buildTelegraphHill bouquet careful": {
+   "state": "done",
+   "time": 58.93333333333063,
+   "condition": 90.19703093153792,
+   "crashes": 0,
+   "tip": 3.96,
+   "style": 50,
+   "result": "701ae68d17abd4e3",
+   "trace": "93cf64876ff77c59",
+   "events": "633eb9f1e2e08b62"
+  },
+  "buildTelegraphHill bouquet typical": {
+   "state": "done",
+   "time": 44.28333333333146,
+   "condition": 87.04546316298794,
+   "crashes": 0,
+   "tip": 4.7,
+   "style": 50,
+   "result": "6dcd0506b9917011",
+   "trace": "2eab755aed958f26",
+   "events": "5ac223caf856416b"
+  },
+  "buildTelegraphHill bouquet fast": {
+   "state": "done",
+   "time": 43.0499999999982,
+   "condition": 86.78459165474463,
+   "crashes": 0,
+   "tip": 4.94,
+   "style": 300,
+   "result": "e526e20ec04c1286",
+   "trace": "4183dcf3b2c7713e",
+   "events": "0c4dd063f3a922f1"
+  },
+  "buildTelegraphHill bouquet reckless": {
+   "state": "done",
+   "time": 44.174999999998136,
+   "condition": 85.23611140587687,
+   "crashes": 0,
+   "tip": 4.62,
+   "style": 150,
+   "result": "a8cacd9ceaa22f12",
+   "trace": "aa1f0219f38e2691",
+   "events": "0a456a13f63d02f4"
+  }
+ },
+ "unbreakable": {
+  "buildNobHill": {
+   "state": "done",
+   "time": 42.69166666666489,
+   "condition": 100,
+   "crashes": 1,
+   "tip": 5.3,
+   "style": 675,
+   "result": "0352b6320e6e84f4",
+   "trace": "27526c017bbac865",
+   "events": "edb1716a5510698b"
+  },
+  "buildRussianHill": {
+   "state": "done",
+   "time": 30.841666666665557,
+   "condition": 100,
+   "crashes": 1,
+   "tip": 6.85,
+   "style": 700,
+   "result": "79ffd7ea3de71fb0",
+   "trace": "ce3edfbc4975f758",
+   "events": "8dafcde4d0288e8f"
+  },
+  "buildTelegraphHill": {
+   "state": "done",
+   "time": 44.174999999998136,
+   "condition": 100,
+   "crashes": 0,
+   "tip": 5.25,
+   "style": 150,
+   "result": "4fe0765e7628acd9",
+   "trace": "e3fa9868420bbff5",
+   "events": "91fe8114d4ebd893"
+  }
+ },
+ "cargoScripts": {
+  "coffee": "87ae098ad0204d29",
+  "cake": "e7f41d3350309703",
+  "bouquet": "c1ea03c73143274c"
+ }
+}
