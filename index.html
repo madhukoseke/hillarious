@@ -588,6 +588,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   };
   const SAG = (PHYS.mass * PHYS.g) / (2 * PHYS.springK);
   const RIDE_H = -PHYS.mountY + PHYS.suspRest - SAG + PHYS.wheelR; // CoM height over flat ground at rest
+  // Physics per world (TD-10). PHYS, SAG, and RIDE_H stay Earth's; a world takes its own from course.planet, with the
+  // sag and ride height derived by the same formulas. A new planet adds a PLANETS entry; nothing else reads globals.
+  const PLANETS = { earth: PHYS };
+  function withDerived(P) {
+    const sag = (P.mass * P.g) / (2 * P.springK);
+    return Object.freeze({ ...P, sag, rideH: -P.mountY + P.suspRest - sag + P.wheelR });
+  }
+  const EARTH = withDerived(PHYS);
+  function physicsFor(planet) { return !planet || planet === 'earth' || !PLANETS[planet] ? EARTH : withDerived(PLANETS[planet]); }
 
   const CARGO = {
     mountX: 0.63, mountY: 0.06,
@@ -1365,14 +1374,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HOLD_INPUT = Object.freeze({ pedal: false, brake: true, leanBack: false, leanFwd: false, jumpHeld: false, jumpPressed: false });
 
   class Bike {
-    constructor() {
-      this.wheels = [-PHYS.wheelBase / 2, PHYS.wheelBase / 2].map((lx) => ({
-        lx, contact: false, was: false, comp: SAG, pcomp: SAG, spin: 0, pspin: 0, spinV: 0, load: 0,
+    constructor(P = EARTH) {
+      this.P = P;
+      this.wheels = [-P.wheelBase / 2, P.wheelBase / 2].map((lx) => ({
+        lx, contact: false, was: false, comp: P.sag, pcomp: P.sag, spin: 0, pspin: 0, spinV: 0, load: 0,
         nx: 0, ny: 1, cx: 0, cy: 0, pen: 0, excess: 0, rigid: false, surf: null, hx: 0, hy: 0,
       }));
       this.q = { pen: 0, px: 0, py: 0, nx: 0, ny: 1, surf: null };
       this.tmp = { x: 0, y: 0 }; this.land = { x: 0, a: 0, t: 0 };
-      this.reset(0, RIDE_H, 0, 0);
+      this.reset(0, P.rideH, 0, 0);
     }
     reset(x, y, a, speed) {
       Object.assign(this, {
@@ -1382,7 +1392,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         impact: 0, touchImpact: 0, bottomOut: 0, bigAirSent: false, takeoffX: x,
       });
       for (const wh of this.wheels) {
-        wh.contact = true; wh.was = true; wh.comp = wh.pcomp = SAG; wh.spin = wh.pspin = 0; wh.spinV = 0;
+        wh.contact = true; wh.was = true; wh.comp = wh.pcomp = this.P.sag; wh.spin = wh.pspin = 0; wh.spinV = 0;
         wh.load = 0; wh.rigid = false; wh.excess = 0; wh.surf = null;
       }
     }
@@ -1392,7 +1402,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       return out;
     }
     applyImpulse(px, py, nx, ny, e, mu) {
-      const m = PHYS.mass, I = PHYS.inertia;
+      const m = this.P.mass, I = this.P.inertia;
       const rx = px - this.x, ry = py - this.y;
       const vn = (this.vx - this.w * ry) * nx + (this.vy + this.w * rx) * ny;
       if (vn >= 0) return vn;
@@ -1422,10 +1432,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // Where the current flight lands (x), on what slope (a), and in how long (t). The landing assist and the
     // Free Ride physics overlay both read it.
     predictLanding(world, out) {
-      const T = world.terrain, g = PHYS.g;
+      const T = world.terrain, g = this.P.g;
       let t = 0.3;
       for (let k = 0; k < 3; k++) {
-        const hl = T.height(this.x + this.vx * t) + RIDE_H * 0.9;
+        const hl = T.height(this.x + this.vx * t) + this.P.rideH * 0.9;
         const disc = this.vy * this.vy + 2 * g * Math.max(0, this.y - hl);
         t = clamp((this.vy + Math.sqrt(disc)) / g, 0.02, 2);
       }
@@ -1434,7 +1444,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     predictLandingAngle(world) { return this.predictLanding(world, this.land).a; }
     step(dt, inp, world, t) {
-      const P = PHYS, m = P.mass, I = P.inertia, q = this.q;
+      const P = this.P, m = P.mass, I = P.inertia, q = this.q;
       this.px = this.x; this.py = this.y; this.pa = this.a; this.pcrank = this.crank;
       const live = !this.crashed;
       const pedal = live && inp.pedal, brake = live && inp.brake;
@@ -1624,9 +1634,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.pvx = vx; this.pvy = vy;
       const k = 1 - Math.exp(-dt / C.tau);
       this.afx += (ax - this.afx) * k; this.afy += (ay - this.afy) * k;
-      const gx = -this.afx, gy = -PHYS.g - this.afy;           // effective gravity, world frame
+      const gx = -this.afx, gy = -b.P.g - this.afy;           // effective gravity, world frame
       const lgx = gx * ca + gy * sa, lgy = -gx * sa + gy * ca;   // ...in the cup frame
-      const mag = Math.hypot(lgx, lgy) / PHYS.g;
+      const mag = Math.hypot(lgx, lgy) / b.P.g;
       this.gMag = mag;
       // Near free fall the liquid floats: no meaningful restoring direction, just weak surface tension.
       const fall = smoothstep(0.25, 0.55, mag);
@@ -1717,9 +1727,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.pvx = vx; this.pvy = vy;
       const k = 1 - Math.exp(-dt / C.tau);
       this.afx += (ax - this.afx) * k; this.afy += (ay - this.afy) * k;
-      const gx = -this.afx, gy = -PHYS.g - this.afy;
+      const gx = -this.afx, gy = -b.P.g - this.afy;
       const lgx = gx * ca + gy * sa, lgy = -gx * sa + gy * ca;   // effective gravity in the rack frame
-      this.gMag = Math.hypot(lgx, lgy) / PHYS.g;
+      this.gMag = Math.hypot(lgx, lgy) / b.P.g;
       const dA = wrapAngle(b.a - this.pa); this.pa = b.a;
       this.angle -= dA * C.rot;                                   // the cake lags fast pitching
       const th = this.angle;
@@ -1877,7 +1887,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (!this.near && b.x > this.x - 26) { this.near = true; W.emit('MAYBEMO_ENCOUNTER', { x: this.x }); }
       if (!this.passed && b.x >= this.midX) {
         this.passed = true;
-        const clear = b.y - RIDE_H - this.roofY;
+        const clear = b.y - b.P.rideH - this.roofY;
         if (clear > -0.3) {
           const near = !b.grounded && clear < 1.0;
           if (near) { W.score.nearMisses++; W.score.style += 75; }
@@ -1924,7 +1934,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const stop = this.state === 'STOPPED' ? Math.max(0, this.P.stopTime - this.t) : this.state === 'RESUMING' ? 0 : this.P.stopTime + 2;
       return stop + Math.max(0, this.z + this.P.len - LANE.near) / 4;
     }
-    riderOnTop(b) { return b.x + 1 > this.x0 && b.x - 1 < this.x1 && b.y - RIDE_H > this.y + this.P.height - 0.4; }
+    riderOnTop(b) { return b.x + 1 > this.x0 && b.x - 1 < this.x1 && b.y - b.P.rideH > this.y + this.P.height - 0.4; }
     update(dt, W) {
       const b = W.bike, P = this.P;
       this.pz = this.z; this.t += dt;
@@ -1974,9 +1984,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (W.state === 'riding' && !this.passChecked && b.x > this.cx) { // the rider crossed our crossing point
         this.passChecked = true;
         if (this.blocking) {
-          if (this.kind === 'maybemo' && b.y - RIDE_H > this.y + P.height - 0.3) {
+          if (this.kind === 'maybemo' && b.y - b.P.rideH > this.y + P.height - 0.3) {
             this.overDone = true;
-            const clear = b.y - RIDE_H - (this.y + P.height), near = !b.grounded && clear < 1.0;
+            const clear = b.y - b.P.rideH - (this.y + P.height), near = !b.grounded && clear < 1.0;
             if (near) { W.score.nearMisses++; W.score.style += 75; }
             W.emit('MAYBEMO_OVER', { near, clear });
           }
@@ -2016,7 +2026,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     updateBoardwalk(b) {
       const walk = this.boardwalk;
       if (!walk) return;
-      const ca = Math.cos(b.a), sa = Math.sin(b.a), gy = b.y - RIDE_H;
+      const ca = Math.cos(b.a), sa = Math.sin(b.a), gy = b.y - b.P.rideH;
       const margin = walk.surface.active && b.x >= walk.x0 ? 0.6 : 0;
       walk.surface.active = b.wheels.every((wh) => gy + wh.lx * sa > polylineY(walk.pts, b.x + wh.lx * ca) - margin);
     }
@@ -2057,7 +2067,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const c of this.cones) {
         if (c.state !== 0) continue;
         for (const wh of b.wheels) {
-          if (Math.abs(wh.hx - c.x) < PHYS.wheelR + 0.16 && wh.hy - c.y < PHYS.wheelR + 0.42 && wh.hy > c.y - 0.2) { this.knock(c, b); break; }
+          if (Math.abs(wh.hx - c.x) < b.P.wheelR + 0.16 && wh.hy - c.y < b.P.wheelR + 0.42 && wh.hy > c.y - 0.2) { this.knock(c, b); break; }
         }
       }
       for (const car of this.cars) car.update(dt, W);
@@ -2090,7 +2100,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const c of this.cones) {
         c.px = c.x; c.py = c.y; c.pa = c.a;
         if (c.state !== 1) continue;
-        c.vy -= PHYS.g * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.a += c.w * dt;
+        c.vy -= this.w.phys.g * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.a += c.w * dt;
         const h = T.height(c.x);
         if (c.y < h + 0.05) {
           c.y = h + 0.05;
@@ -2554,7 +2564,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // opts.startCp starts the run at a checkpoint (Free Ride); opts.unbreakable keeps the cargo whole (it still sloshes).
     constructor(course, opts) {
       this.course = course; this.terrain = course.terrain; this.opts = opts || {};
-      this.bike = new Bike();
+      this.phys = physicsFor(course.planet); // course.planet: unset means Earth
+      this.bike = new Bike(this.phys);
       this.cargo = makeCargo(course.cargo);
       this.score = new Score(course.par, this.cargo.kind);
       this.obstacles = new Obstacles(this);
@@ -2589,7 +2600,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     drain() { const ev = this.events; this.events = []; return ev; }
     spawn(x, speed) {
       const T = this.terrain, s = T.slope(x), inv = 1 / Math.sqrt(1 + s * s);
-      this.bike.reset(x - s * inv * RIDE_H, T.height(x) + inv * RIDE_H, Math.atan(s), speed);
+      this.bike.reset(x - s * inv * this.phys.rideH, T.height(x) + inv * this.phys.rideH, Math.atan(s), speed);
       this.cargo.resetSlosh();
     }
     // Deepest contact between a circle and the terrain or obstacle surfaces.
@@ -2728,7 +2739,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const rel = wrapAngle(b.a - Math.atan(this.terrain.slope(b.x)));
       this.emit('LAND', { impact, airTime, rel, x: b.x, y: b.y });
       if (this.state !== 'riding' && this.state !== 'finishing') return;
-      if (this.state === 'riding' && this.invuln <= 0 && impact > PHYS.crashLandImpact) { this.crash('landing', clamp((impact - 12) / 6, 0, 1)); return; }
+      if (this.state === 'riding' && this.invuln <= 0 && impact > this.phys.crashLandImpact) { this.crash('landing', clamp((impact - 12) / 6, 0, 1)); return; }
       const hurt = this.cargo.splash(impact, rel, this.state !== 'riding' || !!this.opts.unbreakable);
       this.drainCargo();
       if (hurt > 0) {
@@ -2765,8 +2776,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         }
         return;
       }
-      if (speed > PHYS.obstacleCrashSpeed) this.crash(o.kind === 'cablecar' ? 'cablecar' : 'obstacle', clamp((speed - 4.5) / 6, 0, 1));
-      else if (speed > PHYS.bonkSpeed && this.t - this.lastBonk > 0.5) { this.lastBonk = this.t; this.cargo.kick(0.8); this.emit('BONK', { speed, kind: o.kind }); }
+      if (speed > this.phys.obstacleCrashSpeed) this.crash(o.kind === 'cablecar' ? 'cablecar' : 'obstacle', clamp((speed - 4.5) / 6, 0, 1));
+      else if (speed > this.phys.bonkSpeed && this.t - this.lastBonk > 0.5) { this.lastBonk = this.t; this.cargo.kick(0.8); this.emit('BONK', { speed, kind: o.kind }); }
     }
     crash(cause, sev) {
       if (this.state !== 'riding') return;
@@ -2786,7 +2797,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     updateBody(o, dt, rad, e) {
       if (!o.on) return;
       o.px = o.x; o.py = o.y; o.pa = o.a;
-      o.vy -= PHYS.g * dt; o.vx *= 1 - 0.1 * dt;
+      o.vy -= this.phys.g * dt; o.vx *= 1 - 0.1 * dt;
       o.x += o.vx * dt; o.y += o.vy * dt; o.a += o.w * dt;
       const T = this.terrain, h = T.height(o.x);
       if (o.y - rad < h) {
@@ -2820,7 +2831,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // The wind at a position. Pass the height too: anything on or above the boardwalk is sheltered from it.
     windAt(x, y = -Infinity) {
       const walk = this.course.boardwalk;
-      if (walk && x >= walk.x0 && x <= walk.x1 && y - RIDE_H > polylineY(walk.pts, x) - 0.3) return 0;
+      if (walk && x >= walk.x0 && x <= walk.x1 && y - this.phys.rideH > polylineY(walk.pts, x) - 0.3) return 0;
       for (const g of this.course.gusts || []) if (x >= g.x0 && x <= g.x1) return g.wind;
       return 0;
     }
@@ -2938,7 +2949,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -2986,7 +2997,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     enableTouch() { if (!this.touchMode) { this.touchMode = true; document.body.classList.add('touch'); } this.setDevice('touch'); }
     setDevice(d) { if (this.device !== d) { this.device = d; if (this.onDevice) this.onDevice(d); } }
     onKey(e, isDown) {
-      if (e.target && e.target.closest && e.target.closest('input, textarea')) return; // let the name fields take typing
+      if (e.target && e.target.closest && e.target.closest('input:not([type="range"]), textarea')) return; // let the name fields take typing; sliders go through the game
       const a = KEYMAP[e.code] || (e.key === ' ' ? 'jump' : null);
       if (!a) return;
       if (isDown) this.setDevice('keyboard');
@@ -4708,16 +4719,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       P.x = lerp(b.px, b.x, alpha); P.y = lerp(b.py, b.y, alpha); P.a = lerpAngle(b.pa, b.a, alpha);
       for (let i = 0; i < 2; i++) {
         const wh = b.wheels[i], comp = lerp(wh.pcomp, wh.comp, alpha);
-        P.hub[i].x = wh.lx; P.hub[i].y = PHYS.mountY - PHYS.suspRest + comp;
+        P.hub[i].x = wh.lx; P.hub[i].y = world.phys.mountY - world.phys.suspRest + comp;
         P.spin[i] = lerp(wh.pspin, wh.spin, alpha);
       }
       const sp = Math.hypot(b.vx, b.vy);
       P.speed = sp; P.crank = b.pedalIn ? lerp(b.pcrank, b.crank, alpha) : b.crank;
-      P.hgt = P.y - RIDE_H - world.terrain.height(P.x);
+      P.hgt = P.y - world.phys.rideH - world.terrain.height(P.x);
       P.wave = world.state === 'riding' && !b.grounded && b.airTime > 0.4 && P.hgt > 0.9 ? clamp((b.airTime - 0.4) / 0.15, 0, 1) * clamp((P.hgt - 0.9) / 0.4, 0, 1) : 0;
       P.lean = b.lean; P.brake = b.brakeIn ? clamp(sp / 8, 0, 1) : 0;
       P.stand = clamp(clamp((sp - 11) / 6, 0, 1) * (b.grounded ? 1 : 0.5) + (b.airTime > 0.25 ? 0.4 : 0), 0, 1);
-      P.bob = (b.grounded ? Math.sin(game.time * 9) * 0.006 * clamp(sp / 8, 0, 1) : 0.02) - (b.wheels[0].comp - SAG) * 0.25;
+      P.bob = (b.grounded ? Math.sin(game.time * 9) * 0.006 * clamp(sp / 8, 0, 1) : 0.02) - (b.wheels[0].comp - world.phys.sag) * 0.25;
       const view = cargoView(c.kind);
       P.view = view; P.cg = view.pose(c, cg); P.shield = c.shield; P.bellRing = game.bellT > 0 ? Math.abs(Math.sin(game.bellT * 30)) : 0;
       const worried = view.worried(c);
@@ -4729,7 +4740,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     drawBike(world, alpha, game) {
       const ctx = this.ctx, b = world.bike, T = world.terrain;
       const P = this.bikePose(world, alpha, game);
-      const gh = T.height(P.x), hgt = P.y - RIDE_H - gh;
+      const gh = T.height(P.x), hgt = P.y - world.phys.rideH - gh;
       ctx.fillStyle = 'rgba(30,28,34,' + clamp(0.28 - hgt * 0.04, 0.06, 0.28).toFixed(3) + ')';
       ctx.beginPath(); ctx.ellipse(P.x, gh + 0.1, clamp(0.8 - hgt * 0.06, 0.35, 0.8), 0.09, 0, 0, TAU); ctx.fill();
       const pose = riderPose(P, this.rpose);
@@ -5273,7 +5284,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (a === 'mute') { this.toggleMute(); continue; }
         if (this.state !== 'riding' && this.state !== 'delivered') { // menus: move focus, or press the focused button
           const slider = document.activeElement && document.activeElement.matches && document.activeElement.matches('input[type="range"]') ? document.activeElement : null;
-          if (slider && (a === 'navLeft' || a === 'navRight')) { this.nudgeSlider(slider, a === 'navRight' ? 1 : -1); continue; }
+          if (slider && (a === 'navLeft' || a === 'navRight' || a === 'leanBack' || a === 'leanFwd')) { this.nudgeSlider(slider, a === 'navRight' || a === 'leanFwd' ? 1 : -1); continue; }
+          if (slider && (a === 'confirm' || a === 'jump')) continue; // confirming a slider must not start a ride or resume
           if (NAV[a]) { this.menuFocus(NAV[a]); continue; }
           const btn = a === 'confirm' && this.focusedButton();
           if (btn) { btn.click(); continue; }
@@ -5444,14 +5456,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       switch (e.type) {
         case 'HOP':
           A.play('hop');
-          for (let i = 0; i < 4; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 0.8, e.y - RIDE_H + 0.05, (Math.random() - 0.5) * 1.5, Math.random() * 0.8, 0.6, 0.08, '');
+          for (let i = 0; i < 4; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 0.8, e.y - W.phys.rideH + 0.05, (Math.random() - 0.5) * 1.5, Math.random() * 0.8, 0.6, 0.08, '');
           break;
         case 'LAND': {
           if (this.mode === 'free' && e.airTime > 0.12) { const S = this.freeStats; S.totalAir += e.airTime; S.bestAir = Math.max(S.bestAir, e.airTime); }
           A.play('land', clamp(e.impact / 10, 0.15, 1));
           if (e.impact > 2.5) {
             const n = Math.min(14, 3 + Math.round(e.impact));
-            for (let i = 0; i < n; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 1.2, e.y - RIDE_H + 0.05, (Math.random() - 0.5) * 3, Math.random() * 1.2, 0.7, 0.1, '');
+            for (let i = 0; i < n; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 1.2, e.y - W.phys.rideH + 0.05, (Math.random() - 0.5) * 3, Math.random() * 1.2, 0.7, 0.1, '');
             this.cam.shake(Math.min(0.55, e.impact / 18));
           }
           break;
