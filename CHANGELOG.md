@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - On landscape phones, the keyboard legend no longer covers the title's Press SPACE line and volume sliders. How to play still lists the controls.
 
 ### Developer
+- Physics per world: each world takes its physics from `course.planet` through `PLANETS` and `physicsFor` (Earth by default), and the bike, cargo, obstacles, and bodies read it from there. `PHYS`, `SAG`, and `RIDE_H` remain Earth's values. Unblocks Mars and weather.
 - Port check: `tests/golden/ports.json` records how every course builds and plays, including every cargo on every route and a timed ride on The Test Hill; courses come from `ROUTES` and `DRILLS`. Course data must match exactly and rides within 1e-4, since physics floats can differ between machines. Rewrite it with `node tests/golden/update.mjs` only for an intended gameplay change.
 - One cargo interface: `CARGO_TYPES` (engine) and `CARGO_VIEW` (drawing, sounds, HUD) replace every cargo-type branch. A new cargo adds its class and one entry in each table.
 - Fairness check: `tests/fairness.test.mjs` runs all four riders on every route and drill in `ROUTES` and `DRILLS`.
