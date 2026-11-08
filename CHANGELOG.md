@@ -6,6 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Fixed
+- On landscape phones, the final review's verdict stamp stays on screen while the save form is in view, down to 740×360.
 - The review card's "Most trouble" line no longer breaks the review after the cargo refactor, and it says "% petals" for the bouquet instead of "% latte".
 - The bouquet now sheds pink petals when it loses petals, instead of coffee droplets that never appeared.
 - After a cake or bouquet crash, the rack and basket are empty while the cargo flies, instead of showing a coffee cup.
