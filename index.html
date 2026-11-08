@@ -502,6 +502,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           <div><span>Near misses</span><b id="rv-near"></b></div>
           <div><span>Clean landings</span><b id="rv-clean"></b></div>
           <div><span>Crashes</span><b id="rv-crash"></b></div>
+          <div><span>Style</span><b id="rv-style"></b></div>
         </div>
         <div class="rc-items" id="rv-items"></div>
         <div class="rc-total"><span id="rv-total-label">TIP</span><b id="rv-tip"></b></div>
@@ -2212,7 +2213,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     return {
       deliveries: n, stars, avgStars, band, verdict: EMPLOYEE_REVIEWS[band], crashes,
       tips: r2(Math.max(0, sum((r) => r.tip))), time: sum((r) => r.time), par: sum((r) => r.par),
-      nearMisses: sum((r) => r.nearMisses), cleanLandings: sum((r) => r.cleanLandings), avgCondition: n ? sum((r) => clamp(r.condition, 0, 100)) / n : 0,
+      nearMisses: sum((r) => r.nearMisses), cleanLandings: sum((r) => r.cleanLandings), bigAirs: sum((r) => r.bigAirs), style: sum((r) => r.style), avgCondition: n ? sum((r) => clamp(r.condition, 0, 100)) / n : 0,
     };
   }
   // Keeps the three best shifts (most tips, then fastest). Returns the new list and the shift's rank (0 = unranked).
@@ -2226,6 +2227,17 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   // Stored record format version. Version 1 adds `v` to best-tip and shift records; records without `v` still read.
   const RECORD_VERSION = 1;
   // Sanitizes a stored best-tip record. Anything that is not a finite tip and time returns null, so corrupt saves never reach the review.
+  // Style best per route (TD-04): style is its own score (near misses, clean landings, big air), separate from tips.
+  // Stored as 'style:<route>' { v, style }; corrupt or negative records are ignored, like best tips.
+  function cleanStyleBest(raw) {
+    const b = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    return Number.isFinite(b.style) && b.style >= 0 ? { v: RECORD_VERSION, style: b.style } : null;
+  }
+  // Compares a run's style with the stored best. A new best needs some style: a 0-point run never sets one.
+  function recordStyle(raw, style) {
+    const prev = cleanStyleBest(raw), isNew = Number.isFinite(style) && style > 0 && (!prev || style > prev.style);
+    return { prev, isNew, best: isNew ? { v: RECORD_VERSION, style } : prev };
+  }
   function cleanBest(raw) {
     const b = plainObject(raw);
     if (!Number.isFinite(b.tip) || !Number.isFinite(b.time)) return null;
@@ -2971,7 +2983,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
-    cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
+    cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, CHAPTERS, chapterRoutes, THEMES, MID_LAYERS, themeFor, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
@@ -5168,6 +5180,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       $('rv-time').textContent = fmtTime(r.time);
       $('rv-near').textContent = String(r.nearMisses);
       $('rv-clean').textContent = String(r.cleanLandings);
+      if (w.best) { // style best per route, saved like the best tip
+        const key = 'style:' + C.id, rec = recordStyle(this.store.get(key, null), r.style);
+        if (rec.isNew) this.store.set(key, rec.best);
+        $('rv-style').textContent = r.style + (rec.isNew && rec.prev ? ' · NEW BEST' : rec.best && !rec.isNew ? ' · best ' + rec.best.style : '');
+      } else $('rv-style').textContent = String(r.style);
       $('rv-crash').textContent = String(r.crashes);
       const items = $('rv-items'); items.textContent = '';
       const item = (label, value, cls) => {
@@ -5240,7 +5257,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ['Cargo care', Math.round(S.avgCondition) + '%', per],
         ['Punctuality', fmtTime(S.time), punct],
         ['Gravity compliance', grav, S.crashes + (S.crashes === 1 ? ' crash' : ' crashes')],
-        ['Style', String(S.cleanLandings + S.nearMisses), S.cleanLandings + ' clean landings · ' + S.nearMisses + ' near misses'],
+        ['Style', String(S.style), S.cleanLandings + ' clean landings · ' + S.nearMisses + ' near misses · ' + S.bigAirs + ' big air'],
         ['Tips earned', fmtMoney(S.tips), S.deliveries + ' of ' + this.shiftRoutes.length + ' deliveries'],
       ];
       rows.textContent = '';

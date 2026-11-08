@@ -1156,6 +1156,30 @@ test('pieces: an unknown piece fails loudly', () => {
   } finally { H.ROUTE_DATA.nobHill.pieces = pieces; }
 });
 
+/* ---------------------------- style best (TD-04) ---------------------------- */
+
+test('style: a separate score with a per-route best; corrupt records are ignored and a 0-point run sets nothing', () => {
+  assert.equal(H.cleanStyleBest(null), null);
+  assert.equal(H.cleanStyleBest({ style: -5 }), null);
+  assert.equal(H.cleanStyleBest({ style: 'lots' }), null);
+  assert.equal(H.cleanStyleBest([300]), null);
+  assert.deepEqual(plain(H.cleanStyleBest({ style: 300 })), { v: H.RECORD_VERSION, style: 300 });
+  const first = H.recordStyle(null, 450);
+  assert.ok(first.isNew && !first.prev && first.best.style === 450, 'the first styled run is the best');
+  assert.ok(!H.recordStyle(null, 0).isNew, 'no style, no record');
+  const lower = H.recordStyle({ v: 1, style: 450 }, 300);
+  assert.ok(!lower.isNew && lower.best.style === 450, 'a lower run keeps the old best');
+  const higher = H.recordStyle({ v: 1, style: 450 }, 600);
+  assert.ok(higher.isNew && higher.prev.style === 450 && higher.best.style === 600);
+  assert.ok(H.recordStyle({ style: 'corrupt' }, 100).isNew, 'a corrupt record is replaced');
+});
+
+test('style: the shift summary totals style and big air across deliveries', () => {
+  const S = H.shiftSummary([{ condition: 90, kind: 'coffee', tip: 5, time: 40, par: 46, crashes: 0, nearMisses: 1, cleanLandings: 2, bigAirs: 1, style: 275 },
+    { condition: 80, kind: 'cake', tip: 4, time: 42, par: 48, crashes: 1, nearMisses: 0, cleanLandings: 3, bigAirs: 0, style: 150 }]);
+  assert.equal(S.style, 425); assert.equal(S.bigAirs, 1);
+});
+
 /* ------------------------------- themes (TD-12) ------------------------------- */
 
 test('themes: every course names a theme in THEMES, and every theme names layers that exist', () => {

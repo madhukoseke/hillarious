@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- Style is its own score: each receipt shows the style points you earned (near misses, clean landings, big air) and your best on that route, with NEW BEST when you beat it. Tips still depend only on the delivery.
+
+### Changed
+- The final review's Style row shows the shift's style points, and counts big air alongside clean landings and near misses.
+
 ### Fixed
 - On landscape phones, the final review's verdict stamp stays on screen while the save form is in view, down to 740×360.
 - The review card's "Most trouble" line no longer breaks the review after the cargo refactor, and it says "% petals" for the bouquet instead of "% latte".
