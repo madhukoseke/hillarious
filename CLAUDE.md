@@ -11,7 +11,7 @@ A single-file browser game. Everything ships in `index.html`. The engine section
 - Themes: a course's look comes from its `THEMES` entry; add an entry (and a far-skyline builder if needed) rather than branching on a theme id in the renderer.
 - Shifts: a shift is a chapter (`CHAPTERS`), not `ROUTES`. Read the current shift's routes from `game.shiftRoutes` and its scores from `chapter.scoresKey`.
 - Physics: read gravity and bike constants from the world (`world.phys`, or `bike.P`), never from `PHYS`, `SAG`, or `RIDE_H`, which are Earth's defaults. A new planet adds a `PLANETS` entry.
-- Set pieces: prefer writing a route as `pieces: [[kind, params], ...]` from `PIECES`. Inside a piece, a number is an offset from the piece's mark and a string is any position. Add a new piece kind to `PIECES` rather than special-casing a route.
+- Set pieces: prefer writing a route as `pieces: [[kind, params], ...]` from `PIECES`. Inside a piece, a number is an offset from the piece's mark and a string is any position. Add a new piece kind to `PIECES` rather than special-casing a route. `gust` makes an exposed block with wind; `block` takes `lead` to put its mark ahead of (or behind) where it starts.
 - Serve: `python3 -m http.server 8765` in this folder, then open http://127.0.0.1:8765/. The Playwright scripts in `tests/playtest/` expect that port.
 - Cross-browser: `tests/playtest/cross-browser.mjs` (setup in its header). Record results in `docs/browser-matrix.md`.
 - Autopilot demo: `?autopilot=typical` (also `careful`, `fast`, `reckless`). Jump to the cake: `?delivery=2`. Open every order and drill: `?unlock=all`.

@@ -824,6 +824,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const rel = (mark, ...offs) => mark + offs.map((o) => (o < 0 ? '-' + -o : '+' + o)).join('');
   const HAZARD_HINTS = {
     car: { id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
+    gust: { id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
   };
   function fragment(kind, mark, p) {
     const f = { kind, mark, difficulty: p.difficulty || 1, hazards: [], path: [], features: [], marks: { ...(p.marks || {}) },
@@ -848,7 +849,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // A block of road: an optional grade change in, a straight, an optional grade change out, and its hazards.
     block(p) {
       const f = fragment('block', p.mark, p);
-      f.path.push(['mark', p.mark]);
+      f.path.push(p.lead === undefined ? ['mark', p.mark] : ['mark', p.mark, p.lead]); // lead: the mark sits that far from here
       if (p.enter) f.path.push(['ease', ...p.enter]);
       f.path.push(['straight', p.len]);
       if (p.exit) f.path.push(['ease', ...p.exit]);
@@ -882,6 +883,28 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         f.hazards.push(L.big ? 'big-lip' : 'lip');
       }
       if (p.cablecar) { const c = p.cablecar; f.crossers.push({ kind: 'cablecar', x: f.at(c.at), trigger: f.at(c.trigger), lead: c.lead, sign: c.sign }); f.hazards.push('cablecar'); }
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
+    // An exposed block (F-31): a grade in, then a straight where the wind blows, then a grade out. The gust runs from
+    // the piece's mark to the end of the straight; cargo that minds the wind (the bouquet) feels it.
+    gust(p) {
+      const f = fragment('gust', p.mark, p);
+      if (p.enter) f.path.push(['ease', ...p.enter]);
+      f.path.push(['mark', p.mark], ['straight', p.len], ['gust', p.mark, p.wind]);
+      if (p.exit) f.path.push(['ease', ...p.exit]);
+      f.hazards.push('gust');
+      for (const h of p.hints || []) hint(f, { ...(HAZARD_HINTS[h.hazard] || {}), ...h });
+      return f;
+    },
+    // A raised lip mid-block, away from any crossing (a driveway or a kerb): a short run to it, up, down, then the
+    // rest of the block.
+    lip(p) {
+      const f = fragment('lip', p.mark, p);
+      f.path.push(['mark', p.mark, p.lead], ['straight', p.run], ['ease', ...p.up], ['ease', ...p.down], ['lip', p.mark, !!p.big]);
+      f.path.push(['straight', p.len]);
+      if (p.exit) f.path.push(['ease', ...p.exit]);
+      f.hazards.push(p.big ? 'big-lip' : 'lip');
       for (const h of p.hints || []) hint(f, h);
       return f;
     },
@@ -990,31 +1013,23 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     telegraph: {
       meta: { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 48, seed: 2027 },
       origin: [-60, 0], start: 3, park: { x0: -60, x1: 1 },
-      path: [
-        ['straight', 90],                                                    // a run-up, to choose road or boardwalk before the gust
-        ['intersection', 3, 12, 'KEARNY ST'],
-        ['ease', -0.14, 6],
-        ['mark', 'gust0'], ['straight', 40], ['gust', 'gust0', -6],
-        ['ease', 0, 5],
-        ['mark', 'lipA', 2], ['straight', 4], ['ease', 0.07, 1.2], ['ease', -0.1, 1.2], ['lip', 'lipA', false],
-        ['straight', 40], ['ease', 0, 6],
-        ['mark', 'potholeX', 6], ['straight', 120],
+      pieces: [
+        ['plateau', { len: 90, street: [3, 12, 'KEARNY ST'], checkpoints: ['start'], // a run-up, to choose road or boardwalk before the gust
+          hints: [{ at: 6, id: 'boardwalk', actions: ['hop'], text: 'Hop up to the boardwalk: no gust, but slower.' }] }],
+        ['gust', { mark: 'gust0', enter: [-0.14, 6], len: 40, wind: -6, exit: [0, 5], difficulty: 3, checkpoints: [10], hints: [{ hazard: 'gust', at: -8 }] }],
+        ['lip', { mark: 'lipA', lead: 2, run: 4, up: [0.07, 1.2], down: [-0.1, 1.2], len: 40, exit: [0, 6], difficulty: 2, checkpoints: [2] }],
+        ['block', { mark: 'potholeX', lead: 6, len: 120, difficulty: 2, potholes: [[0, 1.0, 0.22]] }],
         // The long run-down to Ruth's door (D-12): a second grade, a flat, and pedestrians on the sidewalk.
-        ['mark', 'pedA', 30], ['straight', 30], ['ease', -0.12, 6], ['straight', 110], ['ease', 0, 6], ['straight', 50],
-        ['mark', 'pedB', -40], ['straight', 40],
-        ['mark', 'fin'], ['straight', 90],
+        ['block', { mark: 'pedA', lead: 30, len: 30, exit: [-0.12, 6], pedestrians: [{ at: 0, kind: 'tourist' }] }],
+        ['block', { mark: 'grade2', len: 110, exit: [0, 6], difficulty: 2 }], // 12%
+        ['block', { mark: 'flat', len: 50 }],
+        ['block', { mark: 'pedB', lead: -40, len: 40, pedestrians: [{ at: 0, kind: 'dog' }] }],
+        ['finish', { mark: 'fin', len: 90, checkpoints: [-10] }],
       ],
-      features: [['pothole', 'potholeX', 1.0, 0.22]],
       finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
-      pedestrians: [{ x: 'pedA', kind: 'tourist' }, { x: 'pedB', kind: 'dog' }],
-      checkpoints: ['start', 'gust0+10', 'lipA+2', 'fin-10'],
       // The safe approach (D-12, D-17): hop up to Napier Lane's boardwalk, out of the gust and over the lip and pothole.
       // It is one-way, so a rider who doesn't hop stays on the road underneath. "ground" is the road height there.
       boardwalk: { name: 'NAPIER LANE', x0: 'gust0-18-3', x1: 'potholeX+62', speedLimit: 8.5, pts: [['gust0-18-3', 0.25], ['gust0-18', 0.55], ['gust0', 0.45], ['potholeX+62', 'ground-0.1']] },
-      hints: [
-        { x: 6, id: 'boardwalk', actions: ['hop'], text: 'Hop up to the boardwalk: no gust, but slower.' },
-        { x: 'gust0-8', id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
-      ],
       customer: {
         name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
         order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',

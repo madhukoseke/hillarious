@@ -1110,24 +1110,35 @@ test('routes: every route in ROUTES is a ROUTE_DATA entry, and its builder is th
 test('routes: positions are a mark plus offsets, read left to right; an unknown mark or step fails loudly', () => {
   const C = H.buildRussianHill(), larkin = C.intersections.find((i) => i.name === 'LARKIN ST').x0;
   assert.equal(C.cones[0], larkin - 6 - 1.4, '"rampX-1.4" with rampX = "larkin-6"');
-  const saved = H.ROUTE_DATA.telegraph.pedestrians;
+  // A hand-written route (path steps, no pieces) still builds: Telegraph joined by hand gives the same course.
+  const raw = H.joinPieces(H.ROUTE_DATA.telegraph);
   try {
-    H.ROUTE_DATA.telegraph.pedestrians = [{ x: 'nowhere+3', kind: 'dog' }];
-    assert.throws(() => H.buildTelegraphHill(), /unknown position "nowhere\+3"/);
-  } finally { H.ROUTE_DATA.telegraph.pedestrians = saved; }
-  const path = H.ROUTE_DATA.telegraph.path;
-  try {
-    H.ROUTE_DATA.telegraph.path = [...path, ['teleport', 9]];
-    assert.throws(() => H.buildTelegraphHill(), /unknown path step "teleport"/);
-  } finally { H.ROUTE_DATA.telegraph.path = path; }
+    H.ROUTE_DATA.__raw = raw;
+    assert.equal(JSON.stringify(H.buildRoute('__raw')), JSON.stringify({ ...H.buildTelegraphHill(), id: '__raw' }), 'a hand-written path builds the same course');
+    H.ROUTE_DATA.__raw = { ...raw, pedestrians: [{ x: 'nowhere+3', kind: 'dog' }] };
+    assert.throws(() => H.buildRoute('__raw'), /unknown position "nowhere\+3"/);
+    H.ROUTE_DATA.__raw = { ...raw, path: [...raw.path, ['teleport', 9]] };
+    assert.throws(() => H.buildRoute('__raw'), /unknown path step "teleport"/);
+  } finally { delete H.ROUTE_DATA.__raw; }
 });
 
 /* ----------------------------- set pieces (F-30) ----------------------------- */
 
 const PIECE_ROUTES = Object.keys(H.ROUTE_DATA).filter((id) => H.ROUTE_DATA[id].pieces);
 
-test('pieces: Nob Hill and Russian Hill are built from set pieces', () => {
-  assert.deepEqual(plain(PIECE_ROUTES), ['nobHill', 'russianHill']);
+test('pieces: every route is built from set pieces', () => {
+  assert.deepEqual(plain(PIECE_ROUTES), ['nobHill', 'russianHill', 'telegraph']);
+});
+
+test('pieces: the gust block (F-31) blows from its mark to the end of its straight, and declares the hazard', () => {
+  const f = H.PIECES.gust({ mark: 'g', enter: [-0.1, 5], len: 30, wind: -4, exit: [0, 5], hints: [{ hazard: 'gust', at: -6 }] });
+  assert.deepEqual(plain(f.path), [['ease', -0.1, 5], ['mark', 'g'], ['straight', 30], ['gust', 'g', -4], ['ease', 0, 5]]);
+  assert.deepEqual(plain(f.hazards), ['gust']);
+  assert.equal(f.hints[0].x, 'g-6'); assert.equal(f.hints[0].id, 'gust', 'the hint defaults to the gust warning');
+  const C = H.buildTelegraphHill(), g = C.gusts[0], kearny = C.intersections.find((i) => i.name === 'KEARNY ST');
+  assert.equal(C.gusts.length, 1); assert.equal(g.wind, -6);
+  assert.ok(Math.abs(g.x1 - g.x0 - 40) < 1e-9 && g.x0 > kearny.x1, 'one 40 m gust, past Kearny');
+  assert.ok(C.boardwalk.x0 < g.x0 && C.boardwalk.x1 > g.x1, 'the boardwalk still covers the gust');
 });
 
 for (const id of PIECE_ROUTES) {
@@ -1144,6 +1155,8 @@ for (const id of PIECE_ROUTES) {
     if (C.cars.length) assert.ok(hazards.has('car-plank') || hazards.has('car'));
     if (C.ramps.length) assert.ok(hazards.has('ramp'));
     if (C.lips.some((l) => l.big)) assert.ok(hazards.has('big-lip'));
+    if (C.lips.some((l) => !l.big)) assert.ok(hazards.has('lip'));
+    if ((C.gusts || []).length) assert.ok(hazards.has('gust'));
     for (const c of C.crossers) assert.ok(hazards.has(c.kind), `${c.kind} is a declared hazard`);
   });
 }
