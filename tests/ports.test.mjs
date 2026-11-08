@@ -1,34 +1,23 @@
-// Port check (F-28): every course must build and play exactly as recorded in tests/golden/ports.json.
-// Restructuring routes (F-26) or cargo (F-27) must keep this passing without updating the file.
+// Port check (F-28): every course must build and play as recorded in tests/golden/ports.json.
+// Restructuring routes or cargo must keep this passing without updating the file.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { loadGame } from './harness.mjs';
-import { snapshot, COURSE_BUILDERS } from './golden/snapshot.mjs';
+import { snapshot, compare, courseBuilders } from './golden/snapshot.mjs';
 
 const golden = JSON.parse(fs.readFileSync(new URL('./golden/ports.json', import.meta.url), 'utf8'));
+const H = loadGame();
 
 test('port check: the fingerprint is deterministic from a fresh load', () => {
-  assert.deepEqual(snapshot(loadGame()), snapshot(loadGame()));
+  assert.deepEqual(compare(snapshot(H), snapshot(loadGame())), []);
 });
 
-test('port check: every course builds and plays exactly as recorded', () => {
-  const now = snapshot(loadGame());
-  assert.deepEqual(Object.keys(now), [...COURSE_BUILDERS, 'cargoRides', 'unbreakable', 'cargoScripts'], 'course list');
-  for (const build of COURSE_BUILDERS) {
-    const g = golden[build], n = now[build];
-    assert.ok(g, `${build} has no recorded fingerprint; run node tests/golden/update.mjs`);
-    assert.equal(n.terrain, g.terrain, `${build}: terrain changed`);
-    assert.equal(n.course, g.course, `${build}: objects, hints, checkpoints or other course data changed`);
-    for (const [p, r] of Object.entries(g.rides)) {
-      const m = n.rides[p];
-      const where = `${build} ${p}: ${r.time.toFixed(2)} s ${r.condition.toFixed(1)}% -> ${m.time.toFixed(2)} s ${m.condition.toFixed(1)}%`;
-      assert.deepEqual(m, r, `ride changed (${where})`);
-    }
-  }
-  for (const group of ['cargoRides', 'unbreakable']) for (const [k, r] of Object.entries(golden[group])) {
-    const m = now[group][k];
-    assert.deepEqual(m, r, `${group} ${k} changed: ${r.time.toFixed(2)} s ${r.condition.toFixed(1)}% -> ${m.time.toFixed(2)} s ${m.condition.toFixed(1)}%`);
-  }
-  for (const [k, v] of Object.entries(golden.cargoScripts)) assert.equal(now.cargoScripts[k], v, `${k} cargo rules changed`);
+test('port check: every course the game lists is in the recorded baseline, and nothing else', () => {
+  assert.deepEqual(Object.keys(golden.courses).sort(), courseBuilders(H).slice().sort(), 'a new or removed course needs node tests/golden/update.mjs');
+});
+
+test('port check: every course builds and plays as recorded', () => {
+  const diffs = compare(golden, snapshot(H));
+  assert.deepEqual(diffs.slice(0, 12), [], `${diffs.length} differences from tests/golden/ports.json`);
 });
