@@ -8,6 +8,7 @@ A single-file browser game. Everything ships in `index.html`. The engine section
 - Port check: `tests/ports.test.mjs` compares every course and ride against `tests/golden/ports.json`. Refactors must pass it unchanged. Only an intended gameplay change may rewrite it (`node tests/golden/update.mjs`), and the commit must say so.
 - Cargo: each type is a class plus one entry in `CARGO_TYPES` (engine) and `CARGO_VIEW` (presentation). Do not branch on `cargo.kind` elsewhere.
 - Routes: each delivery is one `ROUTE_DATA` entry (path steps, features, objects, customer) built by `buildRoute`; list it in `ROUTES` to put it in the shift. Do not branch on a route id elsewhere.
+- Themes: a course's look comes from its `THEMES` entry; add an entry (and a far-skyline builder if needed) rather than branching on a theme id in the renderer.
 - Shifts: a shift is a chapter (`CHAPTERS`), not `ROUTES`. Read the current shift's routes from `game.shiftRoutes` and its scores from `chapter.scoresKey`.
 - Physics: read gravity and bike constants from the world (`world.phys`, or `bike.P`), never from `PHYS`, `SAG`, or `RIDE_H`, which are Earth's defaults. A new planet adds a `PLANETS` entry.
 - Set pieces: prefer writing a route as `pieces: [[kind, params], ...]` from `PIECES`. Inside a piece, a number is an offset from the piece's mark and a string is any position. Add a new piece kind to `PIECES` rather than special-casing a route.

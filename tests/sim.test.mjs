@@ -1156,6 +1156,22 @@ test('pieces: an unknown piece fails loudly', () => {
   } finally { H.ROUTE_DATA.nobHill.pieces = pieces; }
 });
 
+/* ------------------------------- themes (TD-12) ------------------------------- */
+
+test('themes: every course names a theme in THEMES, and every theme names layers that exist', () => {
+  const builds = ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill', 'buildTitleCourse', 'buildTestHill', ...H.DRILLS.map((D) => D.build)];
+  for (const b of builds) {
+    const C = typeof b === 'string' ? H[b]() : b();
+    assert.ok(Object.prototype.hasOwnProperty.call(H.THEMES, C.theme), `${C.id} theme "${C.theme}" has an entry`);
+  }
+  for (const [id, T] of Object.entries(H.THEMES)) {
+    assert.ok(H.MID_LAYERS[T.mid], `${id} mid layer "${T.mid}"`);
+    assert.ok(['nob', 'russian'].includes(T.far), `${id} far skyline "${T.far}" has a builder`);
+    for (const k of ['horizon', 'farParallax', 'farDrop']) assert.ok(Number.isFinite(T[k]), `${id}.${k}`);
+  }
+  assert.equal(H.themeFor('nowhere'), H.THEMES.nob, 'an unknown theme falls back to Nob Hill');
+});
+
 /* ------------------------------ chapters (TD-11) ------------------------------ */
 
 test('chapters: San Francisco is the shift today, with every route in order and the original scores key', () => {
