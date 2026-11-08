@@ -2241,7 +2241,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const GAME_URL = 'https://hillarious.pages.dev';
   function shareText(S) {
     const crashes = S.crashes === 1 ? '1 crash' : (S.crashes || 0) + ' crashes';
-    return 'I earned ' + fmtMoney(S.tips || 0) + ' in tips on my HILLARIOUS delivery shift in San Francisco (' + (S.avgStars || 0).toFixed(1) + '★, ' + crashes + '). Can you beat it? 🚲 ' + GAME_URL;
+    return 'I earned ' + fmtMoney(S.tips || 0) + ' in tips on my HILLARIOUS delivery shift in ' + (S.place || 'San Francisco') + ' (' + (S.avgStars || 0).toFixed(1) + '★, ' + crashes + '). Can you beat it? 🚲 ' + GAME_URL;
   }
   function shareLinks(S) {
     const t = encodeURIComponent(shareText(S));
@@ -2269,6 +2269,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'russianHill', build: buildRussianHill, requires: 'nobHill' },
     { id: 'telegraph', build: buildTelegraphHill, requires: 'russianHill' },
   ];
+  // Chapters (TD-11): a shift is one chapter's routes in order, with its own place name for sharing and its own
+  // high-score key. ROUTES stays the list of every route (unlocks, Dispatch, Free Ride). San Francisco keeps the
+  // original 'shifts' key, so saved scores carry over. A second shift (Mars, the Mission) adds a chapter here.
+  const CHAPTERS = [
+    { id: 'sf', name: 'San Francisco', place: 'San Francisco', routes: ['nobHill', 'russianHill', 'telegraph'], scoresKey: 'shifts' },
+  ];
+  function chapterRoutes(ch) { return ch.routes.map((id) => ROUTES.find((r) => r.id === id)).filter(Boolean); }
   // Dispatch-board teasers for deliveries that aren't built yet. Empty now that every route is built.
   const COMING_SOON = [];
   // Three optional goals per delivery. Each reads only World.result(); meeting all three masters the route.
@@ -2946,7 +2953,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
-    ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
+    ROUTES, CHAPTERS, chapterRoutes, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
     buildDrillStairs, buildDrillCable, buildDrillExam, cargoWords,
   };
@@ -4774,7 +4781,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.debug = this.params.has('debug');
       const ap = this.params.get('autopilot');
       this.autopilotName = ap === null ? null : AUTOPILOT_PROFILES[ap] ? ap : 'typical';
-      this.startIndex = clamp((Number(this.params.get('delivery')) || 1) - 1, 0, ROUTES.length - 1); // ?delivery=2 jumps straight to the cake, ?delivery=3 to the bouquet
+      this.chapter = CHAPTERS.find((c) => c.id === this.params.get('chapter')) || CHAPTERS[0];
+      this.shiftRoutes = chapterRoutes(this.chapter);
+      this.startIndex = clamp((Number(this.params.get('delivery')) || 1) - 1, 0, this.shiftRoutes.length - 1); // ?delivery=2 jumps straight to the cake, ?delivery=3 to the bouquet
       this.unlockAll = this.params.get('unlock') === 'all';          // ?unlock=all opens every order and drill (tests, demos)
       this.reducedMotion = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
       this.store = new Store();
@@ -4904,7 +4913,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
-      fillScoreList(document.getElementById('title-board'), this.store.get('shifts', []));
+      fillScoreList(document.getElementById('title-board'), this.store.get(this.chapter.scoresKey, []));
       for (const R of ROUTES) {
         const best = cleanBest(this.store.get('best:' + R.id, null));
         if (best) parts.push(cargoWords(ROUTE_DATA[R.id].meta.cargo).short + ' ' + fmtMoney(best.tip) + ' (' + Math.round(best.condition) + '%)');
@@ -4938,7 +4947,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         default: break;
       }
     }
-    get lastDelivery() { return this.deliveryIndex + 1 >= ROUTES.length; }
+    get lastDelivery() { return this.deliveryIndex + 1 >= this.shiftRoutes.length; }
     // A course to read on menus (checkpoints, titles, customers), built once per id.
     courseFor(id) {
       if (!this.courseCache[id]) { const R = ROUTES.find((r) => r.id === id); this.courseCache[id] = R ? R.build() : buildTestHill(); }
@@ -4956,7 +4965,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     newWorld(spec) {
       this.run = spec; this.mode = spec.mode;
-      if (spec.mode === 'shift') this.deliveryIndex = ROUTES.findIndex((r) => r.id === spec.route);
+      if (spec.mode === 'shift') this.deliveryIndex = this.shiftRoutes.findIndex((r) => r.id === spec.route);
       const C = this.runCourse(spec);
       this.world = new World(C, spec.mode === 'free' ? { startCp: spec.cp, unbreakable: spec.unbreakable } : null);
       this.R.ensureScenery(C);
@@ -4971,7 +4980,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.cam.snap(b.x, b.y, 0); this.cam.zoom = 1; this.cam.trauma = 0;
       this.world.drain();
     }
-    startDelivery(index) { this.startRun({ mode: 'shift', route: ROUTES[index].id }); }
+    startDelivery(index) { this.startRun({ mode: 'shift', route: this.shiftRoutes[index].id }); }
     // Every ride starts here: { mode: 'shift' | 'single' | 'drill' | 'free', route | drill, and Free Ride's options }.
     startRun(spec) {
       this.newWorld(spec);
@@ -4979,7 +4988,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const C = this.world.course, cu = C.customer, $ = (id) => document.getElementById(id);
       this.state = 'intro'; this.introT = this.autopilotName ? 1.2 : null; // players advance themselves; autopilot demos keep a timer
       const n = DRILLS.findIndex((D) => D.id === spec.drill) + 1;
-      const eyebrow = spec.mode === 'drill' ? 'COURIER ACADEMY · DRILL ' + n + ' OF ' + DRILLS.length : spec.mode === 'single' ? 'SINGLE ORDER · ' + C.hood : 'DELIVERY ' + C.index + ' OF ' + ROUTES.length + ' · ' + C.hood;
+      const eyebrow = spec.mode === 'drill' ? 'COURIER ACADEMY · DRILL ' + n + ' OF ' + DRILLS.length : spec.mode === 'single' ? 'SINGLE ORDER · ' + C.hood : 'DELIVERY ' + (this.deliveryIndex + 1) + ' OF ' + this.shiftRoutes.length + ' · ' + C.hood;
       $('intro-eyebrow').textContent = eyebrow;
       $('intro-h').textContent = C.title;
       $('intro-route').textContent = cu.route;
@@ -5201,6 +5210,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (this.state === 'final') return;
       this.state = 'final'; this.audio.update(null, false);
       const S = shiftSummary(this.results), $ = (id) => document.getElementById(id), rows = $('fr-rows');
+      S.place = this.chapter.place; // for the share text
       const starStr = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
       const late = S.time - S.par, punct = late <= 0 ? 'On time' : late <= 15 ? 'Fashionably late' : 'Geologically slow';
       const grav = S.crashes === 0 ? 'Exemplary' : S.crashes <= 2 ? 'Negotiable' : 'Under review';
@@ -5211,7 +5221,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ['Punctuality', fmtTime(S.time), punct],
         ['Gravity compliance', grav, S.crashes + (S.crashes === 1 ? ' crash' : ' crashes')],
         ['Style', String(S.cleanLandings + S.nearMisses), S.cleanLandings + ' clean landings · ' + S.nearMisses + ' near misses'],
-        ['Tips earned', fmtMoney(S.tips), S.deliveries + ' of ' + ROUTES.length + ' deliveries'],
+        ['Tips earned', fmtMoney(S.tips), S.deliveries + ' of ' + this.shiftRoutes.length + ' deliveries'],
       ];
       rows.textContent = '';
       for (const [label, value, note] of data) {
@@ -5224,7 +5234,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       $('share-x').href = share.x; $('share-li').href = share.linkedin;
       // Nothing is saved yet: the player types a name (and optional X / LinkedIn) to put the shift on the board.
       this.pendingShift = { tips: S.tips, time: S.time, stars: S.avgStars, date: new Date().toISOString().slice(0, 10) };
-      const rank = recordShift(this.store.get('shifts', []), this.pendingShift).rank;
+      const rank = recordShift(this.store.get(this.chapter.scoresKey, []), this.pendingShift).rank;
       const form = $('hs-form'), profile = this.store.get('profile', {}) || {};
       for (const el of form.querySelectorAll('input, button')) el.disabled = false;
       form.hidden = !rank;
@@ -5240,7 +5250,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     // Shows the top shifts; the list is kept in localStorage, so it's per browser.
     renderBoard(headline) {
-      const $ = (id) => document.getElementById(id), list = this.store.get('shifts', []), ol = $('hs-board');
+      const $ = (id) => document.getElementById(id), list = this.store.get(this.chapter.scoresKey, []), ol = $('hs-board');
       $('fr-best').textContent = headline;
       fillScoreList(ol, list);
     }
@@ -5250,8 +5260,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const $ = (id) => document.getElementById(id);
       const name = $('hs-name').value.trim().slice(0, 20), x = cleanHandle($('hs-x').value, 15), linkedin = cleanHandle($('hs-li').value, 60);
       if (!name) { $('hs-status').textContent = 'Type a name to save your shift.'; $('hs-name').focus(); return; }
-      const rec = recordShift(this.store.get('shifts', []), { ...this.pendingShift, v: RECORD_VERSION, name, x, linkedin });
-      this.store.set('shifts', rec.list);
+      const rec = recordShift(this.store.get(this.chapter.scoresKey, []), { ...this.pendingShift, v: RECORD_VERSION, name, x, linkedin });
+      this.store.set(this.chapter.scoresKey, rec.list);
       this.store.set('profile', { name, x, linkedin });
       this.pendingShift = null;
       this.lockShiftForm('Saved to the high scores.');
@@ -5784,7 +5794,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.fillStyle = COL.coral; ctx.font = '900 ' + (u * 0.78).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'left';
       const head = this.mode === 'drill' ? 'DRILL ' + (DRILLS.findIndex((D) => D.id === C.id) + 1) + '/' + DRILLS.length + ' · ACADEMY'
         : this.mode === 'free' ? 'FREE RIDE · ' + (C.loop ? 'LAP ' + (W.laps + 1) : C.hood) : this.mode === 'single' ? 'SINGLE ORDER · ' + C.hood
-          : 'DELIVERY ' + C.index + '/' + ROUTES.length + ' · ' + C.hood;
+          : 'DELIVERY ' + (this.deliveryIndex + 1) + '/' + this.shiftRoutes.length + ' · ' + C.hood;
       ctx.fillText(head, pad + u * 0.8, pad + u * 0.95);
       ctx.fillStyle = COL.ink; ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_DISPLAY;
       ctx.fillText(C.title, pad + u * 0.8, pad + u * 2.35);

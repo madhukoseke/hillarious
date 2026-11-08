@@ -1156,6 +1156,26 @@ test('pieces: an unknown piece fails loudly', () => {
   } finally { H.ROUTE_DATA.nobHill.pieces = pieces; }
 });
 
+/* ------------------------------ chapters (TD-11) ------------------------------ */
+
+test('chapters: San Francisco is the shift today, with every route in order and the original scores key', () => {
+  const sf = H.CHAPTERS[0];
+  assert.equal(sf.id, 'sf');
+  assert.equal(sf.scoresKey, 'shifts', 'existing high scores stay where they are');
+  assert.deepEqual(plain(H.chapterRoutes(sf).map((r) => r.id)), plain(H.ROUTES.map((r) => r.id)));
+  const ids = new Set(), keys = new Set();
+  for (const ch of H.CHAPTERS) {
+    assert.ok(!ids.has(ch.id) && !keys.has(ch.scoresKey), `${ch.id} has its own id and scores key`); ids.add(ch.id); keys.add(ch.scoresKey);
+    assert.equal(H.chapterRoutes(ch).length, ch.routes.length, `${ch.id} lists only real routes`);
+  }
+});
+
+test('chapters: the share text names the chapter\'s place, defaulting to San Francisco', () => {
+  const S = { tips: 12.5, avgStars: 4, crashes: 1 };
+  assert.match(H.shareText(S), / in San Francisco \(/);
+  assert.match(H.shareText({ ...S, place: 'Mars' }), / in Mars \(/);
+});
+
 /* ------------------------- physics per world (TD-10) ------------------------- */
 
 test('physics per world: Earth is the default and matches the globals; another planet changes how a world rides', () => {
