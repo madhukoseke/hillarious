@@ -593,6 +593,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   };
   const SAG = (PHYS.mass * PHYS.g) / (2 * PHYS.springK);
   const RIDE_H = -PHYS.mountY + PHYS.suspRest - SAG + PHYS.wheelR; // CoM height over flat ground at rest
+  // Physics per world (TD-10). PHYS, SAG, and RIDE_H stay Earth's; a world takes its own from course.planet, with the
+  // sag and ride height derived by the same formulas. A new planet adds a PLANETS entry; nothing else reads globals.
+  const PLANETS = { earth: PHYS };
+  function withDerived(P) {
+    const sag = (P.mass * P.g) / (2 * P.springK);
+    return Object.freeze({ ...P, sag, rideH: -P.mountY + P.suspRest - sag + P.wheelR });
+  }
+  const EARTH = withDerived(PHYS);
+  function physicsFor(planet) { return !planet || planet === 'earth' || !PLANETS[planet] ? EARTH : withDerived(PLANETS[planet]); }
 
   const CARGO = {
     mountX: 0.63, mountY: 0.06,
@@ -1370,14 +1379,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HOLD_INPUT = Object.freeze({ pedal: false, brake: true, leanBack: false, leanFwd: false, jumpHeld: false, jumpPressed: false });
 
   class Bike {
-    constructor() {
-      this.wheels = [-PHYS.wheelBase / 2, PHYS.wheelBase / 2].map((lx) => ({
-        lx, contact: false, was: false, comp: SAG, pcomp: SAG, spin: 0, pspin: 0, spinV: 0, load: 0,
+    constructor(P = EARTH) {
+      this.P = P;
+      this.wheels = [-P.wheelBase / 2, P.wheelBase / 2].map((lx) => ({
+        lx, contact: false, was: false, comp: P.sag, pcomp: P.sag, spin: 0, pspin: 0, spinV: 0, load: 0,
         nx: 0, ny: 1, cx: 0, cy: 0, pen: 0, excess: 0, rigid: false, surf: null, hx: 0, hy: 0,
       }));
       this.q = { pen: 0, px: 0, py: 0, nx: 0, ny: 1, surf: null };
       this.tmp = { x: 0, y: 0 }; this.land = { x: 0, a: 0, t: 0 };
-      this.reset(0, RIDE_H, 0, 0);
+      this.reset(0, P.rideH, 0, 0);
     }
     reset(x, y, a, speed) {
       Object.assign(this, {
@@ -1387,7 +1397,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         impact: 0, touchImpact: 0, bottomOut: 0, bigAirSent: false, takeoffX: x,
       });
       for (const wh of this.wheels) {
-        wh.contact = true; wh.was = true; wh.comp = wh.pcomp = SAG; wh.spin = wh.pspin = 0; wh.spinV = 0;
+        wh.contact = true; wh.was = true; wh.comp = wh.pcomp = this.P.sag; wh.spin = wh.pspin = 0; wh.spinV = 0;
         wh.load = 0; wh.rigid = false; wh.excess = 0; wh.surf = null;
       }
     }
@@ -1397,7 +1407,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       return out;
     }
     applyImpulse(px, py, nx, ny, e, mu) {
-      const m = PHYS.mass, I = PHYS.inertia;
+      const m = this.P.mass, I = this.P.inertia;
       const rx = px - this.x, ry = py - this.y;
       const vn = (this.vx - this.w * ry) * nx + (this.vy + this.w * rx) * ny;
       if (vn >= 0) return vn;
@@ -1427,10 +1437,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // Where the current flight lands (x), on what slope (a), and in how long (t). The landing assist and the
     // Free Ride physics overlay both read it.
     predictLanding(world, out) {
-      const T = world.terrain, g = PHYS.g;
+      const T = world.terrain, g = this.P.g;
       let t = 0.3;
       for (let k = 0; k < 3; k++) {
-        const hl = T.height(this.x + this.vx * t) + RIDE_H * 0.9;
+        const hl = T.height(this.x + this.vx * t) + this.P.rideH * 0.9;
         const disc = this.vy * this.vy + 2 * g * Math.max(0, this.y - hl);
         t = clamp((this.vy + Math.sqrt(disc)) / g, 0.02, 2);
       }
@@ -1439,7 +1449,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     predictLandingAngle(world) { return this.predictLanding(world, this.land).a; }
     step(dt, inp, world, t) {
-      const P = PHYS, m = P.mass, I = P.inertia, q = this.q;
+      const P = this.P, m = P.mass, I = P.inertia, q = this.q;
       this.px = this.x; this.py = this.y; this.pa = this.a; this.pcrank = this.crank;
       const live = !this.crashed;
       const pedal = live && inp.pedal, brake = live && inp.brake;
@@ -1629,9 +1639,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.pvx = vx; this.pvy = vy;
       const k = 1 - Math.exp(-dt / C.tau);
       this.afx += (ax - this.afx) * k; this.afy += (ay - this.afy) * k;
-      const gx = -this.afx, gy = -PHYS.g - this.afy;           // effective gravity, world frame
+      const gx = -this.afx, gy = -b.P.g - this.afy;           // effective gravity, world frame
       const lgx = gx * ca + gy * sa, lgy = -gx * sa + gy * ca;   // ...in the cup frame
-      const mag = Math.hypot(lgx, lgy) / PHYS.g;
+      const mag = Math.hypot(lgx, lgy) / b.P.g;
       this.gMag = mag;
       // Near free fall the liquid floats: no meaningful restoring direction, just weak surface tension.
       const fall = smoothstep(0.25, 0.55, mag);
@@ -1722,9 +1732,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.pvx = vx; this.pvy = vy;
       const k = 1 - Math.exp(-dt / C.tau);
       this.afx += (ax - this.afx) * k; this.afy += (ay - this.afy) * k;
-      const gx = -this.afx, gy = -PHYS.g - this.afy;
+      const gx = -this.afx, gy = -b.P.g - this.afy;
       const lgx = gx * ca + gy * sa, lgy = -gx * sa + gy * ca;   // effective gravity in the rack frame
-      this.gMag = Math.hypot(lgx, lgy) / PHYS.g;
+      this.gMag = Math.hypot(lgx, lgy) / b.P.g;
       const dA = wrapAngle(b.a - this.pa); this.pa = b.a;
       this.angle -= dA * C.rot;                                   // the cake lags fast pitching
       const th = this.angle;
@@ -1882,7 +1892,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (!this.near && b.x > this.x - 26) { this.near = true; W.emit('MAYBEMO_ENCOUNTER', { x: this.x }); }
       if (!this.passed && b.x >= this.midX) {
         this.passed = true;
-        const clear = b.y - RIDE_H - this.roofY;
+        const clear = b.y - b.P.rideH - this.roofY;
         if (clear > -0.3) {
           const near = !b.grounded && clear < 1.0;
           if (near) { W.score.nearMisses++; W.score.style += 75; }
@@ -1929,7 +1939,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const stop = this.state === 'STOPPED' ? Math.max(0, this.P.stopTime - this.t) : this.state === 'RESUMING' ? 0 : this.P.stopTime + 2;
       return stop + Math.max(0, this.z + this.P.len - LANE.near) / 4;
     }
-    riderOnTop(b) { return b.x + 1 > this.x0 && b.x - 1 < this.x1 && b.y - RIDE_H > this.y + this.P.height - 0.4; }
+    riderOnTop(b) { return b.x + 1 > this.x0 && b.x - 1 < this.x1 && b.y - b.P.rideH > this.y + this.P.height - 0.4; }
     update(dt, W) {
       const b = W.bike, P = this.P;
       this.pz = this.z; this.t += dt;
@@ -1979,9 +1989,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (W.state === 'riding' && !this.passChecked && b.x > this.cx) { // the rider crossed our crossing point
         this.passChecked = true;
         if (this.blocking) {
-          if (this.kind === 'maybemo' && b.y - RIDE_H > this.y + P.height - 0.3) {
+          if (this.kind === 'maybemo' && b.y - b.P.rideH > this.y + P.height - 0.3) {
             this.overDone = true;
-            const clear = b.y - RIDE_H - (this.y + P.height), near = !b.grounded && clear < 1.0;
+            const clear = b.y - b.P.rideH - (this.y + P.height), near = !b.grounded && clear < 1.0;
             if (near) { W.score.nearMisses++; W.score.style += 75; }
             W.emit('MAYBEMO_OVER', { near, clear });
           }
@@ -2021,7 +2031,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     updateBoardwalk(b) {
       const walk = this.boardwalk;
       if (!walk) return;
-      const ca = Math.cos(b.a), sa = Math.sin(b.a), gy = b.y - RIDE_H;
+      const ca = Math.cos(b.a), sa = Math.sin(b.a), gy = b.y - b.P.rideH;
       const margin = walk.surface.active && b.x >= walk.x0 ? 0.6 : 0;
       walk.surface.active = b.wheels.every((wh) => gy + wh.lx * sa > polylineY(walk.pts, b.x + wh.lx * ca) - margin);
     }
@@ -2062,7 +2072,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const c of this.cones) {
         if (c.state !== 0) continue;
         for (const wh of b.wheels) {
-          if (Math.abs(wh.hx - c.x) < PHYS.wheelR + 0.16 && wh.hy - c.y < PHYS.wheelR + 0.42 && wh.hy > c.y - 0.2) { this.knock(c, b); break; }
+          if (Math.abs(wh.hx - c.x) < b.P.wheelR + 0.16 && wh.hy - c.y < b.P.wheelR + 0.42 && wh.hy > c.y - 0.2) { this.knock(c, b); break; }
         }
       }
       for (const car of this.cars) car.update(dt, W);
@@ -2095,7 +2105,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const c of this.cones) {
         c.px = c.x; c.py = c.y; c.pa = c.a;
         if (c.state !== 1) continue;
-        c.vy -= PHYS.g * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.a += c.w * dt;
+        c.vy -= this.w.phys.g * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.a += c.w * dt;
         const h = T.height(c.x);
         if (c.y < h + 0.05) {
           c.y = h + 0.05;
@@ -2236,7 +2246,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const GAME_URL = 'https://hillarious.pages.dev';
   function shareText(S) {
     const crashes = S.crashes === 1 ? '1 crash' : (S.crashes || 0) + ' crashes';
-    return 'I earned ' + fmtMoney(S.tips || 0) + ' in tips on my HILLARIOUS delivery shift in San Francisco (' + (S.avgStars || 0).toFixed(1) + '★, ' + crashes + '). Can you beat it? 🚲 ' + GAME_URL;
+    return 'I earned ' + fmtMoney(S.tips || 0) + ' in tips on my HILLARIOUS delivery shift in ' + (S.place || 'San Francisco') + ' (' + (S.avgStars || 0).toFixed(1) + '★, ' + crashes + '). Can you beat it? 🚲 ' + GAME_URL;
   }
   function shareLinks(S) {
     const t = encodeURIComponent(shareText(S));
@@ -2264,6 +2274,28 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'russianHill', build: buildRussianHill, requires: 'nobHill' },
     { id: 'telegraph', build: buildTelegraphHill, requires: 'russianHill' },
   ];
+  // Neighbourhood themes (TD-12): how each course.theme looks behind the street. A theme names its far skyline and
+  // mid ridge layers and sets the horizon, water, hills, parallax, and moving extras. A new neighbourhood or planet
+  // adds an entry here (and a far-layer builder if it needs a new skyline) instead of branching in the renderer.
+  const MID_LAYERS = {
+    nob: { seed: 21, phase: 0, fill: '#c9c2b0', towers: true, trees: 0.1 },
+    russian: { seed: 33, phase: 2.1, fill: '#bcc7a8', towers: false, trees: 0.22 },
+  };
+  const NOB_THEME = { far: 'nob', mid: 'nob', horizon: 0.6, water: '#86b9d6', hills: true, farParallax: 0.12, farDrop: 0.05, sailboats: false, ridgeCableCar: true };
+  const THEMES = {
+    nob: NOB_THEME,
+    russian: { far: 'russian', mid: 'russian', horizon: 0.56, water: '#7fb3d3', hills: false, farParallax: 0.06, farDrop: 0.02, sailboats: true, ridgeCableCar: false },
+    telegraph: { ...NOB_THEME }, // Telegraph Hill looks east over downtown, like Nob Hill, for now
+  };
+  function themeFor(id) { return THEMES[id] || NOB_THEME; }
+
+  // Chapters (TD-11): a shift is one chapter's routes in order, with its own place name for sharing and its own
+  // high-score key. ROUTES stays the list of every route (unlocks, Dispatch, Free Ride). San Francisco keeps the
+  // original 'shifts' key, so saved scores carry over. A second shift (Mars, the Mission) adds a chapter here.
+  const CHAPTERS = [
+    { id: 'sf', name: 'San Francisco', place: 'San Francisco', routes: ['nobHill', 'russianHill', 'telegraph'], scoresKey: 'shifts' },
+  ];
+  function chapterRoutes(ch) { return ch.routes.map((id) => ROUTES.find((r) => r.id === id)).filter(Boolean); }
   // Dispatch-board teasers for deliveries that aren't built yet. Empty now that every route is built.
   const COMING_SOON = [];
   // Three optional goals per delivery. Each reads only World.result(); meeting all three masters the route.
@@ -2552,7 +2584,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // opts.startCp starts the run at a checkpoint (Free Ride); opts.unbreakable keeps the cargo whole (it still sloshes).
     constructor(course, opts) {
       this.course = course; this.terrain = course.terrain; this.opts = opts || {};
-      this.bike = new Bike();
+      this.phys = physicsFor(course.planet); // course.planet: unset means Earth
+      this.bike = new Bike(this.phys);
       this.cargo = makeCargo(course.cargo);
       this.score = new Score(course.par, this.cargo.kind);
       this.obstacles = new Obstacles(this);
@@ -2587,7 +2620,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     drain() { const ev = this.events; this.events = []; return ev; }
     spawn(x, speed) {
       const T = this.terrain, s = T.slope(x), inv = 1 / Math.sqrt(1 + s * s);
-      this.bike.reset(x - s * inv * RIDE_H, T.height(x) + inv * RIDE_H, Math.atan(s), speed);
+      this.bike.reset(x - s * inv * this.phys.rideH, T.height(x) + inv * this.phys.rideH, Math.atan(s), speed);
       this.cargo.resetSlosh();
     }
     // Deepest contact between a circle and the terrain or obstacle surfaces.
@@ -2726,7 +2759,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const rel = wrapAngle(b.a - Math.atan(this.terrain.slope(b.x)));
       this.emit('LAND', { impact, airTime, rel, x: b.x, y: b.y });
       if (this.state !== 'riding' && this.state !== 'finishing') return;
-      if (this.state === 'riding' && this.invuln <= 0 && impact > PHYS.crashLandImpact) { this.crash('landing', clamp((impact - 12) / 6, 0, 1)); return; }
+      if (this.state === 'riding' && this.invuln <= 0 && impact > this.phys.crashLandImpact) { this.crash('landing', clamp((impact - 12) / 6, 0, 1)); return; }
       const hurt = this.cargo.splash(impact, rel, this.state !== 'riding' || !!this.opts.unbreakable);
       this.drainCargo();
       if (hurt > 0) {
@@ -2763,8 +2796,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         }
         return;
       }
-      if (speed > PHYS.obstacleCrashSpeed) this.crash(o.kind === 'cablecar' ? 'cablecar' : 'obstacle', clamp((speed - 4.5) / 6, 0, 1));
-      else if (speed > PHYS.bonkSpeed && this.t - this.lastBonk > 0.5) { this.lastBonk = this.t; this.cargo.kick(0.8); this.emit('BONK', { speed, kind: o.kind }); }
+      if (speed > this.phys.obstacleCrashSpeed) this.crash(o.kind === 'cablecar' ? 'cablecar' : 'obstacle', clamp((speed - 4.5) / 6, 0, 1));
+      else if (speed > this.phys.bonkSpeed && this.t - this.lastBonk > 0.5) { this.lastBonk = this.t; this.cargo.kick(0.8); this.emit('BONK', { speed, kind: o.kind }); }
     }
     crash(cause, sev) {
       if (this.state !== 'riding') return;
@@ -2784,7 +2817,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     updateBody(o, dt, rad, e) {
       if (!o.on) return;
       o.px = o.x; o.py = o.y; o.pa = o.a;
-      o.vy -= PHYS.g * dt; o.vx *= 1 - 0.1 * dt;
+      o.vy -= this.phys.g * dt; o.vx *= 1 - 0.1 * dt;
       o.x += o.vx * dt; o.y += o.vy * dt; o.a += o.w * dt;
       const T = this.terrain, h = T.height(o.x);
       if (o.y - rad < h) {
@@ -2818,7 +2851,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // The wind at a position. Pass the height too: anything on or above the boardwalk is sheltered from it.
     windAt(x, y = -Infinity) {
       const walk = this.course.boardwalk;
-      if (walk && x >= walk.x0 && x <= walk.x1 && y - RIDE_H > polylineY(walk.pts, x) - 0.3) return 0;
+      if (walk && x >= walk.x0 && x <= walk.x1 && y - this.phys.rideH > polylineY(walk.pts, x) - 0.3) return 0;
       for (const g of this.course.gusts || []) if (x >= g.x0 && x <= g.x1) return g.wind;
       return 0;
     }
@@ -2936,11 +2969,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
-    ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
+    ROUTES, CHAPTERS, chapterRoutes, THEMES, MID_LAYERS, themeFor, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
     buildDrillStairs, buildDrillCable, buildDrillExam, cargoWords,
   };
@@ -2984,7 +3017,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     enableTouch() { if (!this.touchMode) { this.touchMode = true; document.body.classList.add('touch'); } this.setDevice('touch'); }
     setDevice(d) { if (this.device !== d) { this.device = d; if (this.onDevice) this.onDevice(d); } }
     onKey(e, isDown) {
-      if (e.target && e.target.closest && e.target.closest('input, textarea')) return; // let the name fields take typing
+      if (e.target && e.target.closest && e.target.closest('input:not([type="range"]), textarea')) return; // let the name fields take typing; sliders go through the game
       const a = KEYMAP[e.code] || (e.key === ' ' ? 'jump' : null);
       if (!a) return;
       if (isDown) this.setDevice('keyboard');
@@ -4314,7 +4347,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const H = Math.round(Math.max(120, this.H * 0.46));
       this.far = { nob: this.farNob(H), russian: this.farRussian(H) };
       const Hm = Math.round(Math.max(110, this.H * 0.5));
-      this.mid = { nob: this.midLayer(Hm, 'nob'), russian: this.midLayer(Hm, 'russian') };
+      this.mid = Object.fromEntries(Object.entries(MID_LAYERS).map(([k, spec]) => [k, this.midLayer(Hm, spec)]));
     }
     farNob(H) { // downtown skyline in front of the East Bay hills
       const W = 1800, c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -4370,15 +4403,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (let x = 2280; x < 2600; x += 14 + rng() * 10) { g.fillStyle = PASTELS[(rng() * PASTELS.length) | 0]; const h = 8 + rng() * 10; g.fillRect(x, B - h - H * 0.02 * Math.sin((x - 2240) / 120), 12, h + 6); }
       return c;
     }
-    midLayer(Hm, theme) { // a nearer ridge of rooftops, hazed back
+    midLayer(Hm, spec) { // a nearer ridge of rooftops, hazed back
       const W = 2400, c = document.createElement('canvas'); c.width = W; c.height = Hm;
-      const g = c.getContext('2d'), rng = mulberry32(theme === 'nob' ? 21 : 33), ph = theme === 'nob' ? 0 : 2.1;
+      const g = c.getContext('2d'), rng = mulberry32(spec.seed), ph = spec.phase;
       const prof = (x) => Hm * (0.4 + 0.15 * Math.sin(x * TAU / 2400 * 2 + ph) + 0.07 * Math.sin(x * TAU / 2400 * 5 + 1));
-      g.fillStyle = theme === 'nob' ? '#c9c2b0' : '#bcc7a8'; g.beginPath(); g.moveTo(0, Hm);
+      g.fillStyle = spec.fill; g.beginPath(); g.moveTo(0, Hm);
       for (let x = 0; x <= W; x += 20) g.lineTo(x, Hm - prof(x)); g.lineTo(W, Hm); g.closePath(); g.fill();
       for (let x = 0; x < W;) {
-        const w = 13 + rng() * 9, tall = theme === 'nob' && rng() < 0.12, h = tall ? 40 + rng() * 26 : 13 + rng() * 11, y = Hm - Math.max(prof(x), prof(x + w));
-        if (rng() < (theme === 'nob' ? 0.1 : 0.22)) { g.fillStyle = rng() < 0.5 ? '#86a374' : '#7a9a6a'; g.beginPath(); g.arc(x + w / 2, y - 7, 8, 0, TAU); g.fill(); x += w; continue; }
+        const w = 13 + rng() * 9, tall = spec.towers && rng() < 0.12, h = tall ? 40 + rng() * 26 : 13 + rng() * 11, y = Hm - Math.max(prof(x), prof(x + w));
+        if (rng() < spec.trees) { g.fillStyle = rng() < 0.5 ? '#86a374' : '#7a9a6a'; g.beginPath(); g.arc(x + w / 2, y - 7, 8, 0, TAU); g.fill(); x += w; continue; }
         g.fillStyle = tall ? '#d8d3c6' : PASTELS[(rng() * PASTELS.length) | 0]; g.fillRect(x, y - h, w, h + 30);
         if (!tall && rng() < 0.5) { g.beginPath(); g.moveTo(x - 1, y - h); g.lineTo(x + w / 2, y - h - 6); g.lineTo(x + w + 1, y - h); g.fill(); }
         g.fillStyle = 'rgba(80,96,110,0.45)';
@@ -4399,7 +4432,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     ensureScenery(course) { if (this.sceneryFor !== course) { this.scenery = buildScenery(course); this.sceneryFor = course; } }
     drawBackdrop(cam, time, theme) {
-      const ctx = this.ctx, W = this.W, H = this.H, bay = theme === 'russian';
+      const ctx = this.ctx, W = this.W, H = this.H, T = themeFor(theme);
       const sky = ctx.createLinearGradient(0, 0, 0, H);
       sky.addColorStop(0, '#86c5ea'); sky.addColorStop(0.55, '#bfe0ef'); sky.addColorStop(1, '#fbe3bf');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
@@ -4411,19 +4444,19 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         const span = W + 400, cx = (((i * 380 - cam.x * 2 - time * 6) % span) + span) % span - 200, cy = H * (0.1 + (i % 3) * 0.07);
         for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.ellipse(cx + k * 28, cy + Math.sin(k * 2) * 6, 34 - k * 3, 16, 0, 0, TAU); ctx.fill(); }
       }
-      const horizon = H * (bay ? 0.56 : 0.6) + clamp(cam.y * this.S * 0.025, -H * 0.1, H * 0.2);
-      ctx.fillStyle = bay ? '#7fb3d3' : '#86b9d6'; ctx.fillRect(0, horizon - H * 0.03, W, H);
-      if (!bay) {
+      const horizon = H * T.horizon + clamp(cam.y * this.S * 0.025, -H * 0.1, H * 0.2);
+      ctx.fillStyle = T.water; ctx.fillRect(0, horizon - H * 0.03, W, H);
+      if (T.hills) {
         ctx.fillStyle = '#a7c39b'; ctx.beginPath(); ctx.moveTo(0, horizon);
         for (let x = 0; x <= W + 40; x += 40) { const wx = x + cam.x * this.S * 0.04; ctx.lineTo(x, horizon - H * 0.06 - Math.sin(wx * 0.004) * H * 0.04 - Math.sin(wx * 0.011) * H * 0.02); }
         ctx.lineTo(W, horizon); ctx.closePath(); ctx.fill();
       }
-      const far = this.far && this.far[bay ? 'russian' : 'nob'];
+      const far = this.far && this.far[T.far];
       if (far) {
-        const off = (((cam.x * this.S * (bay ? 0.06 : 0.12)) % far.width) + far.width) % far.width, y = horizon - far.height + H * (bay ? 0.02 : 0.05);
+        const off = (((cam.x * this.S * T.farParallax) % far.width) + far.width) % far.width, y = horizon - far.height + H * T.farDrop;
         for (let x = -off; x < W; x += far.width) ctx.drawImage(far, x, y);
       }
-      if (bay) { // sailboats drift on the bay
+      if (T.sailboats) { // sailboats drift on the bay
         for (let i = 0; i < 5; i++) {
           const span = W + 200, bx = (((i * 337 + time * (6 + i * 1.5) - cam.x * this.S * 0.08) % span) + span) % span - 100, by = horizon + H * (0.035 + (i % 3) * 0.028), s = 0.7 + (i % 3) * 0.25;
           ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.moveTo(bx, by - 2); ctx.lineTo(bx, by - 26 * s); ctx.lineTo(bx + 14 * s, by - 3); ctx.closePath(); ctx.fill();
@@ -4431,12 +4464,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         }
       }
       ctx.fillStyle = 'rgba(251,227,191,0.25)'; ctx.fillRect(0, horizon - H * 0.12, W, H * 0.2);
-      const mid = this.mid && this.mid[bay ? 'russian' : 'nob'];
+      const mid = this.mid && this.mid[T.mid];
       if (mid) {
         const moff = (((cam.x * this.S * 0.3) % mid.width) + mid.width) % mid.width;
         const my = H - mid.height * 0.92 + clamp(cam.y * this.S * 0.06, -H * 0.18, H * 0.3);
         for (let x = -moff; x < W; x += mid.width) ctx.drawImage(mid, x, my);
-        if (!bay) { // a cable car climbs the far ridge
+        if (T.ridgeCableCar) { // a cable car climbs the far ridge
           const cxC = (time * 16) % mid.width;
           let sx = cxC - moff; if (sx < -60) sx += mid.width;
           if (sx > -60 && sx < W + 60) {
@@ -4706,16 +4739,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       P.x = lerp(b.px, b.x, alpha); P.y = lerp(b.py, b.y, alpha); P.a = lerpAngle(b.pa, b.a, alpha);
       for (let i = 0; i < 2; i++) {
         const wh = b.wheels[i], comp = lerp(wh.pcomp, wh.comp, alpha);
-        P.hub[i].x = wh.lx; P.hub[i].y = PHYS.mountY - PHYS.suspRest + comp;
+        P.hub[i].x = wh.lx; P.hub[i].y = world.phys.mountY - world.phys.suspRest + comp;
         P.spin[i] = lerp(wh.pspin, wh.spin, alpha);
       }
       const sp = Math.hypot(b.vx, b.vy);
       P.speed = sp; P.crank = b.pedalIn ? lerp(b.pcrank, b.crank, alpha) : b.crank;
-      P.hgt = P.y - RIDE_H - world.terrain.height(P.x);
+      P.hgt = P.y - world.phys.rideH - world.terrain.height(P.x);
       P.wave = world.state === 'riding' && !b.grounded && b.airTime > 0.4 && P.hgt > 0.9 ? clamp((b.airTime - 0.4) / 0.15, 0, 1) * clamp((P.hgt - 0.9) / 0.4, 0, 1) : 0;
       P.lean = b.lean; P.brake = b.brakeIn ? clamp(sp / 8, 0, 1) : 0;
       P.stand = clamp(clamp((sp - 11) / 6, 0, 1) * (b.grounded ? 1 : 0.5) + (b.airTime > 0.25 ? 0.4 : 0), 0, 1);
-      P.bob = (b.grounded ? Math.sin(game.time * 9) * 0.006 * clamp(sp / 8, 0, 1) : 0.02) - (b.wheels[0].comp - SAG) * 0.25;
+      P.bob = (b.grounded ? Math.sin(game.time * 9) * 0.006 * clamp(sp / 8, 0, 1) : 0.02) - (b.wheels[0].comp - world.phys.sag) * 0.25;
       const view = cargoView(c.kind);
       P.view = view; P.cg = view.pose(c, cg); P.shield = c.shield; P.bellRing = game.bellT > 0 ? Math.abs(Math.sin(game.bellT * 30)) : 0;
       const worried = view.worried(c);
@@ -4727,7 +4760,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     drawBike(world, alpha, game) {
       const ctx = this.ctx, b = world.bike, T = world.terrain;
       const P = this.bikePose(world, alpha, game);
-      const gh = T.height(P.x), hgt = P.y - RIDE_H - gh;
+      const gh = T.height(P.x), hgt = P.y - world.phys.rideH - gh;
       ctx.fillStyle = 'rgba(30,28,34,' + clamp(0.28 - hgt * 0.04, 0.06, 0.28).toFixed(3) + ')';
       ctx.beginPath(); ctx.ellipse(P.x, gh + 0.1, clamp(0.8 - hgt * 0.06, 0.35, 0.8), 0.09, 0, 0, TAU); ctx.fill();
       const pose = riderPose(P, this.rpose);
@@ -4768,7 +4801,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.debug = this.params.has('debug');
       const ap = this.params.get('autopilot');
       this.autopilotName = ap === null ? null : AUTOPILOT_PROFILES[ap] ? ap : 'typical';
-      this.startIndex = clamp((Number(this.params.get('delivery')) || 1) - 1, 0, ROUTES.length - 1); // ?delivery=2 jumps straight to the cake, ?delivery=3 to the bouquet
+      this.chapter = CHAPTERS.find((c) => c.id === this.params.get('chapter')) || CHAPTERS[0];
+      this.shiftRoutes = chapterRoutes(this.chapter);
+      this.startIndex = clamp((Number(this.params.get('delivery')) || 1) - 1, 0, this.shiftRoutes.length - 1); // ?delivery=2 jumps straight to the cake, ?delivery=3 to the bouquet
       this.unlockAll = this.params.get('unlock') === 'all';          // ?unlock=all opens every order and drill (tests, demos)
       this.reducedMotion = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
       this.store = new Store();
@@ -4898,7 +4933,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
-      fillScoreList(document.getElementById('title-board'), this.store.get('shifts', []));
+      fillScoreList(document.getElementById('title-board'), this.store.get(this.chapter.scoresKey, []));
       for (const R of ROUTES) {
         const best = cleanBest(this.store.get('best:' + R.id, null));
         if (best) parts.push(cargoWords(ROUTE_DATA[R.id].meta.cargo).short + ' ' + fmtMoney(best.tip) + ' (' + Math.round(best.condition) + '%)');
@@ -4932,7 +4967,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         default: break;
       }
     }
-    get lastDelivery() { return this.deliveryIndex + 1 >= ROUTES.length; }
+    get lastDelivery() { return this.deliveryIndex + 1 >= this.shiftRoutes.length; }
     // A course to read on menus (checkpoints, titles, customers), built once per id.
     courseFor(id) {
       if (!this.courseCache[id]) { const R = ROUTES.find((r) => r.id === id); this.courseCache[id] = R ? R.build() : buildTestHill(); }
@@ -4950,7 +4985,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     newWorld(spec) {
       this.run = spec; this.mode = spec.mode;
-      if (spec.mode === 'shift') this.deliveryIndex = ROUTES.findIndex((r) => r.id === spec.route);
+      if (spec.mode === 'shift') this.deliveryIndex = this.shiftRoutes.findIndex((r) => r.id === spec.route);
       const C = this.runCourse(spec);
       this.world = new World(C, spec.mode === 'free' ? { startCp: spec.cp, unbreakable: spec.unbreakable } : null);
       this.R.ensureScenery(C);
@@ -4965,7 +5000,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.cam.snap(b.x, b.y, 0); this.cam.zoom = 1; this.cam.trauma = 0;
       this.world.drain();
     }
-    startDelivery(index) { this.startRun({ mode: 'shift', route: ROUTES[index].id }); }
+    startDelivery(index) { this.startRun({ mode: 'shift', route: this.shiftRoutes[index].id }); }
     // Every ride starts here: { mode: 'shift' | 'single' | 'drill' | 'free', route | drill, and Free Ride's options }.
     startRun(spec) {
       this.newWorld(spec);
@@ -4973,7 +5008,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const C = this.world.course, cu = C.customer, $ = (id) => document.getElementById(id);
       this.state = 'intro'; this.introT = this.autopilotName ? 1.2 : null; // players advance themselves; autopilot demos keep a timer
       const n = DRILLS.findIndex((D) => D.id === spec.drill) + 1;
-      const eyebrow = spec.mode === 'drill' ? 'COURIER ACADEMY · DRILL ' + n + ' OF ' + DRILLS.length : spec.mode === 'single' ? 'SINGLE ORDER · ' + C.hood : 'DELIVERY ' + C.index + ' OF ' + ROUTES.length + ' · ' + C.hood;
+      const eyebrow = spec.mode === 'drill' ? 'COURIER ACADEMY · DRILL ' + n + ' OF ' + DRILLS.length : spec.mode === 'single' ? 'SINGLE ORDER · ' + C.hood : 'DELIVERY ' + (this.deliveryIndex + 1) + ' OF ' + this.shiftRoutes.length + ' · ' + C.hood;
       $('intro-eyebrow').textContent = eyebrow;
       $('intro-h').textContent = C.title;
       $('intro-route').textContent = cu.route;
@@ -5195,6 +5230,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (this.state === 'final') return;
       this.state = 'final'; this.audio.update(null, false);
       const S = shiftSummary(this.results), $ = (id) => document.getElementById(id), rows = $('fr-rows');
+      S.place = this.chapter.place; // for the share text
       const starStr = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
       const late = S.time - S.par, punct = late <= 0 ? 'On time' : late <= 15 ? 'Fashionably late' : 'Geologically slow';
       const grav = S.crashes === 0 ? 'Exemplary' : S.crashes <= 2 ? 'Negotiable' : 'Under review';
@@ -5205,7 +5241,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ['Punctuality', fmtTime(S.time), punct],
         ['Gravity compliance', grav, S.crashes + (S.crashes === 1 ? ' crash' : ' crashes')],
         ['Style', String(S.cleanLandings + S.nearMisses), S.cleanLandings + ' clean landings · ' + S.nearMisses + ' near misses'],
-        ['Tips earned', fmtMoney(S.tips), S.deliveries + ' of ' + ROUTES.length + ' deliveries'],
+        ['Tips earned', fmtMoney(S.tips), S.deliveries + ' of ' + this.shiftRoutes.length + ' deliveries'],
       ];
       rows.textContent = '';
       for (const [label, value, note] of data) {
@@ -5218,7 +5254,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       $('share-x').href = share.x; $('share-li').href = share.linkedin;
       // Nothing is saved yet: the player types a name (and optional X / LinkedIn) to put the shift on the board.
       this.pendingShift = { tips: S.tips, time: S.time, stars: S.avgStars, date: new Date().toISOString().slice(0, 10) };
-      const rank = recordShift(this.store.get('shifts', []), this.pendingShift).rank;
+      const rank = recordShift(this.store.get(this.chapter.scoresKey, []), this.pendingShift).rank;
       const form = $('hs-form'), profile = this.store.get('profile', {}) || {};
       for (const el of form.querySelectorAll('input, button')) el.disabled = false;
       form.hidden = !rank;
@@ -5234,7 +5270,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     // Shows the top shifts; the list is kept in localStorage, so it's per browser.
     renderBoard(headline) {
-      const $ = (id) => document.getElementById(id), list = this.store.get('shifts', []), ol = $('hs-board');
+      const $ = (id) => document.getElementById(id), list = this.store.get(this.chapter.scoresKey, []), ol = $('hs-board');
       $('fr-best').textContent = headline;
       fillScoreList(ol, list);
     }
@@ -5244,8 +5280,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const $ = (id) => document.getElementById(id);
       const name = $('hs-name').value.trim().slice(0, 20), x = cleanHandle($('hs-x').value, 15), linkedin = cleanHandle($('hs-li').value, 60);
       if (!name) { $('hs-status').textContent = 'Type a name to save your shift.'; $('hs-name').focus(); return; }
-      const rec = recordShift(this.store.get('shifts', []), { ...this.pendingShift, v: RECORD_VERSION, name, x, linkedin });
-      this.store.set('shifts', rec.list);
+      const rec = recordShift(this.store.get(this.chapter.scoresKey, []), { ...this.pendingShift, v: RECORD_VERSION, name, x, linkedin });
+      this.store.set(this.chapter.scoresKey, rec.list);
       this.store.set('profile', { name, x, linkedin });
       this.pendingShift = null;
       this.lockShiftForm('Saved to the high scores.');
@@ -5268,7 +5304,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (a === 'mute') { this.toggleMute(); continue; }
         if (this.state !== 'riding' && this.state !== 'delivered') { // menus: move focus, or press the focused button
           const slider = document.activeElement && document.activeElement.matches && document.activeElement.matches('input[type="range"]') ? document.activeElement : null;
-          if (slider && (a === 'navLeft' || a === 'navRight')) { this.nudgeSlider(slider, a === 'navRight' ? 1 : -1); continue; }
+          if (slider && (a === 'navLeft' || a === 'navRight' || a === 'leanBack' || a === 'leanFwd')) { this.nudgeSlider(slider, a === 'navRight' || a === 'leanFwd' ? 1 : -1); continue; }
+          if (slider && (a === 'confirm' || a === 'jump')) continue; // confirming a slider must not start a ride or resume
           if (NAV[a]) { this.menuFocus(NAV[a]); continue; }
           const btn = a === 'confirm' && this.focusedButton();
           if (btn) { btn.click(); continue; }
@@ -5439,14 +5476,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       switch (e.type) {
         case 'HOP':
           A.play('hop');
-          for (let i = 0; i < 4; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 0.8, e.y - RIDE_H + 0.05, (Math.random() - 0.5) * 1.5, Math.random() * 0.8, 0.6, 0.08, '');
+          for (let i = 0; i < 4; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 0.8, e.y - W.phys.rideH + 0.05, (Math.random() - 0.5) * 1.5, Math.random() * 0.8, 0.6, 0.08, '');
           break;
         case 'LAND': {
           if (this.mode === 'free' && e.airTime > 0.12) { const S = this.freeStats; S.totalAir += e.airTime; S.bestAir = Math.max(S.bestAir, e.airTime); }
           A.play('land', clamp(e.impact / 10, 0.15, 1));
           if (e.impact > 2.5) {
             const n = Math.min(14, 3 + Math.round(e.impact));
-            for (let i = 0; i < n; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 1.2, e.y - RIDE_H + 0.05, (Math.random() - 0.5) * 3, Math.random() * 1.2, 0.7, 0.1, '');
+            for (let i = 0; i < n; i++) P.spawn(PK.DUST, e.x + (Math.random() - 0.5) * 1.2, e.y - W.phys.rideH + 0.05, (Math.random() - 0.5) * 3, Math.random() * 1.2, 0.7, 0.1, '');
             this.cam.shake(Math.min(0.55, e.impact / 18));
           }
           break;
@@ -5777,7 +5814,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.fillStyle = COL.coral; ctx.font = '900 ' + (u * 0.78).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'left';
       const head = this.mode === 'drill' ? 'DRILL ' + (DRILLS.findIndex((D) => D.id === C.id) + 1) + '/' + DRILLS.length + ' · ACADEMY'
         : this.mode === 'free' ? 'FREE RIDE · ' + (C.loop ? 'LAP ' + (W.laps + 1) : C.hood) : this.mode === 'single' ? 'SINGLE ORDER · ' + C.hood
-          : 'DELIVERY ' + C.index + '/' + ROUTES.length + ' · ' + C.hood;
+          : 'DELIVERY ' + (this.deliveryIndex + 1) + '/' + this.shiftRoutes.length + ' · ' + C.hood;
       ctx.fillText(head, pad + u * 0.8, pad + u * 0.95);
       ctx.fillStyle = COL.ink; ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_DISPLAY;
       ctx.fillText(C.title, pad + u * 0.8, pad + u * 2.35);
