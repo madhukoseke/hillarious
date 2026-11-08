@@ -12,16 +12,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - The final review's Style row shows the shift's style points, and counts big air alongside clean landings and near misses.
 
 ### Fixed
+- On landscape phones, the final review's verdict stamp stays on screen while the save form is in view, down to 740×360.
 - The review card's "Most trouble" line no longer breaks the review after the cargo refactor, and it says "% petals" for the bouquet instead of "% latte".
 - The bouquet now sheds pink petals when it loses petals, instead of coffee droplets that never appeared.
 - After a cake or bouquet crash, the rack and basket are empty while the cargo flies, instead of showing a coffee cup.
 - In Free Ride, a cake on Nob Hill or Telegraph Hill says "m to the cake drop" instead of "latte drop".
 - SKIP on the final review shows one "not saved" message instead of two.
-- A gamepad can reach the music and effects sliders: move to them with the d-pad and nudge them left or right.
+- A gamepad or the arrow keys can reach the music and effects sliders: move onto them, nudge them left or right, and move off with up or down. Confirming on a slider does nothing, so it can't start a ride by accident.
 - On landscape phones, the keyboard legend no longer covers the title's Press SPACE line and volume sliders. How to play still lists the controls.
 
 ### Developer
-- Port check: `tests/golden/ports.json` records how every course builds and plays, including every cargo on every route; `tests/ports.test.mjs` fails on any change. Rewrite it with `node tests/golden/update.mjs` only for an intended gameplay change.
+- Themes: `THEMES` describes each neighbourhood's backdrop (skyline and ridge layers, horizon, water, hills, parallax, sailboats, ridge cable car), and `MID_LAYERS` the ridge layers. The renderer reads the table instead of branching on `theme === 'russian'`. Telegraph Hill has its own entry, matching Nob Hill's look for now.
+- Chapters: `CHAPTERS` groups routes into shifts, each with its own place name for the share text and its own high-score key. San Francisco keeps `shifts`, so saved scores carry over; `?chapter=` picks one. `ROUTES` stays the list of every route for unlocks, Dispatch, and Free Ride.
+- Physics per world: each world takes its physics from `course.planet` through `PLANETS` and `physicsFor` (Earth by default), and the bike, cargo, obstacles, and bodies read it from there. `PHYS`, `SAG`, and `RIDE_H` remain Earth's values. Unblocks Mars and weather.
+- Port check: `tests/golden/ports.json` records how every course builds and plays, including every cargo on every route and a timed ride on The Test Hill; courses come from `ROUTES` and `DRILLS`. Course data must match exactly and rides within 1e-4, since physics floats can differ between machines. Rewrite it with `node tests/golden/update.mjs` only for an intended gameplay change.
 - One cargo interface: `CARGO_TYPES` (engine) and `CARGO_VIEW` (drawing, sounds, HUD) replace every cargo-type branch. A new cargo adds its class and one entry in each table.
 - Fairness check: `tests/fairness.test.mjs` runs all four riders on every route and drill in `ROUTES` and `DRILLS`.
 - Set pieces: Nob Hill and Russian Hill are lists of pieces (`plateau`, `block`, `stairs`, `crossing`, `finish` in `PIECES`). Each piece reports its length, grades, difficulty, and hazards; the port check confirms both routes are unchanged.

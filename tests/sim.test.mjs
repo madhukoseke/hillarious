@@ -1179,3 +1179,66 @@ test('style: the shift summary totals style and big air across deliveries', () =
     { condition: 80, kind: 'cake', tip: 4, time: 42, par: 48, crashes: 1, nearMisses: 0, cleanLandings: 3, bigAirs: 0, style: 150 }]);
   assert.equal(S.style, 425); assert.equal(S.bigAirs, 1);
 });
+
+/* ------------------------------- themes (TD-12) ------------------------------- */
+
+test('themes: every course names a theme in THEMES, and every theme names layers that exist', () => {
+  const builds = ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill', 'buildTitleCourse', 'buildTestHill', ...H.DRILLS.map((D) => D.build)];
+  for (const b of builds) {
+    const C = typeof b === 'string' ? H[b]() : b();
+    assert.ok(Object.prototype.hasOwnProperty.call(H.THEMES, C.theme), `${C.id} theme "${C.theme}" has an entry`);
+  }
+  for (const [id, T] of Object.entries(H.THEMES)) {
+    assert.ok(H.MID_LAYERS[T.mid], `${id} mid layer "${T.mid}"`);
+    assert.ok(['nob', 'russian'].includes(T.far), `${id} far skyline "${T.far}" has a builder`);
+    for (const k of ['horizon', 'farParallax', 'farDrop']) assert.ok(Number.isFinite(T[k]), `${id}.${k}`);
+  }
+  assert.equal(H.themeFor('nowhere'), H.THEMES.nob, 'an unknown theme falls back to Nob Hill');
+});
+
+/* ------------------------------ chapters (TD-11) ------------------------------ */
+
+test('chapters: San Francisco is the shift today, with every route in order and the original scores key', () => {
+  const sf = H.CHAPTERS[0];
+  assert.equal(sf.id, 'sf');
+  assert.equal(sf.scoresKey, 'shifts', 'existing high scores stay where they are');
+  assert.deepEqual(plain(H.chapterRoutes(sf).map((r) => r.id)), plain(H.ROUTES.map((r) => r.id)));
+  const ids = new Set(), keys = new Set();
+  for (const ch of H.CHAPTERS) {
+    assert.ok(!ids.has(ch.id) && !keys.has(ch.scoresKey), `${ch.id} has its own id and scores key`); ids.add(ch.id); keys.add(ch.scoresKey);
+    assert.equal(H.chapterRoutes(ch).length, ch.routes.length, `${ch.id} lists only real routes`);
+  }
+});
+
+test('chapters: the share text names the chapter\'s place, defaulting to San Francisco', () => {
+  const S = { tips: 12.5, avgStars: 4, crashes: 1 };
+  assert.match(H.shareText(S), / in San Francisco \(/);
+  assert.match(H.shareText({ ...S, place: 'Mars' }), / in Mars \(/);
+});
+
+/* ------------------------- physics per world (TD-10) ------------------------- */
+
+test('physics per world: Earth is the default and matches the globals; another planet changes how a world rides', () => {
+  const earth = H.physicsFor(undefined);
+  assert.equal(earth, H.physicsFor('earth'));
+  assert.equal(earth.g, H.PHYS.g); assert.equal(earth.sag, H.SAG); assert.equal(earth.rideH, H.RIDE_H);
+  assert.equal(H.physicsFor('nowhere'), earth, 'an unknown planet falls back to Earth');
+  H.PLANETS.testMoon = { ...H.PHYS, g: H.PHYS.g * 0.38 };
+  try {
+    const hop = (planet) => {
+      const C = H.makeTestCourse('flat'); C.planet = planet;
+      const w = new H.World(C);
+      settle(w, 1.5);
+      const rest = w.bike.y - C.terrain.height(w.bike.x);
+      w.step(input({ jumpPressed: true, jumpHeld: true }));
+      let air = 0;
+      for (let i = 0; i < 1200; i++) { w.step(input({ jumpHeld: i < 20 })); if (!w.bike.grounded) air += H.STEP; else if (air > 0.1) break; }
+      return { w, rest, air };
+    };
+    const e = hop(undefined), m = hop('testMoon');
+    assert.equal(m.w.phys.g, H.PHYS.g * 0.38);
+    assert.ok(Math.abs(e.rest - H.RIDE_H) < 0.02, `Earth bike rests at ${e.rest.toFixed(3)}`);
+    assert.ok(Math.abs(m.rest - m.w.phys.rideH) < 0.02 && m.w.phys.rideH > H.RIDE_H, 'the Moon bike rests at its own, higher ride height (less sag)');
+    assert.ok(m.air > e.air * 2, `low gravity hangs longer: ${m.air.toFixed(2)} s vs ${e.air.toFixed(2)} s`);
+  } finally { delete H.PLANETS.testMoon; }
+});
