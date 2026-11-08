@@ -325,7 +325,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   .final > .btns { grid-column: 2; }
   .final > .hs-form { grid-column: 2; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
   .final > .hs-form label:last-of-type, .final > .hs-form .btns, .final > .hs-form .hs-status { grid-column: 1 / -1; }
-  .fr-verdict p { font-size: 18px; }
+  .fr-verdict p { font-size: 16px; }
+  /* Keep the verdict stamp on screen while the save form is in view (TD-07): tighter verdict box, stamp tucked lower. */
+  .final > .fr-verdict { margin-top: 12px; padding: 9px 12px; }
+  .final > .fr-verdict .fr-stamp { top: -10px; }
+  .final > .fr-best { margin-top: 4px; }
+  .final > .hs-form { margin-top: 6px; }
   .receipt { width: min(780px, 96vw); max-height: 96vh; display: grid; grid-template-columns: 1fr 1fr; column-gap: 22px; align-items: start; padding: 14px 18px 18px; }
   .receipt .rc-lines { font-size: 13px; padding: 4px 0; }
   .rc-foot { display: none; }
