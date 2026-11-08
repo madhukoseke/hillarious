@@ -5180,7 +5180,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const ts = drill ? null : troubleSpot(C, r.log), tbox = $('rv-trouble');
       this.trouble = ts ? { route: C.id, cp: ts.cp, cargo: r.kind, traffic: true, unbreakable: false, slowmo: false } : null;
       tbox.hidden = !ts;
-      if (ts) $('rv-trouble-text').textContent = 'Most trouble: ' + ts.label + ' · ' + (ts.crashes ? ts.crashes + (ts.crashes === 1 ? ' crash, ' : ' crashes, ') : '') + '−' + Math.round(ts.lost) + (cake ? '% cake' : '% latte');
+      if (ts) $('rv-trouble-text').textContent = 'Most trouble: ' + ts.label + ' · ' + (ts.crashes ? ts.crashes + (ts.crashes === 1 ? ' crash, ' : ' crashes, ') : '') + '−' + Math.round(ts.lost) + cargoWords(r.kind).unit;
       const next = $('rv-next'), again = $('rv-again'), alt = $('rv-alt');
       const set = (b, act, text) => { b.dataset.act = act; (b === next ? $('rv-next-label') : b).textContent = text; };
       if (mode === 'shift') { const last = this.lastDelivery; set(next, last ? 'final' : 'next', last ? 'PERFORMANCE REVIEW' : 'NEXT DELIVERY'); set(again, 'again', 'RIDE AGAIN'); set(alt, 'title', 'TITLE'); }
