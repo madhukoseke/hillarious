@@ -2990,7 +2990,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     enableTouch() { if (!this.touchMode) { this.touchMode = true; document.body.classList.add('touch'); } this.setDevice('touch'); }
     setDevice(d) { if (this.device !== d) { this.device = d; if (this.onDevice) this.onDevice(d); } }
     onKey(e, isDown) {
-      if (e.target && e.target.closest && e.target.closest('input, textarea')) return; // let the name fields take typing
+      if (e.target && e.target.closest && e.target.closest('input:not([type="range"]), textarea')) return; // let the name fields take typing; sliders go through the game
       const a = KEYMAP[e.code] || (e.key === ' ' ? 'jump' : null);
       if (!a) return;
       if (isDown) this.setDevice('keyboard');
@@ -5274,7 +5274,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (a === 'mute') { this.toggleMute(); continue; }
         if (this.state !== 'riding' && this.state !== 'delivered') { // menus: move focus, or press the focused button
           const slider = document.activeElement && document.activeElement.matches && document.activeElement.matches('input[type="range"]') ? document.activeElement : null;
-          if (slider && (a === 'navLeft' || a === 'navRight')) { this.nudgeSlider(slider, a === 'navRight' ? 1 : -1); continue; }
+          if (slider && (a === 'navLeft' || a === 'navRight' || a === 'leanBack' || a === 'leanFwd')) { this.nudgeSlider(slider, a === 'navRight' || a === 'leanFwd' ? 1 : -1); continue; }
+          if (slider && (a === 'confirm' || a === 'jump')) continue; // confirming a slider must not start a ride or resume
           if (NAV[a]) { this.menuFocus(NAV[a]); continue; }
           const btn = a === 'confirm' && this.focusedButton();
           if (btn) { btn.click(); continue; }
