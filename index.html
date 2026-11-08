@@ -308,6 +308,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   .title-board li:nth-child(n + 4) { display: none; } /* medals only on the title; the final review lists all five */
   .title-board .hs-rank, .title-board .hs-social { width: 19px; height: 19px; }
   .title-wrap:has(.title-board li) .sub { display: none; } /* room for the medals */
+  #title-keys { display: none; } /* it covered Press SPACE and the sliders; How to play lists the controls */
   .title-wrap .best { margin-top: 4px; font-size: 11px; }
   .card { padding: 14px 18px; max-height: 96vh; }
   .card h2 { font-size: 22px; margin-bottom: 6px; }
@@ -801,202 +802,272 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     };
   }
 
-  // Delivery 1: California St, eastbound from the top of Nob Hill to the Financial District.
-  function buildNobHill() {
-    const C = emptyCourse('nobHill');
-    Object.assign(C, { index: 1, title: 'THE $9 LATTE', hood: 'NOB HILL', street: 'CALIFORNIA', theme: 'nob', cargo: 'coffee', par: 46, seed: 1873 });
-    const b = new CourseBuilder(-70, 0);
-    b.straight(88);                                          // Taylor St plateau (start)
-    C.start = 4;
-    C.park = { x0: -70, x1: 3 };
-    C.intersections.push({ x0: 6, x1: 18, name: 'TAYLOR ST' });
-    b.ease(-0.1, 5).straight(58);                            // Block A: 10%, the learning block
-    b.ease(0, 6);
-    const mason = b.x; b.straight(12);
-    C.intersections.push({ x0: mason, x1: b.x, name: 'MASON ST' });
-    b.ease(0.1, 1.6); const lipA = b.x; b.ease(-0.18, 1.1);  // raised crosswalk, small lip
-    C.lips.push({ x: lipA, big: false });
-    C.crosswalks.push({ x0: lipA - 1.6, x1: lipA });
-    const blockB = b.x; b.straight(78);                      // Block B: 18%, parked robot car
-    b.ease(0, 7);
-    const powell = b.x; b.straight(13);
-    C.intersections.push({ x0: powell, x1: b.x, name: 'POWELL ST' });
-    b.ease(0.26, 1.8).straight(1.2); const lipB = b.x; b.ease(-0.34, 1.0); // raised-crosswalk kicker: the big lip
-    C.lips.push({ x: lipB, big: true });
-    C.crosswalks.push({ x0: lipB - 3.0, x1: lipB });
-    const blockC = b.x; b.straight(62);                      // Block C: 34%, absurd
-    b.ease(0, 9);
-    const stockton = b.x; b.straight(12);
-    C.intersections.push({ x0: stockton, x1: b.x, name: 'STOCKTON ST' });
-    b.ease(0.06, 1.2); const lipC = b.x; b.ease(-0.12, 1.2);
-    C.lips.push({ x: lipC, big: false });
-    C.crosswalks.push({ x0: lipC - 1.2, x1: lipC });
-    const blockD = b.x; b.straight(62);                      // Block D: 12%
-    b.ease(0, 6);
-    const grant = b.x; b.straight(12);
-    C.intersections.push({ x0: grant, x1: b.x, name: 'GRANT AVE' });
-    b.ease(0.06, 1.2); const lipD = b.x; b.ease(-0.08, 1.2);
-    C.lips.push({ x: lipD, big: false });
-    C.crosswalks.push({ x0: lipD - 1.2, x1: lipD });
-    const blockE = b.x; b.straight(50);                      // Block E: 8%, the home stretch
-    b.ease(0, 6);
-    const fin = b.x; b.straight(140);
-    C.finishX = fin + 6; C.doorX = fin + 18;
-    C.office = { x0: fin + 12, x1: fin + 30 };
-    b.pothole(46, 1.3, 0.2).pothole(blockD + 26, 1.5, 0.24);
-    b.bump(blockC + 30, 0.9, 0.07).bump(blockC + 34, 0.9, 0.07);
-    C.terrain = b.build();
-    C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
-    C.cones = [blockB + 37.5, blockE + 22, blockE + 23.3];
-    C.cars = [{ x: blockB + 44, plank: true }];
-    C.crossers = [{ kind: 'cablecar', x: powell + 6.5, trigger: powell - 30, lead: 2.9, sign: 'POWELL & MASON' }];
-    C.powerups = [{ kind: 'bubble', x: blockB + 28 }, { kind: 'espresso', x: powell + 10 }];
-    C.pedestrians = [
-      { x: lipA + 7, kind: 'dog' }, { x: lipB + 11, kind: 'tech' }, { x: blockD + 14, kind: 'fitness' }, { x: lipD + 6, kind: 'tourist' },
-    ];
-    C.checkpoints = [C.start, mason + 2, blockB + 18, blockB + 52, powell + 2, stockton + 2, blockD + 32, grant + 2].map((x) => ({ x }));
-    C.hints = [
-      { x: -1e9, id: 'pedal', actions: ['pedal'], text: 'Hold to pedal' },
-      { x: 28, id: 'hop', actions: ['hop'], text: 'Hop the pothole. Hold for higher.' },
-      { x: 64, id: 'brake', actions: ['brake'], text: 'Tap to brake. Hold it and the latte surges forward.' },
-      { x: blockB + 24, id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
-      { x: powell - 30, id: 'cable', actions: ['brake'], text: 'DING DING: cable car crossing! Brake, or beat it.' },
-      { x: powell + 8, id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Hop at the lip for BIG AIR. Lean to land level.' },
-    ];
-    C.customer = {
-      name: 'Skyler', role: 'Founder & CEO, Meetingless', avatar: 'founder', brand: 'MEETINGLESS HQ',
-      order: 'ORDER #0009 · OAT LATTE (L) · NO LID', route: 'Down California Street to the Financial District',
-      messages: ["Please don't ring the bell. I'm in a meeting about reducing unnecessary meetings.", "Also: no lid. We're reducing single-use plastics."],
-      cargoNote: 'Cargo: one large oat-milk latte. Lidless. Brimming.', cargoLabel: 'Coffee remaining',
-    };
-    C.length = C.doorX - C.start;
-    C.landmarks = landmarksFor('nob-hill', C);
-    return C;
+  // Set pieces (F-30). A route is a list of pieces; each piece returns a fragment of ROUTE_DATA (path steps, features,
+  // objects) plus what it is: its length and grades (measured from its path), difficulty 1–5, and the hazards it adds.
+  // Inside a piece, a number is an offset from the piece's own mark and a string is any position ("larkin-6").
+  // Pieces never round positions, so a route built from pieces is identical to the same route written by hand.
+  const rel = (mark, ...offs) => mark + offs.map((o) => (o < 0 ? '-' + -o : '+' + o)).join('');
+  const HAZARD_HINTS = {
+    car: { id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
+  };
+  function fragment(kind, mark, p) {
+    const f = { kind, mark, difficulty: p.difficulty || 1, hazards: [], path: [], features: [], marks: { ...(p.marks || {}) },
+      cones: [], cars: [], ramps: [], crossers: [], powerups: [], pedestrians: [], checkpoints: [], hints: [] };
+    const at = (v) => (typeof v === 'string' || mark === null ? v : rel(mark, v)); // the plateau has no mark: absolute
+    f.at = at;
+    for (const c of p.cones || []) f.cones.push(at(c));
+    for (const u of p.powerups || []) f.powerups.push({ kind: u.kind, x: at(u.at) });
+    for (const w of p.pedestrians || []) f.pedestrians.push({ x: at(w.at), kind: w.kind });
+    for (const c of p.checkpoints || []) f.checkpoints.push(at(c));
+    return f;
+  }
+  const hint = (f, h) => f.hints.push({ x: f.at(h.at), id: h.id, actions: h.actions, text: h.text });
+  const PIECES = {
+    // The start: a flat run-up and the first intersection. Positions here are absolute.
+    plateau(p) {
+      const f = fragment('plateau', null, p);
+      f.path.push(['straight', p.len], ['intersection', ...p.street]);
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
+    // A block of road: an optional grade change in, a straight, an optional grade change out, and its hazards.
+    block(p) {
+      const f = fragment('block', p.mark, p);
+      f.path.push(['mark', p.mark]);
+      if (p.enter) f.path.push(['ease', ...p.enter]);
+      f.path.push(['straight', p.len]);
+      if (p.exit) f.path.push(['ease', ...p.exit]);
+      for (const [x, w, d] of p.potholes || []) { f.features.push(['pothole', f.at(x), w, d]); f.hazards.push('pothole'); }
+      for (const [x, w, h] of p.bumps || []) { f.features.push(['bump', f.at(x), w, h]); f.hazards.push('bump'); }
+      if (p.car) { f.cars.push({ x: f.at(p.car.at), plank: p.car.plank }); f.hazards.push(p.car.plank ? 'car-plank' : 'car'); }
+      if (p.ramp) { f.ramps.push({ x: f.at(p.ramp) }); f.hazards.push('ramp'); }
+      for (const c of p.crossers || []) { f.crossers.push({ kind: c.kind, x: f.at(c.at), trigger: f.at(c.trigger) }); f.hazards.push(c.kind); }
+      for (const h of p.hints || []) hint(f, { ...(HAZARD_HINTS[h.hazard] || {}), ...h });
+      return f;
+    },
+    // A flight of stairs on its own grade, with a run-out back to level.
+    stairs(p) {
+      const f = fragment('stairs', p.mark, p);
+      f.path.push(['ease', -p.rise / p.tread, p.approach], ['mark', p.mark, p.lead], ['straight', p.lead + p.n * p.tread + p.runout], ['ease', ...p.exit]);
+      f.features.push(['stairs', p.mark, p.n, p.tread, p.rise]);
+      f.hazards.push('stairs');
+      for (const c of p.checkpointsAfter || []) f.checkpoints.push(rel(p.mark, p.n * p.tread, c)); // offsets past the last step
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
+    // An intersection, optionally with a raised-crosswalk lip on the way out and a cable car across it.
+    crossing(p) {
+      const f = fragment('crossing', p.mark, p);
+      f.path.push(['street', p.name, p.len, p.mark]);
+      if (p.lip) {
+        const L = p.lip;
+        f.path.push(['ease', ...L.up]);
+        if (L.flat) f.path.push(['straight', L.flat]);
+        f.path.push(['mark', L.mark], ['ease', ...L.down], ['lip', L.mark, L.big, L.crosswalk]);
+        f.hazards.push(L.big ? 'big-lip' : 'lip');
+      }
+      if (p.cablecar) { const c = p.cablecar; f.crossers.push({ kind: 'cablecar', x: f.at(c.at), trigger: f.at(c.trigger), lead: c.lead, sign: c.sign }); f.hazards.push('cablecar'); }
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
+    // The last straight to the customer's door.
+    finish(p) { const f = fragment('finish', p.mark, p); f.path.push(['mark', p.mark], ['straight', p.len]); return f; },
+  };
+  // Measures a piece from its path: length, and the grade it starts and ends on (given the grade it is entered at).
+  function pieceShape(path, entry) {
+    let length = 0, grade = entry;
+    for (const [op, a, b] of path) {
+      if (op === 'straight') length += a;
+      else if (op === 'ease') { length += b; grade = a; }
+      else if (op === 'street') length += b; // ['street', name, len, mark]
+    }
+    return { entry, exit: grade, length };
+  }
+  // Joins a route's pieces into the ROUTE_DATA shape. Features keep the order the hand-written routes used:
+  // potholes, then stairs, then bumps.
+  const FEATURE_ORDER = ['pothole', 'stairs', 'bump'];
+  function joinPieces(R) {
+    const out = { ...R, path: [], features: [], marks: {}, cones: [], cars: [], ramps: [], crossers: [], powerups: [], pedestrians: [], checkpoints: [], hints: [] };
+    const shapes = [];
+    let grade = 0;
+    for (const [kind, p] of R.pieces) {
+      const make = PIECES[kind];
+      if (!make) throw new Error(`route ${R.meta.title}: unknown piece "${kind}"`);
+      const f = make(p), shape = pieceShape(f.path, grade);
+      grade = shape.exit;
+      shapes.push({ kind, mark: f.mark, difficulty: f.difficulty, hazards: f.hazards, ...shape });
+      for (const k of ['path', 'cones', 'cars', 'ramps', 'crossers', 'powerups', 'pedestrians', 'checkpoints', 'hints']) out[k].push(...f[k]);
+      out.features.push(...f.features);
+      Object.assign(out.marks, f.marks);
+    }
+    out.features.sort((a, b) => FEATURE_ORDER.indexOf(a[0]) - FEATURE_ORDER.indexOf(b[0])); // stable: route order within a type
+    for (const k of ['cars', 'ramps', 'crossers', 'powerups']) if (!out[k].length) delete out[k];
+    delete out.pieces;
+    out.pieceShapes = shapes;
+    return out;
   }
 
-  // Delivery 2: across Russian Hill, from Jones St down to a garden wedding below Lombard Street.
-  // Delivery 3: Telegraph Hill, a steep block with one exposed downhill gust zone and a sheltered boardwalk above it.
-  // The gust blows against the rider; bouquet petals go first when it catches them at speed.
-  function buildTelegraphHill() {
-    const C = emptyCourse('telegraph');
-    Object.assign(C, { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 48, seed: 2027 });
-    const b = new CourseBuilder(-60, 0);
-    b.straight(90); // a run-up, so there is time to choose the road or the boardwalk before the gust
-    C.start = 3;
-    C.park = { x0: -60, x1: 1 };
-    C.intersections.push({ x0: 3, x1: 12, name: 'KEARNY ST' });
-    b.ease(-0.14, 6);
-    const gust0 = b.x; b.straight(40); C.gusts = [{ x0: gust0, x1: b.x, wind: -6 }];
-    b.ease(0, 5);
-    const lipA = b.x + 2; b.straight(4); b.ease(0.07, 1.2); b.ease(-0.1, 1.2);
-    C.lips.push({ x: lipA, big: false });
-    b.straight(40); b.ease(0, 6);
-    const potholeX = b.x + 6; b.pothole(potholeX, 1.0, 0.22);
-    b.straight(120);
-    // The long run-down to Ruth's door (D-12): a second grade, a flat, and pedestrians on the sidewalk.
-    const pedA = b.x + 30; b.straight(30); b.ease(-0.12, 6); b.straight(110); b.ease(0, 6); b.straight(50);
-    const pedB = b.x - 40; b.straight(40);
-    const fin = b.x; b.straight(90);
-    C.pedestrians = [{ x: pedA, kind: 'tourist' }, { x: pedB, kind: 'dog' }];
-    C.finishX = fin + 6; C.doorX = fin + 18;
-    C.venue = { x0: fin + 7, x1: fin + 34, arch: fin + 18 };
-    C.terrain = b.build();
-    C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
-    C.checkpoints = [C.start, gust0 + 10, lipA + 2, fin - 10].map((x) => ({ x }));
-    // The safe approach (D-12): hop up to Napier Lane's boardwalk, out of the gust and over the lip and pothole. It is
-    // one-way, so a rider who doesn't hop stays on the road underneath. Gentler than the road, so it costs time.
-    const walk0 = gust0 - 18, walkEnd = potholeX + 62;
-    C.boardwalk = { name: 'NAPIER LANE', x0: walk0 - 3, x1: walkEnd, speedLimit: 8.5, pts: [[walk0 - 3, 0.25], [walk0, 0.55], [gust0, 0.45], [walkEnd, C.terrain.height(walkEnd) - 0.1]] };
-    C.hints = [
-      { x: 6, id: 'boardwalk', actions: ['hop'], text: 'Hop up to the boardwalk: no gust, but slower.' },
-      { x: gust0 - 8, id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
-    ];
-    C.customer = {
-      name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
-      order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',
-      messages: ['Every petal counts. Do not let the wind win.', 'Napier Lane is sheltered, if you can hop up to it. Gusts are not an excuse.'],
-      cargoNote: 'Cargo: one hand-tied bouquet. Petals only.', cargoLabel: 'Petals left',
-    };
-    C.landmarks = landmarksFor('telegraph-hill', C);
-    return C;
-  }
+  // Routes as data (F-26). Each entry is the whole route: course facts, the road as a list of steps, features, and
+  // every object. Positions are numbers or a named mark plus offsets ("blockB+44", "larkin-6-1.4"), applied left to
+  // right, so a block can be resized without breaking the objects on it. buildRoute turns an entry into a course.
+  //   Path steps: ['straight', len] · ['ease', grade, len] · ['mark', name, offset?] (the current x, plus offset)
+  //   ['street', name, len, mark?] (an intersection) · ['intersection', x0, x1, name] · ['lip', mark, big, crosswalk?]
+  //   ['gust', fromMark, wind] (from the mark to here)
+  //   Features: ['pothole', at, width, depth] · ['bump', at, width, height] · ['stairs', at, n, tread, rise]
+  const ROUTE_DATA = {
+    nobHill: {
+      meta: { index: 1, title: 'THE $9 LATTE', hood: 'NOB HILL', street: 'CALIFORNIA', theme: 'nob', cargo: 'coffee', par: 46, seed: 1873 },
+      origin: [-70, 0], start: 4, park: { x0: -70, x1: 3 },
+      pieces: [
+        ['plateau', { len: 88, street: [6, 18, 'TAYLOR ST'], checkpoints: ['start'], hints: [{ at: -1e9, id: 'pedal', actions: ['pedal'], text: 'Hold to pedal' }] }],
+        ['block', { mark: 'blockA', enter: [-0.1, 5], len: 58, exit: [0, 6], difficulty: 1, potholes: [[28, 1.3, 0.2]], // the learning block, 10%
+          hints: [{ at: 10, id: 'hop', actions: ['hop'], text: 'Hop the pothole. Hold for higher.' }, { at: 46, id: 'brake', actions: ['brake'], text: 'Tap to brake. Hold it and the latte surges forward.' }] }],
+        ['crossing', { name: 'MASON ST', len: 12, mark: 'mason', lip: { up: [0.1, 1.6], mark: 'lipA', down: [-0.18, 1.1], big: false, crosswalk: 1.6 }, pedestrians: [{ at: 'lipA+7', kind: 'dog' }], checkpoints: [2] }],
+        ['block', { mark: 'blockB', len: 78, exit: [0, 7], difficulty: 2, car: { at: 44, plank: true }, cones: [37.5], powerups: [{ kind: 'bubble', at: 28 }], checkpoints: [18, 52], hints: [{ hazard: 'car', at: 24 }] }], // 18%, parked robot car
+        ['crossing', { name: 'POWELL ST', len: 13, mark: 'powell', difficulty: 4, lip: { up: [0.26, 1.8], flat: 1.2, mark: 'lipB', down: [-0.34, 1.0], big: true, crosswalk: 3.0 },
+          cablecar: { at: 6.5, trigger: -30, lead: 2.9, sign: 'POWELL & MASON' }, powerups: [{ kind: 'espresso', at: 10 }], pedestrians: [{ at: 'lipB+11', kind: 'tech' }], checkpoints: [2],
+          hints: [{ at: -30, id: 'cable', actions: ['brake'], text: 'DING DING: cable car crossing! Brake, or beat it.' }, { at: 8, id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Hop at the lip for BIG AIR. Lean to land level.' }] }],
+        ['block', { mark: 'blockC', len: 62, exit: [0, 9], difficulty: 4, bumps: [[30, 0.9, 0.07], [34, 0.9, 0.07]] }], // 34%, absurd
+        ['crossing', { name: 'STOCKTON ST', len: 12, mark: 'stockton', lip: { up: [0.06, 1.2], mark: 'lipC', down: [-0.12, 1.2], big: false, crosswalk: 1.2 }, checkpoints: [2] }],
+        ['block', { mark: 'blockD', len: 62, exit: [0, 6], difficulty: 2, potholes: [[26, 1.5, 0.24]], pedestrians: [{ at: 14, kind: 'fitness' }], checkpoints: [32] }], // 12%
+        ['crossing', { name: 'GRANT AVE', len: 12, mark: 'grant', lip: { up: [0.06, 1.2], mark: 'lipD', down: [-0.08, 1.2], big: false, crosswalk: 1.2 }, pedestrians: [{ at: 'lipD+6', kind: 'tourist' }], checkpoints: [2] }],
+        ['block', { mark: 'blockE', len: 50, exit: [0, 6], cones: [22, 23.3] }], // 8%, the home stretch
+        ['finish', { mark: 'fin', len: 140 }],
+      ],
+      finish: { at: 'fin', office: { x0: 12, x1: 30 } },
+      customer: {
+        name: 'Skyler', role: 'Founder & CEO, Meetingless', avatar: 'founder', brand: 'MEETINGLESS HQ',
+        order: 'ORDER #0009 · OAT LATTE (L) · NO LID', route: 'Down California Street to the Financial District',
+        messages: ["Please don't ring the bell. I'm in a meeting about reducing unnecessary meetings.", "Also: no lid. We're reducing single-use plastics."],
+        cargoNote: 'Cargo: one large oat-milk latte. Lidless. Brimming.', cargoLabel: 'Coffee remaining',
+      },
+      length: true, landmarks: 'nob-hill',
+    },
+    russianHill: {
+      meta: { index: 2, title: 'THE WEDDING CAKE', hood: 'RUSSIAN HILL', street: 'GREEN', theme: 'russian', cargo: 'cake', par: 48, seed: 2026, streetTrees: true },
+      origin: [-70, 0], start: 3, park: { x0: -70, x1: 1 }, dropLabel: ' m to the wedding',
+      pieces: [
+        ['plateau', { len: 84, street: [3, 14, 'JONES ST'], pedestrians: [{ at: 9, kind: 'tourist' }], checkpoints: ['start'], hints: [{ at: -1e9, id: 'cake', actions: ['pedal'], text: 'Wedding cake on board. Smooth is fast.' }] }],
+        ['block', { mark: 'block1', enter: [-0.16, 5], len: 40, difficulty: 2, potholes: [[22, 2.0, 0.28]], hints: [{ at: 8, id: 'pothole', actions: ['hop'], text: 'Big pothole. Hop it!' }] }], // 16%, the big pothole
+        ['stairs', { mark: 'stairsX', rise: 0.22, tread: 0.75, n: 7, approach: 3, lead: 1.5, runout: 3, exit: [0, 6], difficulty: 3, // Macondray Lane
+          pedestrians: [{ at: 2.5, kind: 'fitness' }], checkpointsAfter: [4], hints: [{ at: -12, id: 'stairs', actions: ['brake'], text: 'Macondray Lane steps. Slow down... or hop.' }] }],
+        ['crossing', { name: 'LEAVENWORTH ST', len: 12, mark: 'leav', lip: { up: [0.08, 1.4], mark: 'lipA', down: [-0.3, 1.2], big: false, crosswalk: 1.4 }, powerups: [{ kind: 'bubble', at: 6 }], checkpoints: [2] }],
+        ['block', { mark: 'block2', len: 60, exit: [0, 7], difficulty: 3, pedestrians: [{ at: 24, kind: 'dog' }], checkpoints: [12] }], // 30%, Ina Coolbrith Park
+        ['crossing', { name: 'HYDE ST', len: 14, mark: 'hyde', difficulty: 4, lip: { up: [0.06, 1.2], mark: 'lipB', down: [-0.36, 1.0], big: true, crosswalk: 1.2 },
+          cablecar: { at: 7, trigger: -45, lead: 3.6, sign: 'POWELL & HYDE' }, checkpoints: [2], hints: [{ at: -45, id: 'cable', actions: ['brake'], text: 'Cable car on Hyde! Brake early on this slope.' }] }],
+        ['block', { mark: 'block3', len: 52, exit: [-0.12, 8], difficulty: 5, bumps: [[26, 0.9, 0.07], [30, 0.9, 0.07]], pedestrians: [{ at: 14, kind: 'tech' }], checkpoints: [20] }], // 36%, the dramatic one
+        ['block', { mark: 'cz', len: 40, exit: [0, 5], difficulty: 4, marks: { rampX: 'larkin-6' }, ramp: 'rampX', cones: ['rampX-1.4', 9, 10.3], // construction zone: 12%
+          crossers: [{ kind: 'maybemo', at: 'rampX+7.6', trigger: 'larkin-45' }], checkpoints: [-2], hints: [{ at: 'larkin-30', id: 'ramp', actions: ['pedal', 'hop'], text: 'A robot car is stalling at Larkin. Jump the ramp!' }] }],
+        ['crossing', { name: 'LARKIN ST', len: 14, mark: 'larkin', lip: { up: [0.05, 1.2], mark: 'lipC', down: [-0.1, 1.2], big: false, crosswalk: 1.2 }, powerups: [{ kind: 'espresso', at: 11 }], checkpoints: [6] }],
+        ['block', { mark: 'block4', len: 60, exit: [0, 6], cones: [34, 35.3], pedestrians: [{ at: 18, kind: 'tourist' }], checkpoints: [24] }], // 10%, Lombard Street backdrop
+        ['finish', { mark: 'fin', len: 140 }],
+      ],
+      finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
+      customer: {
+        name: 'Gwen', role: 'Wedding planner, Frost & Tiers Events', avatar: 'planner', brand: 'FROST & TIERS EVENTS',
+        order: 'ORDER #0002 · 3-TIER CAKE · HANDLE WITH CARE', route: 'Across Russian Hill to Lombard Gardens',
+        messages: ["Please keep it upright. Unlike the groom's finances.", 'Three tiers. Fondant. Zero "creative interpretations."'],
+        cargoNote: 'Cargo: one three-tier wedding cake, strapped to the rack with optimism.', cargoLabel: 'Cake integrity',
+      },
+      length: true, landmarks: 'russian-hill',
+    },
+    // Telegraph Hill: a steep block with one exposed downhill gust, and the sheltered Napier Lane boardwalk above it.
+    telegraph: {
+      meta: { index: 3, title: 'THE BOUQUET', hood: 'TELEGRAPH HILL', street: 'GREENWICH', theme: 'telegraph', cargo: 'bouquet', par: 48, seed: 2027 },
+      origin: [-60, 0], start: 3, park: { x0: -60, x1: 1 },
+      path: [
+        ['straight', 90],                                                    // a run-up, to choose road or boardwalk before the gust
+        ['intersection', 3, 12, 'KEARNY ST'],
+        ['ease', -0.14, 6],
+        ['mark', 'gust0'], ['straight', 40], ['gust', 'gust0', -6],
+        ['ease', 0, 5],
+        ['mark', 'lipA', 2], ['straight', 4], ['ease', 0.07, 1.2], ['ease', -0.1, 1.2], ['lip', 'lipA', false],
+        ['straight', 40], ['ease', 0, 6],
+        ['mark', 'potholeX', 6], ['straight', 120],
+        // The long run-down to Ruth's door (D-12): a second grade, a flat, and pedestrians on the sidewalk.
+        ['mark', 'pedA', 30], ['straight', 30], ['ease', -0.12, 6], ['straight', 110], ['ease', 0, 6], ['straight', 50],
+        ['mark', 'pedB', -40], ['straight', 40],
+        ['mark', 'fin'], ['straight', 90],
+      ],
+      features: [['pothole', 'potholeX', 1.0, 0.22]],
+      finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
+      pedestrians: [{ x: 'pedA', kind: 'tourist' }, { x: 'pedB', kind: 'dog' }],
+      checkpoints: ['start', 'gust0+10', 'lipA+2', 'fin-10'],
+      // The safe approach (D-12, D-17): hop up to Napier Lane's boardwalk, out of the gust and over the lip and pothole.
+      // It is one-way, so a rider who doesn't hop stays on the road underneath. "ground" is the road height there.
+      boardwalk: { name: 'NAPIER LANE', x0: 'gust0-18-3', x1: 'potholeX+62', speedLimit: 8.5, pts: [['gust0-18-3', 0.25], ['gust0-18', 0.55], ['gust0', 0.45], ['potholeX+62', 'ground-0.1']] },
+      hints: [
+        { x: 6, id: 'boardwalk', actions: ['hop'], text: 'Hop up to the boardwalk: no gust, but slower.' },
+        { x: 'gust0-8', id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
+      ],
+      customer: {
+        name: 'Ruth', role: 'Florist, Telegraph Blooms', avatar: 'planner', brand: 'TELEGRAPH BLOOMS',
+        order: 'ORDER #0003 · BOUQUET · PETALS ONLY', route: 'Down Telegraph Hill to the Bouquet Office',
+        messages: ['Every petal counts. Do not let the wind win.', 'Napier Lane is sheltered, if you can hop up to it. Gusts are not an excuse.'],
+        cargoNote: 'Cargo: one hand-tied bouquet. Petals only.', cargoLabel: 'Petals left',
+      },
+      landmarks: 'telegraph-hill',
+    },
+  };
 
-  function buildRussianHill() {
-    const C = emptyCourse('russianHill');
-    Object.assign(C, { index: 2, title: 'THE WEDDING CAKE', hood: 'RUSSIAN HILL', street: 'GREEN', theme: 'russian', cargo: 'cake', par: 48, seed: 2026, streetTrees: true });
-    const RISE = 0.22, TREAD = 0.75, STEPS = 7;
-    const b = new CourseBuilder(-70, 0);
-    b.straight(84);                                          // Jones St summit (start)
-    C.start = 3;
-    C.park = { x0: -70, x1: 1 };
-    C.intersections.push({ x0: 3, x1: 14, name: 'JONES ST' });
-    b.ease(-0.16, 5).straight(40);                           // Block 1: 16%, the big pothole
-    b.ease(-RISE / TREAD, 3);
-    const stairsX = b.x + 1.5;
-    b.straight(1.5 + STEPS * TREAD + 3);                     // Macondray Lane steps ride on their own grade
-    b.ease(0, 6);
-    const leav = b.x; b.straight(12);
-    C.intersections.push({ x0: leav, x1: b.x, name: 'LEAVENWORTH ST' });
-    b.ease(0.08, 1.4); const lipA = b.x; b.ease(-0.3, 1.2);
-    C.lips.push({ x: lipA, big: false });
-    C.crosswalks.push({ x0: lipA - 1.4, x1: lipA });
-    const block2 = b.x; b.straight(60);                      // Block 2: 30%, Ina Coolbrith Park
-    b.ease(0, 7);
-    const hyde = b.x; b.straight(14);
-    C.intersections.push({ x0: hyde, x1: b.x, name: 'HYDE ST' });
-    b.ease(0.06, 1.2); const lipB = b.x; b.ease(-0.36, 1.0);
-    C.lips.push({ x: lipB, big: true });
-    C.crosswalks.push({ x0: lipB - 1.2, x1: lipB });
-    const block3 = b.x; b.straight(52);                      // Block 3: 36%, the dramatic one
-    b.ease(-0.12, 8);
-    const cz = b.x; b.straight(40);                          // construction zone: 12%
-    b.ease(0, 5);
-    const larkin = b.x; b.straight(14);
-    C.intersections.push({ x0: larkin, x1: b.x, name: 'LARKIN ST' });
-    b.ease(0.05, 1.2); const lipC = b.x; b.ease(-0.1, 1.2);
-    C.lips.push({ x: lipC, big: false });
-    C.crosswalks.push({ x0: lipC - 1.2, x1: lipC });
-    const block4 = b.x; b.straight(60);                      // Block 4: 10%, Lombard Street backdrop
-    b.ease(0, 6);
-    const fin = b.x; b.straight(140);
+  // Turns a ROUTE_DATA entry into a course. Marks are read left to right with their offsets, so the arithmetic (and so
+  // every position) is exactly what the hand-written builders produced; the port check (F-28) holds it to that.
+  const POS_KEYS = new Set(['x', 'x0', 'x1', 'trigger', 'arch']);
+  function buildRoute(id) {
+    const R = ROUTE_DATA[id].pieces ? joinPieces(ROUTE_DATA[id]) : ROUTE_DATA[id], C = emptyCourse(id), marks = { start: R.start };
+    Object.assign(C, R.meta);
+    const at = (p) => {
+      if (typeof p === 'number') return p;
+      const m = /^([A-Za-z]\w*)((?:[+-]\d+(?:\.\d+)?)*)$/.exec(p);
+      if (!m || !(m[1] in marks)) throw new Error(`route ${id}: unknown position "${p}"`);
+      let v = marks[m[1]];
+      for (const t of m[2].match(/[+-]\d+(?:\.\d+)?/g) || []) v = t[0] === '+' ? v + Number(t.slice(1)) : v - Number(t.slice(1));
+      return v;
+    };
+    const place = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, POS_KEYS.has(k) ? at(v) : v]));
+    const b = new CourseBuilder(R.origin[0], R.origin[1]);
+    C.start = R.start; C.park = { ...R.park };
+    for (const [op, ...a] of R.path) {
+      if (op === 'straight') b.straight(a[0]);
+      else if (op === 'ease') b.ease(a[0], a[1]);
+      else if (op === 'mark') marks[a[0]] = a[1] === undefined ? b.x : b.x + a[1];
+      else if (op === 'intersection') C.intersections.push({ x0: a[0], x1: a[1], name: a[2] });
+      else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
+      else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
+      else if (op === 'gust') (C.gusts || (C.gusts = [])).push({ x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else throw new Error(`route ${id}: unknown path step "${op}"`);
+    }
+    for (const [name, p] of Object.entries(R.marks || {})) marks[name] = at(p);
+    const F = R.finish, fin = marks[F.at];
     C.finishX = fin + 6; C.doorX = fin + 18;
-    C.venue = { x0: fin + 7, x1: fin + 34, arch: fin + 18 };
-    b.pothole(36, 2.0, 0.28);
-    b.stairs(stairsX, STEPS, TREAD, RISE);
-    b.bump(block3 + 26, 0.9, 0.07).bump(block3 + 30, 0.9, 0.07);
+    if (F.office) C.office = { x0: fin + F.office.x0, x1: fin + F.office.x1 };
+    if (F.venue) C.venue = { x0: fin + F.venue.x0, x1: fin + F.venue.x1, arch: fin + F.venue.arch };
+    for (const [type, p, ...a] of R.features || []) b[type](at(p), ...a);
     C.terrain = b.build();
     C.potholes = b.features.filter((f) => f.type === 'pothole').map((f) => ({ x0: f.x0, x1: f.x1, depth: f.depth }));
-    C.stairs = [{ x0: stairsX, x1: stairsX + STEPS * TREAD, n: STEPS, tread: TREAD, rise: RISE }];
-    const rampX = larkin - 6;
-    C.ramps = [{ x: rampX }];
-    C.cones = [rampX - 1.4, cz + 9, cz + 10.3, block4 + 34, block4 + 35.3];
-    C.crossers = [
-      { kind: 'cablecar', x: hyde + 7, trigger: hyde - 45, lead: 3.6, sign: 'POWELL & HYDE' },
-      { kind: 'maybemo', x: rampX + 7.6, trigger: larkin - 45 },
-    ];
-    C.powerups = [{ kind: 'bubble', x: leav + 6 }, { kind: 'espresso', x: larkin + 11 }];
-    C.pedestrians = [
-      { x: 9, kind: 'tourist' }, { x: stairsX + 2.5, kind: 'fitness' }, { x: block2 + 24, kind: 'dog' },
-      { x: block3 + 14, kind: 'tech' }, { x: block4 + 18, kind: 'tourist' },
-    ];
-    C.checkpoints = [C.start, stairsX + STEPS * TREAD + 4, leav + 2, block2 + 12, hyde + 2, block3 + 20, cz - 2, larkin + 6, block4 + 24].map((x) => ({ x }));
-    C.hints = [
-      { x: -1e9, id: 'cake', actions: ['pedal'], text: 'Wedding cake on board. Smooth is fast.' },
-      { x: 22, id: 'pothole', actions: ['hop'], text: 'Big pothole. Hop it!' },
-      { x: stairsX - 12, id: 'stairs', actions: ['brake'], text: 'Macondray Lane steps. Slow down... or hop.' },
-      { x: hyde - 45, id: 'cable', actions: ['brake'], text: 'Cable car on Hyde! Brake early on this slope.' },
-      { x: larkin - 30, id: 'ramp', actions: ['pedal', 'hop'], text: 'A robot car is stalling at Larkin. Jump the ramp!' },
-    ];
-    C.customer = {
-      name: 'Gwen', role: 'Wedding planner, Frost & Tiers Events', avatar: 'planner', brand: 'FROST & TIERS EVENTS',
-      order: 'ORDER #0002 · 3-TIER CAKE · HANDLE WITH CARE', route: 'Across Russian Hill to Lombard Gardens',
-      messages: ["Please keep it upright. Unlike the groom's finances.", 'Three tiers. Fondant. Zero "creative interpretations."'],
-      cargoNote: 'Cargo: one three-tier wedding cake, strapped to the rack with optimism.', cargoLabel: 'Cake integrity',
-    };
-    C.length = C.doorX - C.start;
-    C.landmarks = landmarksFor('russian-hill', C);
+    C.stairs = b.features.filter((f) => f.type === 'stairs').map((f) => ({ x0: f.x0, x1: f.x1, n: f.n, tread: f.tread, rise: f.rise }));
+    if (R.ramps) C.ramps = R.ramps.map(place);
+    if (R.cones) C.cones = R.cones.map(at);
+    if (R.cars) C.cars = R.cars.map(place);
+    if (R.crossers) C.crossers = R.crossers.map(place);
+    if (R.powerups) C.powerups = R.powerups.map(place);
+    if (R.pedestrians) C.pedestrians = R.pedestrians.map(place);
+    C.checkpoints = R.checkpoints.map((p) => ({ x: at(p) }));
+    if (R.boardwalk) {
+      const W = R.boardwalk;
+      C.boardwalk = { ...place(W), pts: W.pts.map(([x, y]) => { const px = at(x); return [px, typeof y === 'number' ? y : C.terrain.height(px) - Number(/^ground-(\d+(?:\.\d+)?)$/.exec(y)[1])]; }) };
+    }
+    C.hints = R.hints.map(place);
+    C.customer = { ...R.customer, messages: R.customer.messages.slice() };
+    if (R.length) C.length = C.doorX - C.start;
+    C.landmarks = landmarksFor(R.landmarks, C);
     return C;
   }
+  function buildNobHill() { return buildRoute('nobHill'); }
+  function buildRussianHill() { return buildRoute('russianHill'); }
+  function buildTelegraphHill() { return buildRoute('telegraph'); }
+
+
 
   // Title backdrop: a plateau that tips into an absurd descent.
   function buildTitleCourse() {
@@ -1593,6 +1664,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     bump(speed) { this.sloshV += 0.6 + speed * 0.15; return 0; }
     kick(v) { this.sloshV += v; }
+    windShare() { return 0; }                                // coffee ignores the wind
+    stability() { return this.slosh + this.sloshV; }         // the world's finite check reads this
+    alarm() { return null; }
     crashLoss(sev) {
       const lost = absorbHit(this, Math.min(this.amount, CARGO.crashBase + CARGO.crashExtra * clamp(sev, 0, 1)));
       this.amount -= lost;
@@ -1695,6 +1769,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       return amt;
     }
     kick(v) { this.angVel -= v * 0.8; }
+    windShare() { return 0; }
+    stability() { return this.angle + this.angVel; }
+    alarm() { return Math.abs(this.angle) > 0.3 ? 'CAKE_WOBBLE' : null; }
     crashLoss(sev) {
       const lost = absorbHit(this, Math.min(this.amount, CAKE.crashBase + CAKE.crashExtra * clamp(sev, 0, 1)));
       this.amount -= lost;
@@ -1751,6 +1828,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       return amt;
     }
     kick() { /* petals do not swing */ }
+    windShare(dmg) { return dmg || 0; }                       // all of update's loss is the gust's
+    stability() { return 0; }
+    alarm() { return null; }
     crashLoss(sev) {
       const lost = absorbHit(this, Math.min(this.amount, BOUQUET.crashBase + BOUQUET.crashExtra * clamp(sev, 0, 1)));
       this.amount -= lost;
@@ -2084,7 +2164,18 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { min: 1, stars: 2, text: 'Mostly stems. Very dramatic stems.' },
     { min: 0, stars: 1, text: 'Ruth asked for a receipt for the petals.' },
   ];
-  function reviewsFor(kind) { return kind === 'cake' ? CAKE_REVIEWS : kind === 'bouquet' ? BOUQUET_REVIEWS : COFFEE_REVIEWS; }
+  // The cargo registry (F-27): the one list of cargo types. Each class keeps its own rules behind the same methods
+  // (update, splash, bump, kick, crashLoss, refill, resetSlosh, windShare, stability, alarm, condition); this table adds
+  // what the world needs around it: how to make one, its review lines, and how it flies off the bike in a crash.
+  // Player-facing words live in CARGO_WORDS, and drawing lives in CARGO_VIEW (presentation section).
+  const CARGO_TYPES = {
+    coffee: { make: () => new CoffeeCargo(), reviews: COFFEE_REVIEWS, crashThrow: { mx: CARGO.mountX, my: 0.15, vx: 1.5, vy: 4.2, w: -9 } },
+    cake: { make: () => new CakeCargo(), reviews: CAKE_REVIEWS, crashThrow: { mx: CAKE.mountX, my: 0.2, vx: 0.5, vy: 3.2, w: -4 } },
+    bouquet: { make: () => new BouquetCargo(), reviews: BOUQUET_REVIEWS, crashThrow: { mx: CARGO.mountX, my: 0.15, vx: 1.5, vy: 4.2, w: -9 } },
+  };
+  function cargoType(kind) { return CARGO_TYPES[cleanCargo(kind)]; } // unknown kinds fall back to the latte, like cleanCargo
+  function makeCargo(kind) { return cargoType(kind).make(); }
+  function reviewsFor(kind) { return cargoType(kind).reviews; }
   function reviewFor(reviews, condition) {
     const c = Math.round(clamp(Number.isFinite(condition) ? condition : 0, 0, 100));
     for (const r of reviews) if (c >= r.min) return r;
@@ -2457,7 +2548,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     constructor(course, opts) {
       this.course = course; this.terrain = course.terrain; this.opts = opts || {};
       this.bike = new Bike();
-      this.cargo = course.cargo === 'cake' ? new CakeCargo() : course.cargo === 'bouquet' ? new BouquetCargo() : new CoffeeCargo();
+      this.cargo = makeCargo(course.cargo);
       this.score = new Score(course.par, this.cargo.kind);
       this.obstacles = new Obstacles(this);
       this.events = []; this.t = 0; this.state = 'riding'; this.cpIndex = 0; this.crashT = 0; this.invuln = 0;
@@ -2534,7 +2625,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           b.step(dt, inp, this, this.t);
           if (this.state !== 'riding') break;
           const windDmg = this.cargo.update(dt, b, !!this.opts.unbreakable, this.windAt(b.x, b.y));
-          if (this.cargo.kind === 'bouquet') this.feats.gustLoss += windDmg || 0; // petals the gust took, for the goal
+          this.feats.gustLoss += this.cargo.windShare(windDmg); // what the gust took, for the goal
           this.trackDamage(windDmg, dt);
           this.drainCargo();
           this.score.time += dt;
@@ -2593,7 +2684,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (sp > 16 && b.grounded && this.t - this.fastT > 8) { this.fastT = this.t; this.emit('PLAYER_FAST', { speed: sp }); }
       this.slowAcc = sp < 2 && this.t > 5 ? this.slowAcc + dt : 0;
       if (this.slowAcc > 2.5 && this.t - this.slowT > 10) { this.slowT = this.t; this.slowAcc = 0; this.emit('PLAYER_SLOW', {}); }
-      if (this.cargo.kind === 'cake' && Math.abs(this.cargo.angle) > 0.3 && this.t - this.wobbleT > 6) { this.wobbleT = this.t; this.emit('CAKE_WOBBLE', {}); }
+      const alarm = this.cargo.alarm(); if (alarm && this.t - this.wobbleT > 6) { this.wobbleT = this.t; this.emit(alarm, {}); }
       if (!this.flags.half && this.cargo.amount < 50) { this.flags.half = true; this.emit('CARGO_HALF', {}); }
       for (let i = 0; i < this.zones.length; i++) { // a STOP box counts once the bike is inside it below 3 m/s
         const z = this.zones[i];
@@ -2676,9 +2767,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       b.crashed = true; this.state = 'crashed'; this.crashT = 0; this.score.crashes++;
       const hip = b.localToWorld(-0.2, 0.3, this.tmp), r = this.rag;
       Object.assign(r, { on: true, x: hip.x, y: hip.y, px: hip.x, py: hip.y, vx: b.vx * 0.85 + 1.2, vy: Math.max(b.vy, 0) * 0.5 + 3.4, a: b.a, pa: b.a, w: b.vx >= 0 ? -6.5 : 6.5 });
-      const cake = this.cargo.kind === 'cake';
-      const cp = cake ? b.localToWorld(CAKE.mountX, 0.2, this.tmp) : b.localToWorld(CARGO.mountX, 0.15, this.tmp), c = this.cup;
-      Object.assign(c, { on: true, x: cp.x, y: cp.y, px: cp.x, py: cp.y, vx: b.vx + (cake ? 0.5 : 1.5), vy: Math.max(b.vy, 0) + (cake ? 3.2 : 4.2), a: b.a, pa: b.a, w: cake ? -4 : -9 });
+      const th = cargoType(this.cargo.kind).crashThrow, cp = b.localToWorld(th.mx, th.my, this.tmp), c = this.cup;
+      Object.assign(c, { on: true, x: cp.x, y: cp.y, px: cp.x, py: cp.y, vx: b.vx + th.vx, vy: Math.max(b.vy, 0) + th.vy, a: b.a, pa: b.a, w: th.w });
       let lost = 0;
       if (this.opts.unbreakable) this.cargo.resetSlosh(); else lost = this.cargo.crashLoss(sev);
       this.drainCargo();
@@ -2741,7 +2831,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       });
     }
     finite() {
-      const b = this.bike, c = this.cargo, m = c.kind === 'cake' ? c.angle + c.angVel : c.slosh + c.sloshV;
+      const b = this.bike, c = this.cargo, m = c.stability();
       return Number.isFinite(b.x + b.y + b.vx + b.vy + b.a + b.w + m + c.amount);
     }
     sanityReset() {
@@ -2841,8 +2931,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill,
-    buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, BOUQUET, World, Score,
+    STEP, PHYS, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
+    buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
@@ -2889,7 +2979,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     enableTouch() { if (!this.touchMode) { this.touchMode = true; document.body.classList.add('touch'); } this.setDevice('touch'); }
     setDevice(d) { if (this.device !== d) { this.device = d; if (this.onDevice) this.onDevice(d); } }
     onKey(e, isDown) {
-      if (e.target && e.target.closest && e.target.closest('input, textarea')) return; // let the name fields take typing
+      if (e.target && e.target.closest && e.target.closest('input:not([type="range"]), textarea')) return; // let the name fields take typing; sliders go through the game
       const a = KEYMAP[e.code] || (e.key === ' ' ? 'jump' : null);
       if (!a) return;
       if (isDown) this.setDevice('keyboard');
@@ -3424,9 +3514,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     line(ctx, BB.x, BB.y + 0.085, rh.x, rh.y + 0.04); line(ctx, BB.x, BB.y - 0.085, rh.x, rh.y - 0.04);
     ctx.fillStyle = '#a19ea6'; ctx.beginPath(); ctx.arc(BB.x, BB.y, 0.088, 0, TAU); ctx.fill();
     ctx.fillStyle = '#6c6972'; ctx.beginPath(); ctx.arc(BB.x, BB.y, 0.05, 0, TAU); ctx.fill();
-    if (P.cake) drawCakeOnRack(ctx, P.cake, t);
+    if (P.view.rack) P.view.rack(ctx, P.cg, t);
     ctx.fillStyle = COL.basketDark; rrect(ctx, 0.44, -0.18, 0.4, 0.2, 0.03); ctx.fill();
-    if (!P.cake) { if (P.bouquet) drawBouquet(ctx, P.bouquet, t); else drawCup(ctx, P.cargo, t); if (P.shield) drawBubbleWrap(ctx, 0.43, -0.16, 0.42, 0.62, t); }
+    if (P.view.basket) { P.view.basket(ctx, P.cg, t); if (P.shield) drawBubbleWrap(ctx, 0.43, -0.16, 0.42, 0.62, t); }
     ctx.fillStyle = COL.basket; rrect(ctx, 0.44, -0.18, 0.4, 0.13, 0.03); ctx.fill();
     ctx.strokeStyle = COL.basketDark; ctx.lineWidth = 0.012;
     for (let i = 1; i < 6; i++) line(ctx, 0.44 + i * 0.066, -0.18, 0.44 + i * 0.066, -0.05);
@@ -4093,6 +4183,83 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     ctx.restore();
   }
 
+  // How each cargo looks and sounds (F-27). The engine half of the contract is CARGO_TYPES; this is the presentation half.
+  // A new cargo adds one entry here: rack or basket drawing, crash flight, HUD icon, meters, lines, and spill effects.
+  function cupBits(game, n, burst) {
+    const W = game.world, b = W.bike, P = game.particles, rim = b.localToWorld(CARGO.mountX + 0.02, 0.3, { x: 0, y: 0 });
+    const dir = W.cargo.lastSpillDir, ca = Math.cos(b.a), sa = Math.sin(b.a);
+    for (let i = 0; i < n; i++) {
+      const out = burst ? (Math.random() - 0.5) * 2.4 : dir * (0.8 + Math.random() * 1.6);
+      const up = 1.2 + Math.random() * (burst ? 3 : 1.8);
+      const vx = b.vx * 0.9 + out * ca - up * sa, vy = b.vy * 0.9 + out * sa + up * ca;
+      if (i % 4 === 3) P.spawn(PK.FOAM, rim.x, rim.y, vx, vy, 1.4, 0.035, COL.foam);
+      else P.spawn(PK.DROP, rim.x + (Math.random() - 0.5) * 0.12, rim.y, vx, vy, 1.6, 0.022 + Math.random() * 0.02, i % 2 ? '#7a4a2e' : '#8f5a38');
+    }
+  }
+  function cakeBits(game, n, burst) {
+    const W = game.world, b = W.bike, P = game.particles, rim = b.localToWorld(CAKE.mountX, 0.45, { x: 0, y: 0 });
+    const dir = W.cargo.angle > 0 ? -1 : 1, ca = Math.cos(b.a), sa = Math.sin(b.a);
+    for (let i = 0; i < n; i++) {
+      const out = burst ? (Math.random() - 0.5) * 2.4 : dir * (0.8 + Math.random() * 1.6);
+      const up = 1.2 + Math.random() * (burst ? 3 : 1.8);
+      const vx = b.vx * 0.9 + out * ca - up * sa, vy = b.vy * 0.9 + out * sa + up * ca;
+      const p = P.spawn(PK.DROP, rim.x + (Math.random() - 0.5) * 0.2, rim.y, vx, vy, 1.6, 0.025 + Math.random() * 0.025, i % 3 ? '#fbf3e6' : '#f3a7b8');
+      p.stain = i % 3 ? 'rgba(251,243,230,0.85)' : 'rgba(243,167,184,0.8)';
+    }
+  }
+  function petalBits(game, n, burst) {
+    const W = game.world, b = W.bike, P = game.particles, rim = b.localToWorld(CARGO.mountX + 0.02, 0.4, { x: 0, y: 0 });
+    const ca = Math.cos(b.a), sa = Math.sin(b.a);
+    for (let i = 0; i < n; i++) {
+      const out = (Math.random() - 0.5) * (burst ? 3 : 1.6), up = 0.8 + Math.random() * (burst ? 2.4 : 1.2);
+      const vx = b.vx * 0.7 + out * ca - up * sa, vy = b.vy * 0.7 + out * sa + up * ca;
+      P.spawn(PK.CONFETTI, rim.x + (Math.random() - 0.5) * 0.2, rim.y, vx, vy, 1.8, 0.03 + Math.random() * 0.02, i % 3 ? '#f29ab0' : '#fff2f5');
+    }
+  }
+  const cupSpill = (game, e) => { game.audio.play('slosh'); game.spawnCargoBits(Math.min(9, 2 + Math.round(e.amount * 4)), false); };
+  const CARGO_VIEW = {
+    coffee: {
+      pose(c, cg) { cg.slosh = c.slosh; cg.sloshV = c.sloshV; cg.tilt = c.tilt; cg.level = c.level(); cg.float = c.float; return cg; },
+      basket: drawCup,
+      worried: (c) => Math.abs(c.slosh) > c.thr * 0.72 || c.spilling > 0.2, lookX: 0.6,
+      flying: (ctx, x, y, a) => drawFlyingCup(ctx, x, y, a),
+      hudIcon: (game, ctx, x, top, u, frac) => game.drawCupIcon(ctx, x, top + u * 0.55, u * 2.4, frac),
+      meter: (c) => ({ label: 'SLOSH ', value: Math.abs(c.slosh) / Math.max(0.05, c.thr) }),
+      debug: (c) => 'slosh ' + c.slosh.toFixed(2) + '  thr ' + c.thr.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  latte ' + c.amount.toFixed(1) + '%',
+      pauseLine: 'The latte is getting cold. And judgmental.', dropLabel: ' m to the latte drop', leavesCup: true, // the cup stays in the basket when the latte flies
+      arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
+      splashSound: 'splash', bits: cupBits, onSpill: cupSpill, spillLine: true, condNote: () => '',
+    },
+    cake: {
+      pose: (c) => c,
+      rack: drawCakeOnRack,
+      worried: (c) => Math.abs(c.angle) > 0.22 || c.spilling > 0.2, lookX: -1,
+      flying: (ctx, x, y, a, c, t) => drawFlyingCake(ctx, x, y, a, c, t),
+      hudIcon: (game, ctx, x, top, u, frac) => game.drawCakeIcon(ctx, x, top + u * 0.5, u * 2.6, frac),
+      meter: (c) => ({ label: 'WOBBLE ', value: Math.abs(c.angle) / CAKE.maxAngle }),
+      debug: (c) => 'cake angle ' + c.angle.toFixed(2) + '  w ' + c.angVel.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  integrity ' + c.amount.toFixed(1) + '%',
+      pauseLine: 'The cake is sweating. And judgmental.', dropLabel: ' m to the cake drop',
+      arrival: { bell: false, bride: true, reviewAfter: 4.4, success: false },
+      splashSound: 'wobble', bits: cakeBits, onSpill: (game) => { if (Math.random() < 0.5) game.spawnCargoBits(2, false); }, spillLine: false,
+      condNote: (r) => (r.decorLeft !== null ? ' · ' + r.decorLeft + '/' + CAKE_DECOR.length + ' decor' : ''),
+    },
+    bouquet: {
+      pose: (c) => c,
+      basket: drawBouquet,
+      worried: (c) => c.spilling > 0.2, lookX: 0.6,
+      flying: (ctx, x, y, a) => drawFlyingBouquet(ctx, x, y, a),
+      hudIcon: (game, ctx, x, top, u, frac) => game.drawBouquetIcon(ctx, x, top + u * 0.55, u * 2.4, frac),
+      meter: (c) => ({ label: 'PETALS LOST ', value: (100 - c.amount) / 100 }),
+      debug: (c) => 'petals ' + c.amount.toFixed(1) + '%  spilling ' + c.spilling.toFixed(2),
+      pauseLine: 'The petals are holding on. Barely. And judgmental.', dropLabel: ' m to the bouquet drop',
+      arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
+      splashSound: 'wobble', bits: petalBits, onSpill: (game, e) => game.spawnCargoBits(Math.min(6, 1 + Math.round(e.amount * 3)), false),
+      spillLine: true, condNote: () => '',
+    },
+  };
+  function cargoView(kind) { return CARGO_VIEW[cleanCargo(kind)]; }
+  const EMPTY_RACK = {}; // nothing on the rack or in the basket
+
   /* ---------- 19. SCENERY (seeded, per course) ---------- */
   const ACCENTS = ['#6b4f7a', '#3f6f73', '#b8564a', '#5b7d4a', '#a8702f', '#4a5f8a'];
   function buildScenery(course) {
@@ -4544,12 +4711,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       P.lean = b.lean; P.brake = b.brakeIn ? clamp(sp / 8, 0, 1) : 0;
       P.stand = clamp(clamp((sp - 11) / 6, 0, 1) * (b.grounded ? 1 : 0.5) + (b.airTime > 0.25 ? 0.4 : 0), 0, 1);
       P.bob = (b.grounded ? Math.sin(game.time * 9) * 0.006 * clamp(sp / 8, 0, 1) : 0.02) - (b.wheels[0].comp - SAG) * 0.25;
-      const cake = c.kind === 'cake', bouquet = c.kind === 'bouquet';
-      if (!cake && !bouquet) { cg.slosh = c.slosh; cg.sloshV = c.sloshV; cg.tilt = c.tilt; cg.level = c.level(); cg.float = c.float; }
-      P.cargo = cg; P.cake = cake ? c : null; P.bouquet = bouquet ? c : null; P.shield = c.shield; P.bellRing = game.bellT > 0 ? Math.abs(Math.sin(game.bellT * 30)) : 0;
-      const worried = cake ? Math.abs(c.angle) > 0.22 || c.spilling > 0.2 : bouquet ? c.spilling > 0.2 : Math.abs(c.slosh) > c.thr * 0.72 || c.spilling > 0.2;
+      const view = cargoView(c.kind);
+      P.view = view; P.cg = view.pose(c, cg); P.shield = c.shield; P.bellRing = game.bellT > 0 ? Math.abs(Math.sin(game.bellT * 30)) : 0;
+      const worried = view.worried(c);
       P.expr = world.state === 'done' ? 'joy' : !b.grounded && b.airTime > 0.18 ? 'wow' : b.brakeIn && sp > 6 ? 'grit' : worried ? 'worried' : sp > 13 ? 'grin' : 'smile';
-      this.look.x = worried ? (cake ? -1 : 0.6) : 1; this.look.y = worried ? -0.8 : 0;
+      this.look.x = worried ? view.lookX : 1; this.look.y = worried ? -0.8 : 0;
       P.look = this.look; P.scarf = null;
       return P;
     }
@@ -4570,7 +4736,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         for (let i = 0; i < S.n; i++) { const dx = S.x[i] - P.x, dy = S.y[i] - P.y; L.x[i] = dx * ca + dy * sa; L.y[i] = -dx * sa + dy * ca; }
         P.scarf = L;
       }
-      if (b.crashed && world.cup.on) { P.cargo = EMPTY_CUP; P.cake = null; P.bouquet = null; P.shield = false; }
+      if (b.crashed && world.cup.on) { // the cargo is in the air: an empty cup stays in the basket, otherwise nothing
+        if (cargoView(world.cargo.kind).leavesCup) { P.view = CARGO_VIEW.coffee; P.cg = EMPTY_CUP; } else P.view = EMPTY_RACK;
+        P.shield = false;
+      }
       ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.a);
       if (rider) drawBikeBack(ctx, P, pose);
       drawBikeBody(ctx, P, game.time);
@@ -4582,9 +4751,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       if (world.cup.on) {
         const c = world.cup, x = lerp(c.px, c.x, alpha), y = lerp(c.py, c.y, alpha), a = lerpAngle(c.pa, c.a, alpha);
-        if (world.cargo.kind === 'cake') drawFlyingCake(ctx, x, y, a, world.cargo, game.time);
-        else if (world.cargo.kind === 'bouquet') drawFlyingBouquet(ctx, x, y, a);
-        else drawFlyingCup(ctx, x, y, a);
+        cargoView(world.cargo.kind).flying(ctx, x, y, a, world.cargo, game.time);
       }
     }
   }
@@ -4664,10 +4831,17 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     menuFocus(dir) {
       const scr = this.shown && this.screens[this.shown];
       if (!scr) return;
-      const els = Array.from(scr.querySelectorAll('button, a[href]')).filter((e) => !e.disabled && e.offsetParent !== null);
+      const els = Array.from(scr.querySelectorAll('button, a[href], input[type="range"]')).filter((e) => !e.disabled && e.offsetParent !== null);
       if (!els.length) return;
       const i = els.indexOf(document.activeElement);
       els[i < 0 ? 0 : (i + dir + els.length) % els.length].focus();
+    }
+    // Gamepad left / right on a focused slider: one step, through the same input event a mouse drag sends.
+    nudgeSlider(r, dir) {
+      const step = Number(r.step) || 1, v = clamp(Number(r.value) + dir * step, Number(r.min) || 0, Number(r.max) || 100);
+      if (v === Number(r.value)) return;
+      r.value = String(v);
+      r.dispatchEvent(new Event('input', { bubbles: true }));
     }
     focusedButton() {
       const el = document.activeElement, scr = this.shown && this.screens[this.shown];
@@ -4720,10 +4894,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     refreshBest() {
       const el = document.getElementById('title-best'), parts = [];
       fillScoreList(document.getElementById('title-board'), this.store.get('shifts', []));
-      const a = cleanBest(this.store.get('best:nobHill', null)), b = cleanBest(this.store.get('best:russianHill', null)), t = cleanBest(this.store.get('best:telegraph', null));
-      if (a) parts.push('Latte ' + fmtMoney(a.tip) + ' (' + Math.round(a.condition) + '%)');
-      if (b) parts.push('Cake ' + fmtMoney(b.tip) + ' (' + Math.round(b.condition) + '%)');
-      if (t) parts.push('Bouquet ' + fmtMoney(t.tip) + ' (' + Math.round(t.condition) + '%)');
+      for (const R of ROUTES) {
+        const best = cleanBest(this.store.get('best:' + R.id, null));
+        if (best) parts.push(cargoWords(ROUTE_DATA[R.id].meta.cargo).short + ' ' + fmtMoney(best.tip) + ' (' + Math.round(best.condition) + '%)');
+      }
       el.textContent = parts.join('  ·  ');
     }
     action(a, data) {
@@ -4909,7 +5083,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       };
       row('Hill', [['route', 'testHill', 'THE TEST HILL', cfg.route === 'testHill']].concat(routes.map((s) => ['route', s.id, this.courseFor(s.id).title, cfg.route === s.id, s.state === 'locked'])));
       row('Start at', C.checkpoints.map((cp, i) => ['cp', i, cpLabel(C, i), cfg.cp === i]));
-      row('Cargo', [['cargo', 'coffee', 'LATTE', cfg.cargo === 'coffee'], ['cargo', 'cake', 'CAKE', cfg.cargo === 'cake'], ['cargo', 'bouquet', 'BOUQUET', cfg.cargo === 'bouquet']]);
+      row('Cargo', Object.keys(CARGO_TYPES).map((k) => ['cargo', k, cargoWords(k).name, cfg.cargo === k]));
       row('Options', [['unbreakable', 1, 'UNBREAKABLE CARGO', cfg.unbreakable], ['traffic', 1, 'TRAFFIC', cfg.traffic], ['slowmo', 1, 'SLOW-MO 0.5×', cfg.slowmo], ['overlay', 1, 'PHYSICS OVERLAY', cfg.overlay]]);
       this.show('free', focus);
     }
@@ -4924,7 +5098,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     pause() {
       if (this.state !== 'riding') return;
       this.state = 'paused'; this.audio.update(null, false); this.audio.setMusic(null);
-      document.getElementById('pause-line').textContent = this.mode === 'drill' ? 'Pat from HR is timing this pause.' : this.world.cargo.kind === 'cake' ? 'The cake is sweating. And judgmental.' : this.world.cargo.kind === 'bouquet' ? 'The petals are holding on. Barely. And judgmental.' : 'The latte is getting cold. And judgmental.';
+      document.getElementById('pause-line').textContent = this.mode === 'drill' ? 'Pat from HR is timing this pause.' : cargoView(this.world.cargo.kind).pauseLine;
       document.getElementById('pause-restart').textContent = { drill: 'RESTART DRILL', free: 'RESTART RIDE' }[this.mode] || 'RESTART DELIVERY';
       this.syncMute();
       this.show('pause');
@@ -4934,7 +5108,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     showReview() {
       if (this.state === 'review' || !this.world) return;
       this.state = 'review'; this.audio.update(null, false); this.audio.setMusic(null);
-      const W = this.world, C = W.course, cu = C.customer, r = W.result(), cake = r.kind === 'cake', $ = (id) => document.getElementById(id);
+      const W = this.world, C = W.course, cu = C.customer, r = W.result(), $ = (id) => document.getElementById(id);
       const mode = this.mode, w = writesFor(mode), drill = mode === 'drill' ? DRILLS.find((D) => D.id === C.id) : null;
       const rv = reviewFor(reviewsFor(r.kind), r.condition);
       if (mode === 'shift') this.results[this.deliveryIndex] = r;
@@ -4949,7 +5123,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (drill) { this.starsHtml($('rv-stars'), stamp, 3, 'Stamp: ' + STAMPS[stamp]); $('rv-quote').textContent = PAT_VERDICTS[stamp]; }
       else { this.starsHtml($('rv-stars'), rv.stars, 5, rv.stars + ' out of 5 stars'); $('rv-quote').textContent = rv.text; }
       $('rv-cond-label').textContent = cargoWords(r.kind).condition;
-      $('rv-cond').textContent = Math.round(r.condition) + '%' + (cake && r.decorLeft !== null ? ' · ' + r.decorLeft + '/' + CAKE_DECOR.length + ' decor' : '');
+      $('rv-cond').textContent = Math.round(r.condition) + '%' + cargoView(r.kind).condNote(r);
       $('rv-time-label').textContent = drill ? 'Drill time' : mode === 'free' ? 'Ride time' : 'Delivery time';
       $('rv-time').textContent = fmtTime(r.time);
       $('rv-near').textContent = String(r.nearMisses);
@@ -4995,7 +5169,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const ts = drill ? null : troubleSpot(C, r.log), tbox = $('rv-trouble');
       this.trouble = ts ? { route: C.id, cp: ts.cp, cargo: r.kind, traffic: true, unbreakable: false, slowmo: false } : null;
       tbox.hidden = !ts;
-      if (ts) $('rv-trouble-text').textContent = 'Most trouble: ' + ts.label + ' · ' + (ts.crashes ? ts.crashes + (ts.crashes === 1 ? ' crash, ' : ' crashes, ') : '') + '−' + Math.round(ts.lost) + (cake ? '% cake' : '% latte');
+      if (ts) $('rv-trouble-text').textContent = 'Most trouble: ' + ts.label + ' · ' + (ts.crashes ? ts.crashes + (ts.crashes === 1 ? ' crash, ' : ' crashes, ') : '') + '−' + Math.round(ts.lost) + cargoWords(r.kind).unit;
       const next = $('rv-next'), again = $('rv-again'), alt = $('rv-alt');
       const set = (b, act, text) => { b.dataset.act = act; (b === next ? $('rv-next-label') : b).textContent = text; };
       if (mode === 'shift') { const last = this.lastDelivery; set(next, last ? 'final' : 'next', last ? 'PERFORMANCE REVIEW' : 'NEXT DELIVERY'); set(again, 'again', 'RIDE AGAIN'); set(alt, 'title', 'TITLE'); }
@@ -5080,7 +5254,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     skipShift() {
       this.pendingShift = null;
-      this.lockShiftForm('Not saved.');
+      this.lockShiftForm('');
       this.renderBoard('Shift not saved to the high scores.');
     }
     handleKeys() {
@@ -5088,6 +5262,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const a of this.input.takeActions()) {
         if (a === 'mute') { this.toggleMute(); continue; }
         if (this.state !== 'riding' && this.state !== 'delivered') { // menus: move focus, or press the focused button
+          const slider = document.activeElement && document.activeElement.matches && document.activeElement.matches('input[type="range"]') ? document.activeElement : null;
+          if (slider && (a === 'navLeft' || a === 'navRight' || a === 'leanBack' || a === 'leanFwd')) { this.nudgeSlider(slider, a === 'navRight' || a === 'leanFwd' ? 1 : -1); continue; }
+          if (slider && (a === 'confirm' || a === 'jump')) continue; // confirming a slider must not start a ride or resume
           if (NAV[a]) { this.menuFocus(NAV[a]); continue; }
           const btn = a === 'confirm' && this.focusedButton();
           if (btn) { btn.click(); continue; }
@@ -5173,12 +5350,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         while (this.steamAcc > 0.07) { this.steamAcc -= 0.07; const p = b.localToWorld(-0.45, 0.75, this.anchor); this.particles.spawn(PK.PUFF, p.x, p.y, -b.vx * 0.15 - 0.4, 0.2, 0.7, 0.06, ''); }
       }
       if (this.state === 'delivered') {
-        const prev = this.deliveredT, cake = W.cargo.kind === 'cake';
+        const prev = this.deliveredT, arrive = cargoView(W.cargo.kind).arrival;
         this.deliveredT += dt;
-        if (!cake && prev < 0.8 && this.deliveredT >= 0.8) { this.audio.play('bell'); this.bellT = 0.6; }
-        if (cake && W.cargo.amount >= 30 && prev < 0.35 && this.deliveredT >= 0.35) this.audio.play('bride');
+        if (arrive.bell && prev < 0.8 && this.deliveredT >= 0.8) { this.audio.play('bell'); this.bellT = 0.6; }
+        if (arrive.bride && W.cargo.amount >= 30 && prev < 0.35 && this.deliveredT >= 0.35) this.audio.play('bride');
         if (prev < 1.25 && this.deliveredT >= 1.25) this.say('DELIVERY_COMPLETE');
-        if (this.deliveredT > (this.autopilotName ? 2.8 : cake ? 4.4 : 3.9)) this.showReview();
+        if (this.deliveredT > (this.autopilotName ? 2.8 : arrive.reviewAfter)) this.showReview();
       }
       if (this.bellT > 0) this.bellT -= dt;
     }
@@ -5245,21 +5422,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
     }
     pop(text, kind, life = 1.6) { this.fx.pops.push({ text, kind, t: 0, life }); if (this.fx.pops.length > 4) this.fx.pops.shift(); }
-    spawnCargoBits(n, burst) {
-      const W = this.world, b = W.bike, P = this.particles, cake = W.cargo.kind === 'cake';
-      const rim = cake ? b.localToWorld(CAKE.mountX, 0.45, { x: 0, y: 0 }) : b.localToWorld(CARGO.mountX + 0.02, 0.3, { x: 0, y: 0 });
-      const dir = cake ? (W.cargo.angle > 0 ? -1 : 1) : W.cargo.lastSpillDir, ca = Math.cos(b.a), sa = Math.sin(b.a);
-      for (let i = 0; i < n; i++) {
-        const out = burst ? (Math.random() - 0.5) * 2.4 : dir * (0.8 + Math.random() * 1.6);
-        const up = 1.2 + Math.random() * (burst ? 3 : 1.8);
-        const vx = b.vx * 0.9 + out * ca - up * sa, vy = b.vy * 0.9 + out * sa + up * ca;
-        if (cake) {
-          const p = P.spawn(PK.DROP, rim.x + (Math.random() - 0.5) * 0.2, rim.y, vx, vy, 1.6, 0.025 + Math.random() * 0.025, i % 3 ? '#fbf3e6' : '#f3a7b8');
-          p.stain = i % 3 ? 'rgba(251,243,230,0.85)' : 'rgba(243,167,184,0.8)';
-        } else if (i % 4 === 3) P.spawn(PK.FOAM, rim.x, rim.y, vx, vy, 1.4, 0.035, COL.foam);
-        else P.spawn(PK.DROP, rim.x + (Math.random() - 0.5) * 0.12, rim.y, vx, vy, 1.6, 0.022 + Math.random() * 0.02, i % 2 ? '#7a4a2e' : '#8f5a38');
-      }
-    }
+    spawnCargoBits(n, burst) { cargoView(this.world.cargo.kind).bits(this, n, burst); }
     dropDecor(e) {
       const W = this.world, b = W.bike, d = e.decor;
       const p0 = W.state === 'crashed' && W.cup.on ? { x: W.cup.x, y: W.cup.y } : b.localToWorld(CAKE.mountX + d.x, 0.1 + d.tier * 0.17, { x: 0, y: 0 });
@@ -5268,7 +5431,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.audio.play('decor');
     }
     onEvent(e) {
-      const A = this.audio, P = this.particles, W = this.world, cake = W.cargo.kind === 'cake', unit = cargoWords(W.cargo.kind).unit;
+      const A = this.audio, P = this.particles, W = this.world, view = cargoView(W.cargo.kind), unit = cargoWords(W.cargo.kind).unit;
       switch (e.type) {
         case 'HOP':
           A.play('hop');
@@ -5284,16 +5447,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           }
           break;
         }
-        case 'SPLASH': A.play(cake ? 'wobble' : 'splash'); this.spawnCargoBits(Math.min(22, 5 + Math.round(e.amount * 2.5)), true); break;
+        case 'SPLASH': A.play(view.splashSound); this.spawnCargoBits(Math.min(22, 5 + Math.round(e.amount * 2.5)), true); break;
         case 'SPILL':
-          if (!cake) { A.play('slosh'); this.spawnCargoBits(Math.min(9, 2 + Math.round(e.amount * 4)), false); }
-          else if (Math.random() < 0.5) this.spawnCargoBits(2, false);
+          view.onSpill(this, e);
           break;
         case 'SPILL_EPISODE': { // bigger losses say what caused them
           const named = e.total >= 2 && SPILL_CAUSES[e.cause];
           this.pop('-' + Math.round(e.total) + unit + (named ? ' · ' + named : ''), 'bad', named ? 2.6 : 1.6);
         }
-          if (!cake && e.total >= 3) this.say('COFFEE_SPILL'); break;
+          if (view.spillLine && e.total >= 3) this.say('COFFEE_SPILL'); break;
         case 'STRAP': A.play('wobble'); this.cam.shake(0.12); break;
         case 'CAKE_DECOR': this.dropDecor(e); if (!e.crash) this.say('CAKE_DECOR'); break;
         case 'CAKE_GROOM': this.dropDecor(e); this.say('CAKE_GROOM'); break;
@@ -5357,7 +5519,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'HINT': if (!this.autopilot) this.fx.hint = { text: e.text, keys: controlKeys(e.actions, this.input.device), id: e.id, t: 0 }; break;
         case 'DELIVERED': {
           this.state = 'delivered'; this.deliveredT = 0; this.fx.stamp = 0; A.setMusic(null);
-          if (e.condition < 30) A.play('trombone'); else if (!cake) A.play('success');
+          if (e.condition < 30) A.play('trombone'); else if (view.arrival.success) A.play('success');
           this.announce('Delivered! ' + cargoWords(W.cargo.kind).noun + ' ' + Math.round(e.condition) + ' percent.');
           const b = W.bike, cols = ['#e8604c', '#f2b134', '#2c7a7b', '#9fd3f0', '#fff6e5', '#f39bb0'];
           for (let i = 0; i < 70; i++) P.spawn(PK.CONFETTI, b.x + (Math.random() - 0.5) * 3, b.y + 2 + Math.random(), (Math.random() - 0.5) * 7, 3 + Math.random() * 6, 2.4 + (i % 3) * 0.1, 0.07, cols[i % cols.length]);
@@ -5600,7 +5762,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.restore();
     }
     drawHud(W) {
-      const R = this.R, ctx = R.ctx, Wd = R.W, u = clamp(Math.min(Wd, R.H) / 46, 11, 18), pad = u * 0.9, C = W.course, cake = W.cargo.kind === 'cake';
+      const R = this.R, ctx = R.ctx, Wd = R.W, u = clamp(Math.min(Wd, R.H) / 46, 11, 18), pad = u * 0.9, C = W.course;
       const panel = (x, y, w, h) => { ctx.fillStyle = 'rgba(255,246,229,0.93)'; rrect(ctx, x, y, w, h, u * 0.7); ctx.fill(); ctx.strokeStyle = 'rgba(45,42,50,0.85)'; ctx.lineWidth = 2; ctx.stroke(); };
       ctx.textBaseline = 'middle';
       ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_DISPLAY;
@@ -5627,15 +5789,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.beginPath(); ctx.moveTo(bx + bw + u * 0.42, by - u * 0.55); ctx.lineTo(bx + bw + u * 1.2, by - u * 0.3); ctx.lineTo(bx + bw + u * 0.42, by - u * 0.05); ctx.fill();
       ctx.textAlign = 'center'; ctx.font = '800 ' + (u * 0.8).toFixed(1) + 'px ' + FONT_BODY;
       const left = Math.max(0, Math.round(endX - W.bike.x));
-      const label = left + (C.loop ? ' m to the bottom' : this.mode === 'drill' ? ' m to the Academy' : C.id === 'russianHill' ? ' m to the wedding' : C.cargo === 'bouquet' ? ' m to the bouquet drop' : ' m to the latte drop');
+      const RD = ROUTE_DATA[C.id], label = left + (C.loop ? ' m to the bottom' : this.mode === 'drill' ? ' m to the Academy' : RD && RD.dropLabel ? RD.dropLabel : cargoView(C.cargo).dropLabel);
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,246,229,0.9)'; ctx.strokeText(label, Wd / 2, by + u * 1.45);
       ctx.fillStyle = 'rgba(45,42,50,0.9)'; ctx.fillText(label, Wd / 2, by + u * 1.45);
       const rw = u * 9.2, rx = Wd - pad - rw;
       panel(rx, pad, rw, u * 3.6);
       const cond = W.cargo.amount;
-      if (cake) this.drawCakeIcon(ctx, rx + u * 1.5, pad + u * 0.5, u * 2.6, cond / 100);
-      else if (W.cargo.kind === 'bouquet') this.drawBouquetIcon(ctx, rx + u * 1.5, pad + u * 0.55, u * 2.4, cond / 100);
-      else this.drawCupIcon(ctx, rx + u * 1.5, pad + u * 0.55, u * 2.4, cond / 100);
+      cargoView(W.cargo.kind).hudIcon(this, ctx, rx + u * 1.5, pad, u, cond / 100);
       ctx.textAlign = 'left'; ctx.fillStyle = cond < 30 ? COL.coral : COL.ink;
       ctx.font = '900 ' + (u * 1.45).toFixed(1) + 'px ' + FONT_DISPLAY;
       ctx.fillText(Math.round(cond) + '%', rx + u * 3.0, pad + u * 1.2);
@@ -5769,13 +5929,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     // Free Ride physics overlay: speed, air and a slosh (or wobble) meter under the HUD, and where an airborne bike will land.
     drawOverlay(W, u) {
-      const R = this.R, ctx = R.ctx, b = W.bike, c = W.cargo, cake = c.kind === 'cake', x = this.input.touchMode ? u * 5.2 : u * 0.9, y = u * 5.0, w = u * 13.5, h = u * 3.4;
-      const bouquet = c.kind === 'bouquet', sp = Math.hypot(b.vx, b.vy);
-      const slosh = cake ? Math.abs(c.angle) / CAKE.maxAngle : bouquet ? (100 - c.amount) / 100 : Math.abs(c.slosh) / Math.max(0.05, c.thr);
+      const R = this.R, ctx = R.ctx, b = W.bike, c = W.cargo, x = this.input.touchMode ? u * 5.2 : u * 0.9, y = u * 5.0, w = u * 13.5, h = u * 3.4;
+      const sp = Math.hypot(b.vx, b.vy), meter = cargoView(c.kind).meter(c), slosh = meter.value;
       ctx.fillStyle = 'rgba(45,42,50,0.82)'; rrect(ctx, x, y, w, h, u * 0.6); ctx.fill();
       ctx.fillStyle = COL.cream; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '800 ' + (u * 0.78).toFixed(1) + 'px ' + FONT_MONO;
       ctx.fillText('SPEED ' + sp.toFixed(1) + ' m/s · AIR ' + (b.grounded ? '0.00' : b.airTime.toFixed(2)) + ' s', x + u * 0.6, y + u * 0.8);
-      ctx.fillText((cake ? 'WOBBLE ' : bouquet ? 'PETALS LOST ' : 'SLOSH ') + Math.round(slosh * 100) + '%', x + u * 0.6, y + u * 1.75);
+      ctx.fillText(meter.label + Math.round(slosh * 100) + '%', x + u * 0.6, y + u * 1.75);
       ctx.fillStyle = 'rgba(255,246,229,0.25)'; rrect(ctx, x + u * 0.6, y + u * 2.35, w - u * 1.2, u * 0.5, u * 0.25); ctx.fill();
       ctx.fillStyle = slosh > 1 ? COL.coral : slosh > 0.7 ? COL.mustard : '#9fe0a8'; rrect(ctx, x + u * 0.6, y + u * 2.35, (w - u * 1.2) * clamp(slosh, 0, 1), u * 0.5, u * 0.25); ctx.fill();
       if (b.grounded || W.state !== 'riding') return;
@@ -5792,9 +5951,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         'x ' + b.x.toFixed(1) + '  v ' + Math.hypot(b.vx, b.vy).toFixed(2) + ' m/s  slope ' + (Math.atan(W.terrain.slope(b.x)) * 57.3).toFixed(1) + '°',
         'pitch ' + (b.a * 57.3).toFixed(1) + '°  w ' + b.w.toFixed(2) + '  air ' + b.airTime.toFixed(2),
         'contact R/F ' + (b.wheels[0].contact ? 1 : 0) + '/' + (b.wheels[1].contact ? 1 : 0) + '  comp ' + b.wheels[0].comp.toFixed(3) + '/' + b.wheels[1].comp.toFixed(3),
-        c.kind === 'cake' ? 'cake angle ' + c.angle.toFixed(2) + '  w ' + c.angVel.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  integrity ' + c.amount.toFixed(1) + '%'
-          : c.kind === 'bouquet' ? 'petals ' + c.amount.toFixed(1) + '%  spilling ' + c.spilling.toFixed(2)
-          : 'slosh ' + c.slosh.toFixed(2) + '  thr ' + c.thr.toFixed(2) + '  g ' + c.gMag.toFixed(2) + '  latte ' + c.amount.toFixed(1) + '%',
+        cargoView(c.kind).debug(c),
       ];
       ctx.font = '600 12px ' + FONT_MONO; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(8, this.R.H - 18 * lines.length - 16, 430, 18 * lines.length + 8);
