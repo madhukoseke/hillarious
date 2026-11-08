@@ -2259,6 +2259,21 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'russianHill', build: buildRussianHill, requires: 'nobHill' },
     { id: 'telegraph', build: buildTelegraphHill, requires: 'russianHill' },
   ];
+  // Neighbourhood themes (TD-12): how each course.theme looks behind the street. A theme names its far skyline and
+  // mid ridge layers and sets the horizon, water, hills, parallax, and moving extras. A new neighbourhood or planet
+  // adds an entry here (and a far-layer builder if it needs a new skyline) instead of branching in the renderer.
+  const MID_LAYERS = {
+    nob: { seed: 21, phase: 0, fill: '#c9c2b0', towers: true, trees: 0.1 },
+    russian: { seed: 33, phase: 2.1, fill: '#bcc7a8', towers: false, trees: 0.22 },
+  };
+  const NOB_THEME = { far: 'nob', mid: 'nob', horizon: 0.6, water: '#86b9d6', hills: true, farParallax: 0.12, farDrop: 0.05, sailboats: false, ridgeCableCar: true };
+  const THEMES = {
+    nob: NOB_THEME,
+    russian: { far: 'russian', mid: 'russian', horizon: 0.56, water: '#7fb3d3', hills: false, farParallax: 0.06, farDrop: 0.02, sailboats: true, ridgeCableCar: false },
+    telegraph: { ...NOB_THEME }, // Telegraph Hill looks east over downtown, like Nob Hill, for now
+  };
+  function themeFor(id) { return THEMES[id] || NOB_THEME; }
+
   // Dispatch-board teasers for deliveries that aren't built yet. Empty now that every route is built.
   const COMING_SOON = [];
   // Three optional goals per delivery. Each reads only World.result(); meeting all three masters the route.
@@ -2935,7 +2950,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
-    ROUTES, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
+    ROUTES, THEMES, MID_LAYERS, themeFor, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
     newlyUnlocked, writesFor, applyRun, cpLabel, troubleSpot, buildTestHill, buildDrillBrake, buildDrillHop, buildDrillLip,
     buildDrillStairs, buildDrillCable, buildDrillExam, cargoWords,
   };
@@ -4309,7 +4324,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const H = Math.round(Math.max(120, this.H * 0.46));
       this.far = { nob: this.farNob(H), russian: this.farRussian(H) };
       const Hm = Math.round(Math.max(110, this.H * 0.5));
-      this.mid = { nob: this.midLayer(Hm, 'nob'), russian: this.midLayer(Hm, 'russian') };
+      this.mid = Object.fromEntries(Object.entries(MID_LAYERS).map(([k, spec]) => [k, this.midLayer(Hm, spec)]));
     }
     farNob(H) { // downtown skyline in front of the East Bay hills
       const W = 1800, c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -4365,15 +4380,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (let x = 2280; x < 2600; x += 14 + rng() * 10) { g.fillStyle = PASTELS[(rng() * PASTELS.length) | 0]; const h = 8 + rng() * 10; g.fillRect(x, B - h - H * 0.02 * Math.sin((x - 2240) / 120), 12, h + 6); }
       return c;
     }
-    midLayer(Hm, theme) { // a nearer ridge of rooftops, hazed back
+    midLayer(Hm, spec) { // a nearer ridge of rooftops, hazed back
       const W = 2400, c = document.createElement('canvas'); c.width = W; c.height = Hm;
-      const g = c.getContext('2d'), rng = mulberry32(theme === 'nob' ? 21 : 33), ph = theme === 'nob' ? 0 : 2.1;
+      const g = c.getContext('2d'), rng = mulberry32(spec.seed), ph = spec.phase;
       const prof = (x) => Hm * (0.4 + 0.15 * Math.sin(x * TAU / 2400 * 2 + ph) + 0.07 * Math.sin(x * TAU / 2400 * 5 + 1));
-      g.fillStyle = theme === 'nob' ? '#c9c2b0' : '#bcc7a8'; g.beginPath(); g.moveTo(0, Hm);
+      g.fillStyle = spec.fill; g.beginPath(); g.moveTo(0, Hm);
       for (let x = 0; x <= W; x += 20) g.lineTo(x, Hm - prof(x)); g.lineTo(W, Hm); g.closePath(); g.fill();
       for (let x = 0; x < W;) {
-        const w = 13 + rng() * 9, tall = theme === 'nob' && rng() < 0.12, h = tall ? 40 + rng() * 26 : 13 + rng() * 11, y = Hm - Math.max(prof(x), prof(x + w));
-        if (rng() < (theme === 'nob' ? 0.1 : 0.22)) { g.fillStyle = rng() < 0.5 ? '#86a374' : '#7a9a6a'; g.beginPath(); g.arc(x + w / 2, y - 7, 8, 0, TAU); g.fill(); x += w; continue; }
+        const w = 13 + rng() * 9, tall = spec.towers && rng() < 0.12, h = tall ? 40 + rng() * 26 : 13 + rng() * 11, y = Hm - Math.max(prof(x), prof(x + w));
+        if (rng() < spec.trees) { g.fillStyle = rng() < 0.5 ? '#86a374' : '#7a9a6a'; g.beginPath(); g.arc(x + w / 2, y - 7, 8, 0, TAU); g.fill(); x += w; continue; }
         g.fillStyle = tall ? '#d8d3c6' : PASTELS[(rng() * PASTELS.length) | 0]; g.fillRect(x, y - h, w, h + 30);
         if (!tall && rng() < 0.5) { g.beginPath(); g.moveTo(x - 1, y - h); g.lineTo(x + w / 2, y - h - 6); g.lineTo(x + w + 1, y - h); g.fill(); }
         g.fillStyle = 'rgba(80,96,110,0.45)';
@@ -4394,7 +4409,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     ensureScenery(course) { if (this.sceneryFor !== course) { this.scenery = buildScenery(course); this.sceneryFor = course; } }
     drawBackdrop(cam, time, theme) {
-      const ctx = this.ctx, W = this.W, H = this.H, bay = theme === 'russian';
+      const ctx = this.ctx, W = this.W, H = this.H, T = themeFor(theme);
       const sky = ctx.createLinearGradient(0, 0, 0, H);
       sky.addColorStop(0, '#86c5ea'); sky.addColorStop(0.55, '#bfe0ef'); sky.addColorStop(1, '#fbe3bf');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
@@ -4406,19 +4421,19 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         const span = W + 400, cx = (((i * 380 - cam.x * 2 - time * 6) % span) + span) % span - 200, cy = H * (0.1 + (i % 3) * 0.07);
         for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.ellipse(cx + k * 28, cy + Math.sin(k * 2) * 6, 34 - k * 3, 16, 0, 0, TAU); ctx.fill(); }
       }
-      const horizon = H * (bay ? 0.56 : 0.6) + clamp(cam.y * this.S * 0.025, -H * 0.1, H * 0.2);
-      ctx.fillStyle = bay ? '#7fb3d3' : '#86b9d6'; ctx.fillRect(0, horizon - H * 0.03, W, H);
-      if (!bay) {
+      const horizon = H * T.horizon + clamp(cam.y * this.S * 0.025, -H * 0.1, H * 0.2);
+      ctx.fillStyle = T.water; ctx.fillRect(0, horizon - H * 0.03, W, H);
+      if (T.hills) {
         ctx.fillStyle = '#a7c39b'; ctx.beginPath(); ctx.moveTo(0, horizon);
         for (let x = 0; x <= W + 40; x += 40) { const wx = x + cam.x * this.S * 0.04; ctx.lineTo(x, horizon - H * 0.06 - Math.sin(wx * 0.004) * H * 0.04 - Math.sin(wx * 0.011) * H * 0.02); }
         ctx.lineTo(W, horizon); ctx.closePath(); ctx.fill();
       }
-      const far = this.far && this.far[bay ? 'russian' : 'nob'];
+      const far = this.far && this.far[T.far];
       if (far) {
-        const off = (((cam.x * this.S * (bay ? 0.06 : 0.12)) % far.width) + far.width) % far.width, y = horizon - far.height + H * (bay ? 0.02 : 0.05);
+        const off = (((cam.x * this.S * T.farParallax) % far.width) + far.width) % far.width, y = horizon - far.height + H * T.farDrop;
         for (let x = -off; x < W; x += far.width) ctx.drawImage(far, x, y);
       }
-      if (bay) { // sailboats drift on the bay
+      if (T.sailboats) { // sailboats drift on the bay
         for (let i = 0; i < 5; i++) {
           const span = W + 200, bx = (((i * 337 + time * (6 + i * 1.5) - cam.x * this.S * 0.08) % span) + span) % span - 100, by = horizon + H * (0.035 + (i % 3) * 0.028), s = 0.7 + (i % 3) * 0.25;
           ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.moveTo(bx, by - 2); ctx.lineTo(bx, by - 26 * s); ctx.lineTo(bx + 14 * s, by - 3); ctx.closePath(); ctx.fill();
@@ -4426,12 +4441,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         }
       }
       ctx.fillStyle = 'rgba(251,227,191,0.25)'; ctx.fillRect(0, horizon - H * 0.12, W, H * 0.2);
-      const mid = this.mid && this.mid[bay ? 'russian' : 'nob'];
+      const mid = this.mid && this.mid[T.mid];
       if (mid) {
         const moff = (((cam.x * this.S * 0.3) % mid.width) + mid.width) % mid.width;
         const my = H - mid.height * 0.92 + clamp(cam.y * this.S * 0.06, -H * 0.18, H * 0.3);
         for (let x = -moff; x < W; x += mid.width) ctx.drawImage(mid, x, my);
-        if (!bay) { // a cable car climbs the far ridge
+        if (T.ridgeCableCar) { // a cable car climbs the far ridge
           const cxC = (time * 16) % mid.width;
           let sx = cxC - moff; if (sx < -60) sx += mid.width;
           if (sx > -60 && sx < W + 60) {
