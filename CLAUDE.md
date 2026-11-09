@@ -15,6 +15,7 @@ A single-file browser game. Everything ships in `index.html`. The engine section
 - Serve: `python3 -m http.server 8765` in this folder, then open http://127.0.0.1:8765/. The Playwright scripts in `tests/playtest/` expect that port.
 - Cross-browser: `tests/playtest/cross-browser.mjs` (setup in its header). Record results in `docs/browser-matrix.md`.
 - Autopilot demo: `?autopilot=typical` (also `careful`, `fast`, `reckless`). Jump to the cake: `?delivery=2`. Open every order and drill: `?unlock=all`.
+- Crash replays: `?replay=off` turns them off; autopilot demos skip them unless `?replay=on`. They re-run the world from `world.inputLog`, so anything that changes a ride must go through `World.step`'s input; never change a world from outside it.
 - Fast browser checks: set `HILL.game.practiceScale = 4` while riding to run the simulation at 4× speed (`tests/playtest/dispatch-training.js` does this).
 
 ## Definition of done for every change

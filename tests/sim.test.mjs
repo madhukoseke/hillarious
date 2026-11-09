@@ -1255,3 +1255,65 @@ test('physics per world: Earth is the default and matches the globals; another p
     assert.ok(m.air > e.air * 2, `low gravity hangs longer: ${m.air.toFixed(2)} s vs ${e.air.toFixed(2)} s`);
   } finally { delete H.PLANETS.testMoon; }
 });
+
+/* ---------------------------- crash replay (F-32) ---------------------------- */
+
+test('replay: inputs pack into one number and back', () => {
+  const all = { pedal: true, brake: false, leanBack: true, leanFwd: false, jumpHeld: true, jumpPressed: true };
+  assert.deepEqual(plain(H.unpackInput(H.packInput(all))), all);
+  assert.equal(H.packInput({}), 0);
+});
+
+// Rides a route with the reckless autopilot and keeps every CRASH event, with the bike as it was at that moment.
+function crashyRide(build, maxT = 90) {
+  const w = new H.World(H[build]()), ap = new H.Autopilot('reckless'), crashes = [];
+  while (w.state !== 'done' && w.t < maxT) {
+    w.step(ap.input(w));
+    for (const e of w.drain()) if (e.type === 'CRASH') crashes.push({ ...e, bike: { x: w.bike.x, y: w.bike.y, a: w.bike.a }, cup: { x: w.cup.x, y: w.cup.y }, amount: w.cargo.amount });
+  }
+  return { w, crashes };
+}
+
+test('replay: re-running the input log reproduces every crash exactly, earlier crashes included', () => {
+  let tested = 0;
+  for (const build of ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill']) {
+    const { w, crashes } = crashyRide(build);
+    assert.equal(w.inputLog.length, Math.round(w.t / H.STEP), 'one input per step');
+    for (const c of crashes) {
+      const rp = new H.CrashReplay(H[build](), w.opts, w.inputLog, c.step);
+      assert.ok(rp.prepare() && rp.from === c.step - Math.round(H.REPLAY.pre / H.STEP), 'fast-forwards to the replay start');
+      assert.equal(rp.world.state, 'riding', 'the replay starts before the crash');
+      while (rp.i < c.step) rp.run(1);
+      assert.equal(rp.world.state, 'crashed', `${build}: the replay crashes on step ${c.step}`);
+      assert.deepEqual({ x: rp.world.bike.x, y: rp.world.bike.y, a: rp.world.bike.a }, c.bike, 'the bike is exactly where it crashed');
+      assert.deepEqual({ x: rp.world.cup.x, y: rp.world.cup.y }, c.cup, 'and so is the flying cargo');
+      assert.equal(rp.world.cargo.amount, c.amount);
+      assert.equal(rp.world.score.crashes, crashes.indexOf(c) + 1, 'earlier crashes and respawns replay too');
+      tested++;
+    }
+  }
+  assert.ok(tested >= 2, `reckless riders crash at least twice across the routes (${tested})`);
+});
+
+test('replay: plays at full speed, slows down and zooms in near the crash, and ends after it', () => {
+  const { w, crashes } = crashyRide('buildNobHill');
+  const c = crashes[0], rp = new H.CrashReplay(H.buildNobHill(), w.opts, w.inputLog, c.step);
+  rp.prepare();
+  assert.equal(rp.rate(), 1); assert.equal(rp.zoomTarget(), 1);
+  let real = 0;
+  while (rp.advance(1 / 60)) { real += 1 / 60; assert.ok(real < 20, 'the replay ends'); }
+  assert.equal(rp.i, c.step + Math.round(H.REPLAY.post / H.STEP), 'it ends a little after the crash');
+  assert.equal(rp.rate(), H.REPLAY.slowRate); assert.equal(rp.zoomTarget(), H.REPLAY.zoom);
+  const expected = (H.REPLAY.pre - H.REPLAY.slowFrom) + (H.REPLAY.slowFrom + H.REPLAY.post) / H.REPLAY.slowRate;
+  assert.ok(Math.abs(real - expected) < 0.1, `about ${expected.toFixed(1)} s long (${real.toFixed(2)} s)`);
+  assert.equal(rp.progress, 1);
+});
+
+test('replay: a crash in the first seconds replays from the start, and never past the end of the log', () => {
+  const w = new H.World(H.buildNobHill());
+  for (let i = 0; i < 30; i++) w.step({});
+  const rp = new H.CrashReplay(H.buildNobHill(), w.opts, w.inputLog, 20);
+  assert.equal(rp.from, 0); assert.ok(rp.prepare());
+  while (rp.advance(1)) {}
+  assert.equal(rp.i, w.inputLog.length, 'stops where the log ends');
+});

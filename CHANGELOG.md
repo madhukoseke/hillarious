@@ -6,6 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ## [Unreleased]
 
 ### Added
+- Crash replays: after a crash, the last couple of seconds play back once, slowing down and zooming in on the moment it went wrong, before you get back on the bike. Press hop (SPACE, HOP, or A) to skip. Replays are off when your device asks for reduced motion, or with `?replay=off`.
 - Style is its own score: each receipt shows the style points you earned (near misses, clean landings, big air) and your best on that route, with NEW BEST when you beat it. Tips still depend only on the delivery.
 
 ### Changed
@@ -28,6 +29,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Port check: `tests/golden/ports.json` records how every course builds and plays, including every cargo on every route and a timed ride on The Test Hill; courses come from `ROUTES` and `DRILLS`. Course data must match exactly and rides within 1e-4, since physics floats can differ between machines. Rewrite it with `node tests/golden/update.mjs` only for an intended gameplay change.
 - One cargo interface: `CARGO_TYPES` (engine) and `CARGO_VIEW` (drawing, sounds, HUD) replace every cargo-type branch. A new cargo adds its class and one entry in each table.
 - Fairness check: `tests/fairness.test.mjs` runs all four riders on every route and drill in `ROUTES` and `DRILLS`.
+- Crash replays re-run the ride from its input log: the world records each step's input (`inputLog`, `packInput`), and `CrashReplay` fast-forwards a fresh world on a fresh copy of the course to just before the crash, then plays it back. Replays are exact because the engine is deterministic. Autopilot demos skip replays unless `?replay=on`. `tests/playtest/crash-replay.mjs` checks them in the browser.
 - Set pieces: every route is a list of pieces (`plateau`, `block`, `stairs`, `crossing`, `gust`, `lip`, `finish` in `PIECES`). Each piece reports its length, grades, difficulty, and hazards; the port check confirms all three routes are unchanged. Telegraph Hill uses two new pieces: `gust`, an exposed block where the wind blows, and `lip`, a raised lip mid-block.
 - Routes as data: Nob Hill, Russian Hill, and Telegraph Hill are `ROUTE_DATA` entries built by `buildRoute`, with positions written as a named mark plus offsets (`"blockB+44"`). The port check confirms they build and play exactly as before.
 

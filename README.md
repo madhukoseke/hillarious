@@ -20,6 +20,7 @@ No installation or account required. Open the link in a modern browser.
 - Courier Academy: six training drills graded by Pat from HR, plus Free Ride from any checkpoint and The Test Hill sandbox
 - Cable cars, traffic, and recognizable SF-inspired scenery
 - Sound effects and a lightweight arcade feel
+- Slow-motion crash replays: see what went wrong, or press hop to skip (off with reduced motion, or add `?replay=off`)
 - Keyboard, touch, and gamepad controls, with on-screen labels that match the device you use
 - A local high-score board with optional X and LinkedIn handles, plus one-click "Share your shift" posts
 - Separate music and effects volume
@@ -55,7 +56,7 @@ The headless simulation and scoring tests need Node.js 22 or later and no other 
 node --test "tests/*.test.mjs"
 ```
 
-They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`. `dispatch-training.js` walks Dispatch, a drill, Free Ride, and The Test Hill from a fresh profile.
+They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`. `dispatch-training.js` walks Dispatch, a drill, Free Ride, and The Test Hill from a fresh profile. `crash-replay.mjs` and `review-cards.mjs` run on a controlled clock and check crash replays and every delivery's review card.
 
 `tests/playtest/cross-browser.mjs` opens Dispatch, Training, and Free Ride, then plays a shift on Chromium, Firefox, and WebKit at desktop and phone sizes. It takes an optional URL argument; setup steps are at the top of the file. Results and the real-device checklist live in [docs/browser-matrix.md](docs/browser-matrix.md).
 

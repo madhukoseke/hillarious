@@ -2629,6 +2629,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.zones = (course.stopZones || []).map((z) => ({ x0: z.x0, x1: z.x1, done: false })); // drill STOP boxes
       this.feats = { bigLipAir: 0, rampCrash: false, gustLoss: 0 }; // goal and drill evidence
       this.runLog = []; this.laps = 0;                // crashes and spills by position, for "Practice this spot"
+      this.inputLog = [];                             // every step's input, packed (packInput), for crash replays (F-32)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
@@ -2680,6 +2681,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     step(inp) {
       const dt = STEP, b = this.bike;
+      this.inputLog.push(packInput(inp));
       this.t += dt;
       if (this.invuln > 0) this.invuln -= dt;
       b.boost = this.boostT > 0 ? 1.6 : 1;
@@ -2839,7 +2841,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.drainCargo();
       this.runLog.push({ kind: 'crash', x: b.x, amount: lost });
       for (const r of this.obstacles.ramps) if (b.x > r.x - 3 && b.x < r.end + 12) this.feats.rampCrash = true; // ramp and its landing
-      this.emit('CRASH', { cause, sev, lost, x: b.x, y: b.y, first: this.score.crashes === 1 });
+      this.emit('CRASH', { cause, sev, lost, x: b.x, y: b.y, first: this.score.crashes === 1, step: this.inputLog.length }); // step: replays end here
     }
     updateBody(o, dt, rad, e) {
       if (!o.on) return;
@@ -2906,6 +2908,43 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.respawn();
       this.emit('SANITY', {});
     }
+  }
+
+  // Crash replay (F-32). The world is deterministic given its inputs, so instead of keeping a buffer of drawn state, a
+  // replay re-runs the ride: a fresh world on a freshly built copy of the course is fast-forwarded through the input
+  // log to a little before the crash, then played on through the crash, at full speed and then in slow motion.
+  // Wipeout clips (F-37) can record the same playback.
+  const REPLAY = { keep: 5, pre: 2.0, post: 0.8, slowFrom: 0.5, slowRate: 0.4, zoom: 1.35 }; // about 4.75 s on screen
+  const INPUT_BITS = ['pedal', 'brake', 'leanBack', 'leanFwd', 'jumpHeld', 'jumpPressed'];
+  function packInput(i) { let n = 0; for (let k = 0; k < INPUT_BITS.length; k++) if (i[INPUT_BITS[k]]) n |= 1 << k; return n; }
+  function unpackInput(n, out = {}) { for (let k = 0; k < INPUT_BITS.length; k++) out[INPUT_BITS[k]] = !!(n & (1 << k)); return out; }
+  class CrashReplay {
+    // course: a fresh build of the same course (worlds change their obstacles). log: the live world's inputLog, which
+    // keeps growing while the crash plays out. crashStep: the CRASH event's step.
+    constructor(course, opts, log, crashStep, tune = REPLAY) {
+      this.world = new World(course, opts); this.log = log; this.tune = tune; this.crashStep = crashStep;
+      this.from = Math.max(0, crashStep - Math.round(Math.min(tune.pre, tune.keep) / STEP));
+      this.to = crashStep + Math.round(tune.post / STEP);
+      this.i = 0; this.inp = {}; this.acc = 0; this.zoom = 1;
+      this.world.drain();
+    }
+    run(n) { const W = this.world; for (; n > 0 && this.i < this.log.length; n--) { W.step(unpackInput(this.log[this.i++], this.inp)); W.events.length = 0; } }
+    // Fast-forward silently, at most `budget` steps; true once the replay can start.
+    prepare(budget = Infinity) { this.run(Math.min(budget, this.from - this.i)); return this.ready; }
+    get ready() { return this.i >= this.from; }
+    get done() { return this.i >= this.to || this.i >= this.log.length; }
+    // Playback speed (world seconds per second) at this point: full speed, then slow motion around the crash.
+    rate() { return (this.crashStep - this.i) * STEP > this.tune.slowFrom ? 1 : this.tune.slowRate; }
+    // How far in the camera is: it pushes in over the slow-motion part.
+    zoomTarget() { return lerp(1, this.tune.zoom, smoothstep(this.tune.slowFrom, 0, (this.crashStep - this.i) * STEP)); }
+    // Plays `dt` seconds of real time; returns false once the replay is over.
+    advance(dt) {
+      this.acc += dt * this.rate();
+      while (this.acc >= STEP && !this.done) { this.run(1); this.acc -= STEP; }
+      return !this.done;
+    }
+    get alpha() { return clamp(this.acc / STEP, 0, 1); }
+    get progress() { return clamp((this.i - this.from) / Math.max(1, this.to - this.from), 0, 1); }
   }
 
   /* =====================================================================
@@ -2996,7 +3035,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, REPLAY, packInput, unpackInput, CrashReplay,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -4831,7 +4870,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.chapter = CHAPTERS.find((c) => c.id === this.params.get('chapter')) || CHAPTERS[0];
       this.shiftRoutes = chapterRoutes(this.chapter);
       this.startIndex = clamp((Number(this.params.get('delivery')) || 1) - 1, 0, this.shiftRoutes.length - 1); // ?delivery=2 jumps straight to the cake, ?delivery=3 to the bouquet
-      this.unlockAll = this.params.get('unlock') === 'all';          // ?unlock=all opens every order and drill (tests, demos)
+      this.unlockAll = this.params.get('unlock') === 'all';
+      this.replayPref = this.params.get('replay'); // ?replay=off turns crash replays off; ?replay=on keeps them in autopilot demos          // ?unlock=all opens every order and drill (tests, demos)
       this.reducedMotion = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
       this.store = new Store();
       this.progress = migrateProgress(this.store.get('progress', null), Object.fromEntries(ROUTES.map((r) => [r.id, cleanBest(this.store.get('best:' + r.id, null))])));
@@ -5020,6 +5060,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.particles.clear(); this.resetFx(); this.timers = []; this.greeted = new Set();
       this.crashOrder = CRASH_LINES.slice();
       this.scarf.ok = false; this.acc = 0; this.slowT = 0; this.timeScale = 1; this.bellT = 0;
+      this.replay = null; this.replaying = false;
       this.practiceScale = spec.mode === 'free' && spec.slowmo ? 0.5 : 1;
       this.freeStats = { bestAir: 0, totalAir: 0 };
       this.autopilot = this.autopilotName ? new Autopilot(this.autopilotName) : null;
@@ -5394,20 +5435,58 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (this.errors++ < 3) console.error(err);
       }
     }
+    // Crash replays (F-32): on by default, off with reduced motion or ?replay=off, and off in autopilot demos unless
+    // ?replay=on, so they stay short.
+    replaysOn() {
+      if (this.replayPref === 'off' || this.reducedMotion) return false;
+      return !this.autopilotName || this.replayPref === 'on';
+    }
+    // The live world waits, one step before it would respawn, while the replay plays.
+    startReplay() {
+      const rp = this.replay;
+      rp.prepare();
+      this.replaying = true; this.replayT = 0; this.replayHit = false;
+      this.particles.clear(); this.scarf.ok = false;
+      const b = rp.world.bike; this.cam.snap(b.x, b.y, b.vx); this.cam.trauma = 0;
+      this.audio.update(null, false);
+      this.announce('Replay. ' + controlKeys(['hop'], this.input.device).join(' or ') + ' skips it.');
+    }
+    endReplay() {
+      this.replaying = false; this.replay = null; this.acc = 0;
+      this.particles.clear(); this.scarf.ok = false; this.cam.zoom = 1;
+      const W = this.world, r = W.rag.on ? W.rag : W.bike; this.cam.snap(r.x, r.y, 0);
+    }
+    updateReplay(dt) {
+      const rp = this.replay, skip = this.input.sample().jumpPressed;
+      this.replayT += dt;
+      if ((skip && this.replayT > 0.25) || !rp.advance(dt)) { this.endReplay(); return; }
+      const W = rp.world, b = W.bike;
+      if (!this.replayHit && W.state === 'crashed') { this.replayHit = true; this.cam.shake(0.6); this.audio.play('crash'); }
+      let fx = lerp(b.px, b.x, rp.alpha), fy = lerp(b.py, b.y, rp.alpha), fvx = b.vx;
+      if (W.state === 'crashed' && W.rag.on) { fx = lerp(fx, W.rag.x, 0.6); fy = lerp(fy, W.rag.y, 0.6); fvx = W.rag.vx * 0.5; }
+      this.cam.update(dt, fx, fy, fvx, Math.hypot(b.vx, b.vy), W.terrain, this.time, this.reducedMotion);
+      rp.zoom += (rp.zoomTarget() - rp.zoom) * (1 - Math.exp(-dt * 4));
+      this.cam.zoom = rp.zoom;
+      this.particles.update(dt * rp.rate(), W.terrain);
+    }
     updateRiding(dt) {
+      if (this.replaying) { this.updateReplay(dt); return; }
       const W = this.world;
+      if (this.replay && !this.replay.ready) this.replay.prepare(1500); // fast-forward a little each frame while the crash plays
       if (this.slowT > 0) { this.slowT -= dt; this.timeScale = this.slowT > 0.3 ? 0.3 : lerp(1, 0.3, clamp(this.slowT / 0.3, 0, 1)); }
       else this.timeScale = 1;
       this.timeScale *= this.practiceScale; // Free Ride slow-mo stacks with the crash slow-mo
       this.acc += dt * this.timeScale;
       let steps = 0;
       while (this.acc >= STEP && steps < MAX_STEPS) {
+        if (this.replay && W.state === 'crashed' && W.crashT + STEP >= CRASH_TIME) { this.startReplay(); break; } // the next step respawns
         W.step(this.autopilot ? this.autopilot.input(W) : this.input.sample());
         this.acc -= STEP; steps++;
       }
       if (steps >= MAX_STEPS) this.acc = 0;
       this.alpha = this.acc / STEP;
       for (const e of W.drain()) this.onEvent(e);
+      if (this.replaying) return; // it just started: the camera is on the replay now
       const b = W.bike;
       let fx = lerp(b.px, b.x, this.alpha), fy = lerp(b.py, b.y, this.alpha), fvx = b.vx;
       if (W.state === 'crashed' && W.rag.on) { fx = lerp(fx, W.rag.x, 0.6); fy = lerp(fy, W.rag.y, 0.6); fvx = W.rag.vx * 0.5; }
@@ -5574,6 +5653,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           break;
         case 'CRASH': {
           this.slowT = 0.75; A.play('crash'); A.duck(1.6); this.cam.shake(0.9);
+          if (this.replaysOn() && e.step) this.replay = new CrashReplay(this.runCourse(this.run), W.opts, W.inputLog, e.step);
           if (!this.crashOrder.length) this.crashOrder = CRASH_LINES.slice();
           this.fx.caption = { text: this.crashOrder.shift(), t: 0 }; this.fx.bubble = null; this.announce(this.fx.caption.text);
           this.spawnCargoBits(24, true);
@@ -5656,19 +5736,37 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.bubbleAt(p.x, p.y, '?!', 'big');
     }
     renderWorld() {
-      const W = this.world;
-      if (!W) return;
-      const R = this.R, ctx = R.ctx;
+      const live = this.world;
+      if (!live) return;
+      const R = this.R, ctx = R.ctx, rp = this.replaying ? this.replay : null, W = rp ? rp.world : live;
       R.S = R.baseS * this.cam.zoom;
-      R.ensureScenery(W.course);
+      R.ensureScenery(live.course); // the replay's course is a copy: same scenery
       this.windX = -2;
-      this.drawWorldScene(W, this.alpha);
+      this.drawWorldScene(W, rp ? rp.alpha : this.alpha);
       R.screenSpace();
       this.drawLabels(W);
-      if (this.state !== 'intro') this.drawHud(W);
-      this.drawFx(W);
+      if (rp) this.drawReplay(rp);
+      else {
+        if (this.state !== 'intro') this.drawHud(W);
+        this.drawFx(W);
+      }
       if (this.state === 'paused' || this.state === 'review') { ctx.fillStyle = 'rgba(45,42,50,0.12)'; ctx.fillRect(0, 0, R.W, R.H); }
       if (this.debug) this.drawDebug(W);
+    }
+    // Letterbox bars, a blinking REPLAY tag, the skip key, and how much is left.
+    drawReplay(rp) {
+      const R = this.R, ctx = R.ctx, w = R.W, h = R.H, bar = Math.round(h * 0.09), u = clamp(Math.min(w, h) / 46, 11, 18);
+      ctx.save();
+      ctx.fillStyle = 'rgba(20,18,24,0.88)'; ctx.fillRect(0, 0, w, bar); ctx.fillRect(0, h - bar, w, bar);
+      ctx.textBaseline = 'middle'; ctx.font = '800 ' + (u * 1.15).toFixed(1) + 'px system-ui, sans-serif';
+      if (Math.floor(this.time * 2.5) % 2 === 0) { ctx.fillStyle = '#e8604c'; ctx.beginPath(); ctx.arc(u * 1.6, bar / 2, u * 0.45, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = '#fff6e5'; ctx.textAlign = 'left'; ctx.fillText('REPLAY', u * 2.6, bar / 2);
+      if (rp.rate() < 1) { ctx.fillStyle = '#f2b134'; ctx.fillText('SLOW-MO', u * 2.6 + ctx.measureText('REPLAY  ').width, bar / 2); }
+      ctx.font = '700 ' + u.toFixed(1) + 'px system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff6e5';
+      ctx.fillText(controlKeys(['hop'], this.input.device).join(' / ') + '  skip', w - u * 1.2, h - bar / 2);
+      ctx.fillStyle = 'rgba(255,246,229,0.25)'; ctx.fillRect(0, h - bar, w, 3);
+      ctx.fillStyle = '#f2b134'; ctx.fillRect(0, h - bar, w * rp.progress, 3);
+      ctx.restore();
     }
     drawWorldScene(W, alpha) {
       const R = this.R, ctx = R.ctx, cam = this.cam, t = this.time, O = W.obstacles;
