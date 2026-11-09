@@ -1,4 +1,4 @@
-// Fairness check (F-29): all four autopilot riders on every route and drill the game lists, so new content is covered
+// Fairness check (F-29): all four autopilot riders on every route and drill the game lists, and on generated routes, so new content is covered
 // without editing this file. It fails if a rider cannot finish, if any ride silently respawns, if the careful or
 // typical rider crashes, or if the typical rider's time falls outside the band around par.
 import test from 'node:test';
@@ -16,7 +16,18 @@ function ride(build, profile) {
   return { w, r: w.result(), sanity: seen.has('SANITY') };
 }
 
-const content = [...H.ROUTES.map((R) => ({ id: R.id, build: R.build })), ...H.DRILLS.map((D) => ({ id: D.id, build: D.build }))];
+// Generated routes (F-33): every seed must be fair, with every cargo. Each push rides seeds 1–5, which between them use
+// every segment; FAIRNESS_SEEDS=2000 rides seeds 1–2000 (FAIRNESS_FROM moves the start, to split the run).
+const GEN_FROM = Number(process.env.FAIRNESS_FROM) || 1, GEN_COUNT = Number(process.env.FAIRNESS_SEEDS) || 5;
+const GEN_SEEDS = Array.from({ length: GEN_COUNT }, (_, i) => GEN_FROM + i);
+const generated = GEN_SEEDS.flatMap((seed) => ['coffee', 'cake', 'bouquet'].map((cargo) => ({ id: `gen-${seed}-${cargo}`, build: () => H.buildGenerated(seed, { cargo }) })));
+const content = [...H.ROUTES.map((R) => ({ id: R.id, build: R.build })), ...H.DRILLS.map((D) => ({ id: D.id, build: D.build })), ...generated];
+
+test('fairness: the generated seeds ridden on every push use every segment', () => {
+  if (GEN_FROM !== 1 || GEN_COUNT < 5) return;
+  const used = new Set(GEN_SEEDS.flatMap((s) => H.planRoute(s).segments.map((g) => g.id)));
+  assert.equal([...used].sort().join(','), [...H.GEN_SEGMENTS.map((g) => g.id)].sort().join(','));
+});
 
 test('fairness: the check covers every route and drill the game lists', () => {
   assert.ok(H.ROUTES.length >= 3 && H.DRILLS.length >= 6, `${H.ROUTES.length} routes, ${H.DRILLS.length} drills`);
