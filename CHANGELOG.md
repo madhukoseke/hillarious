@@ -5,9 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- Daily Dispatch: a new route every day, the same for everyone, at the top of the Dispatch board once you've delivered your first order. Each day brings its own cargo and a twist (Classic, Short haul, or Calm day). You get one scored ride a day, and it counts from the moment you set off, so a restart turns it into practice. Practice is unlimited and saves nothing. Riding on consecutive days builds a 🔥 streak.
+
+### Fixed
+- The sign over Telegraph Hill's finish said "Lombard Gardens · wedding today · cake entrance"; it now says Telegraph Blooms, flower drop-off.
+
 ### Developer
 - Route generator, the groundwork for Daily Dispatch: `generateRoute(seed, rules)` lays out a route from 5–7 hand-made segments taken from the three hand-written routes, using only the seed and integer choices, so every browser builds the same route. Difficulty never falls along the route, there is at most one difficulty-5 segment and never two blind hazards in a row, and par (35–50 s) comes from each segment's measured design time. Not in the game yet.
-- Fairness: every push rides generated seeds 1–5 with every cargo and all four riders; a nightly workflow rides seeds 1–2000 (`FAIRNESS_SEEDS`, `FAIRNESS_FROM`).
+- Fairness: every push rides generated seeds 1–5 with every cargo and all four riders, plus the first 7 daily routes; a nightly workflow rides seeds 1–2000 and the first 2,000 days (`FAIRNESS_SEEDS`, `FAIRNESS_FROM`, `FAIRNESS_DAYS`, `FAIRNESS_DAY_FROM`).
+- Daily records: `hillarious:daily` `{ v, date, seed, result }` and `hillarious:streak` `{ v, count, best, last }`; corrupt records are ignored. `?daily=YYYY-MM-DD` plays another day. `tests/playtest/daily.mjs` checks the flow in the browser, and `cross-browser.mjs` checks that every engine builds the same daily route.
 
 ## [1.5.0] - 2026-11-08
 

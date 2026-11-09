@@ -233,6 +233,8 @@ blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
 .order-tag { font: 900 11px var(--mono); letter-spacing: 0.1em; padding: 3px 8px; border-radius: 6px; border: 2px solid var(--ink); background: var(--cream); white-space: nowrap; }
 .order[data-state="new"] .order-tag { background: var(--coral); color: var(--cream); }
 .order[data-state="mastered"] .order-tag { background: var(--mustard); }
+.order-streak { font: 800 13px var(--mono); color: var(--coral); white-space: nowrap; }
+.order.daily { border-color: var(--coral); }
 .order[data-state="locked"], .order.soon { background: #ece6da; border-style: dashed; }
 .order[data-state="locked"] canvas, .order.soon canvas { filter: grayscale(1); opacity: 0.45; }
 .order[data-state="locked"] .order-top b, .order.soon .order-top b { color: var(--ink-soft); }
@@ -1171,13 +1173,85 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         name: 'Dispatch', role: 'Hillarious Couriers', avatar: 'founder', brand: 'HILLARIOUS DISPATCH',
         order: 'DAILY ORDER #' + plan.seed, route: segs.length + ' blocks from ' + plan.start + ' to the drop',
         messages: ["Today's route. Same hills for everyone. Don't make it weird."],
-        cargoNote: 'Cargo: one ' + cargoWords(cargo).noun + '.', cargoLabel: 'Condition',
+        cargoNote: 'Cargo: one ' + cargoWords(cargo).noun.toLowerCase() + '.', cargoLabel: 'Condition',
       },
       plan: segs.map((g) => ({ id: g.id, difficulty: g.difficulty, blind: !!g.blind, time: g.time, mark: g.mark })),
       length: true,
     };
   }
   function buildGenerated(seed, rules) { return buildRoute('gen-' + (seed >>> 0), generateRoute(seed, rules)); }
+
+  // Daily Dispatch (F-34). Everyone gets the same route on the same local date: the date gives the seed, and the seed
+  // gives the route, the cargo, and one remix (a generator rule). The daily number counts days from DAILY_EPOCH.
+  const DAILY_EPOCH = '2026-11-09'; // HILLARIOUS #1
+  const DAILY_REMIXES = [
+    { id: 'classic', name: 'Classic', note: 'The usual chaos.', rules: {} },
+    { id: 'short', name: 'Short haul', note: 'Five blocks. No excuses.', rules: { min: 5, max: 5 } },
+    { id: 'calm', name: 'Calm day', note: 'No gusts, no cable cars.', rules: { exclude: ['gust', 'cablecar'] } },
+  ];
+  const DAILY_CARGOS = ['coffee', 'cake', 'bouquet'];
+  const DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function dateKey(d) { const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+  // Whole days since 1970 for a date key (no time zones: the key is already the player's local date), or NaN.
+  function dayIndex(key) {
+    const m = DATE_KEY.exec(typeof key === 'string' ? key : '');
+    if (!m) return NaN;
+    const t = Date.UTC(+m[1], +m[2] - 1, +m[3]), d = new Date(t);
+    return d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? Math.round(t / 86400000) : NaN;
+  }
+  function keyForDay(n) { return new Date(n * 86400000).toISOString().slice(0, 10); }
+  const validDateKey = (key) => Number.isFinite(dayIndex(key));
+  const dailyNumber = (key) => dayIndex(key) - dayIndex(DAILY_EPOCH) + 1;
+  // FNV-1a over the date: integer maths only, so every engine agrees.
+  function dailySeed(key) { let h = 0x811c9dc5; for (const ch of 'hillarious:' + key) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0; return h >>> 0; }
+  function dailySpec(key) {
+    if (!validDateKey(key)) throw new Error('daily: bad date "' + key + '"');
+    const seed = dailySeed(key), rng = mulberry32(seed ^ 0x5bd1e995), pick = (a) => a[Math.floor(rng() * a.length)];
+    const cargo = pick(DAILY_CARGOS), remix = pick(DAILY_REMIXES);
+    return { date: key, number: dailyNumber(key), seed, cargo, remix: remix.id };
+  }
+  function dailyRoute(key) {
+    const spec = dailySpec(key), remix = DAILY_REMIXES.find((x) => x.id === spec.remix), R = generateRoute(spec.seed, { cargo: spec.cargo, ...remix.rules });
+    R.meta = { ...R.meta, title: 'HILLARIOUS #' + spec.number, hood: remix.name.toUpperCase() };
+    R.customer = { ...R.customer, order: 'DAILY DISPATCH #' + spec.number + ' · ' + key, messages: ["Today's route. Same hills for everyone. " + remix.note] };
+    R.daily = spec;
+    return R;
+  }
+  function buildDaily(key) { const C = buildRoute('daily', dailyRoute(key)); C.daily = dailySpec(key); return C; }
+  // Saved as hillarious:daily { v, date, seed, result } (result is null until the scored ride finishes, and stays null if
+  // it never does), and hillarious:streak { v, count, best, last }.
+  const DAILY_RESULT_KEYS = ['time', 'condition', 'crashes', 'tip', 'stars'];
+  function cleanDaily(rec) {
+    if (!rec || typeof rec !== 'object' || Array.isArray(rec) || !validDateKey(rec.date) || !Number.isInteger(rec.seed) || rec.seed < 0) return null;
+    let result = null;
+    if (rec.result != null) {
+      if (typeof rec.result !== 'object' || !DAILY_RESULT_KEYS.every((k) => Number.isFinite(rec.result[k]) && rec.result[k] >= 0)) return null;
+      result = Object.fromEntries(DAILY_RESULT_KEYS.map((k) => [k, rec.result[k]]));
+    }
+    return { v: RECORD_VERSION, date: rec.date, seed: rec.seed, result };
+  }
+  function cleanStreak(rec) {
+    const ok = rec && typeof rec === 'object' && Number.isInteger(rec.count) && rec.count >= 0 && Number.isInteger(rec.best) && rec.best >= rec.count && (rec.last === null || validDateKey(rec.last));
+    return ok ? { v: RECORD_VERSION, count: rec.count, best: rec.best, last: rec.last } : { v: RECORD_VERSION, count: 0, best: 0, last: null };
+  }
+  // Playing on consecutive days grows the streak; a missed day starts it again at 1. Playing twice in a day changes nothing.
+  function nextStreak(streak, key) {
+    const s = cleanStreak(streak);
+    if (s.last === key) return s;
+    const count = s.last && dayIndex(key) - dayIndex(s.last) === 1 ? s.count + 1 : 1;
+    return { v: RECORD_VERSION, count, best: Math.max(s.best, count), last: key };
+  }
+  // The scored attempt is used when the ride starts, so restarting or quitting can't buy a second try.
+  function startDaily(rec, streak, spec) {
+    const old = cleanDaily(rec);
+    if (old && old.date === spec.date) return { scored: false, rec: old, streak: cleanStreak(streak) };
+    return { scored: true, rec: { v: RECORD_VERSION, date: spec.date, seed: spec.seed, result: null }, streak: nextStreak(streak, spec.date) };
+  }
+  function finishDaily(rec, spec, r, stars) {
+    const old = cleanDaily(rec);
+    if (!old || old.date !== spec.date || old.result) return null; // only the day's first scored ride counts
+    return { ...old, result: { time: r.time, condition: r.condition, crashes: r.crashes, tip: r.tip, stars } };
+  }
 
 
 
@@ -2500,6 +2574,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const RUN_WRITES = {
     shift: { best: true, shift: true, delivered: true, drill: false },
     single: { best: true, shift: false, delivered: true, drill: false },
+    daily: { best: false, shift: false, delivered: false, drill: false, daily: true }, // its own record (F-34)
     drill: { best: false, shift: false, delivered: false, drill: true },
     free: { best: false, shift: false, delivered: false, drill: false },
   };
@@ -3117,7 +3192,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated, REPLAY, packInput, unpackInput, CrashReplay,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
+    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, REPLAY, packInput, unpackInput, CrashReplay,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -4417,6 +4493,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       splashSound: 'splash', bits: cupBits, onSpill: cupSpill, spillLine: true, condNote: () => '',
     },
     cake: {
+      venueSign: ['LOMBARD GARDENS', 'WEDDING TODAY · CAKE ENTRANCE →'], // the sign over the finish venue's arch
       pose: (c) => c,
       rack: drawCakeOnRack,
       worried: (c) => Math.abs(c.angle) > 0.22 || c.spilling > 0.2, lookX: -1,
@@ -4430,6 +4507,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       condNote: (r) => (r.decorLeft !== null ? ' · ' + r.decorLeft + '/' + CAKE_DECOR.length + ' decor' : ''),
     },
     bouquet: {
+      venueSign: ['TELEGRAPH BLOOMS', 'FLOWER DROP-OFF · PETALS ONLY →'],
       pose: (c) => c,
       basket: drawBouquet,
       worried: (c) => c.spilling > 0.2, lookX: 0.6,
@@ -5104,6 +5182,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'free': this.freeCfg = Object.assign(this.freeCfg, { route: d.route, cp: 0, cargo: this.courseFor(d.route).cargo }); this.showFree(); break;
         case 'free-opt': this.setFreeOpt(d.key, d.val); break;
         case 'free-go': this.store.set('free', this.freeCfg); this.startRun(Object.assign({ mode: 'free' }, this.freeCfg)); break;
+        case 'daily': this.startDailyRun(false); break;
+        case 'daily-practice': this.startDailyRun(true); break;
         case 'practice': if (this.trouble) this.startRun(Object.assign({}, this.freeCfg, this.trouble, { mode: 'free' })); break;
         case 'go': this.beginRide(); break;
         case 'resume': this.resume(); break;
@@ -5125,6 +5205,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // The course a run rides: a fresh build, with Free Ride's cargo and traffic choices applied.
     runCourse(spec) {
       if (spec.mode === 'drill') return DRILLS.find((D) => D.id === spec.drill).build();
+      if (spec.daily) return buildDaily(spec.daily); // the day's route, scored (mode 'daily') or practice (mode 'free')
       const R = ROUTES.find((r) => r.id === spec.route), C = R ? R.build() : buildTestHill();
       if (spec.mode === 'free') {
         if (spec.cargo) C.cargo = cleanCargo(spec.cargo);
@@ -5142,7 +5223,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.particles.clear(); this.resetFx(); this.timers = []; this.greeted = new Set();
       this.crashOrder = CRASH_LINES.slice();
       this.scarf.ok = false; this.acc = 0; this.slowT = 0; this.timeScale = 1; this.bellT = 0;
-      this.replay = null; this.replaying = false;
+      this.replay = null; this.replaying = false; this.dailyStarted = false;
       this.practiceScale = spec.mode === 'free' && spec.slowmo ? 0.5 : 1;
       this.freeStats = { bestAir: 0, totalAir: 0 };
       this.autopilot = this.autopilotName ? new Autopilot(this.autopilotName) : null;
@@ -5154,11 +5235,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // Every ride starts here: { mode: 'shift' | 'single' | 'drill' | 'free', route | drill, and Free Ride's options }.
     startRun(spec) {
       this.newWorld(spec);
-      if (spec.mode === 'free') { this.beginRide(); this.fx.hint = { text: 'Free ride: nothing is saved. Pause to quit.', keys: controlKeys(['pause'], this.input.device), id: 'free', t: 0 }; return; }
+      if (spec.mode === 'free') { this.beginRide(); this.fx.hint = { text: (spec.daily ? "Practice on today's route: " : 'Free ride: ') + 'nothing is saved. Pause to quit.', keys: controlKeys(['pause'], this.input.device), id: 'free', t: 0 }; return; }
       const C = this.world.course, cu = C.customer, $ = (id) => document.getElementById(id);
       this.state = 'intro'; this.introT = this.autopilotName ? 1.2 : null; // players advance themselves; autopilot demos keep a timer
       const n = DRILLS.findIndex((D) => D.id === spec.drill) + 1;
-      const eyebrow = spec.mode === 'drill' ? 'COURIER ACADEMY · DRILL ' + n + ' OF ' + DRILLS.length : spec.mode === 'single' ? 'SINGLE ORDER · ' + C.hood : 'DELIVERY ' + (this.deliveryIndex + 1) + ' OF ' + this.shiftRoutes.length + ' · ' + C.hood;
+      const eyebrow = spec.mode === 'daily' ? 'DAILY DISPATCH · ' + C.hood + ' · ONE SCORED RIDE' : spec.mode === 'drill' ? 'COURIER ACADEMY · DRILL ' + n + ' OF ' + DRILLS.length : spec.mode === 'single' ? 'SINGLE ORDER · ' + C.hood : 'DELIVERY ' + (this.deliveryIndex + 1) + ' OF ' + this.shiftRoutes.length + ' · ' + C.hood;
       $('intro-eyebrow').textContent = eyebrow;
       $('intro-h').textContent = C.title;
       $('intro-route').textContent = cu.route;
@@ -5172,8 +5253,27 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.show('intro'); this.audio.setMusic('title');
       this.announce(eyebrow + ': ' + C.title + '. ' + cu.messages.join(' '));
     }
-    beginRide() { this.state = 'riding'; this.show(null); this.input.clear(); this.last = performance.now(); this.audio.setMusic('ride'); }
-    restartDelivery() { this.newWorld(this.run); this.beginRide(); this.fx.flash = 0.7; }
+    // Daily Dispatch (F-34). ?daily=YYYY-MM-DD plays another day (tests, demos); otherwise it is the local date.
+    todayKey() { const p = this.params.get('daily'); return validDateKey(p) ? p : dateKey(new Date()); }
+    dailyOpen() { return this.unlockAll || !!this.progress.delivered[ROUTES[0].id]; }
+    dailyRecord(key) { const rec = cleanDaily(this.store.get('daily', null)); return rec && rec.date === key ? rec : null; }
+    // The scored ride if today's is unused, practice otherwise (or when asked for).
+    startDailyRun(practice) {
+      if (!this.dailyOpen()) return;
+      const key = this.todayKey();
+      if (practice || this.dailyRecord(key)) this.startRun({ mode: 'free', daily: key, traffic: true });
+      else this.startRun({ mode: 'daily', daily: key });
+    }
+    beginRide() {
+      if (this.mode === 'daily' && !this.dailyStarted) { // the attempt is used from here: quitting or restarting won't give another
+        const res = startDaily(this.store.get('daily', null), this.store.get('streak', null), dailySpec(this.run.daily));
+        if (!res.scored) { this.startRun({ mode: 'free', daily: this.run.daily, traffic: true }); return; }
+        this.store.set('daily', res.rec); this.store.set('streak', res.streak); this.dailyStarted = true;
+      }
+      this.state = 'riding'; this.show(null); this.input.clear(); this.last = performance.now(); this.audio.setMusic('ride'); }
+    restartDelivery() {
+      if (this.mode === 'daily') this.run = { mode: 'free', daily: this.run.daily, traffic: true }; // a restart is practice
+      this.newWorld(this.run); this.beginRide(); this.fx.flash = 0.7; }
     nextDelivery() { if (!this.lastDelivery) this.startDelivery(this.deliveryIndex + 1); else this.toTitle(); }
     // Menus ride over the title scene, so the delivery world goes away.
     toMenu(state) { this.state = state; this.world = null; this.audio.update(null, false); this.audio.setMusic('title'); }
@@ -5184,13 +5284,37 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       el.setAttribute('aria-label', label);
     }
     // Dispatch: one card per order, locked until the order before it has been delivered.
+    // Today's Daily Dispatch card, first on the board. Returns its button to focus when today's ride is still open.
+    dailyCard(box, mk) {
+      const key = this.todayKey(), spec = dailySpec(key), C = buildDaily(key), open = this.dailyOpen(), rec = this.dailyRecord(key);
+      const st = cleanStreak(this.store.get('streak', null)), streak = st.last && dayIndex(key) - dayIndex(st.last) <= 1 ? st.count : 0;
+      const remix = DAILY_REMIXES.find((x) => x.id === spec.remix), cargo = cargoWords(C.cargo).name;
+      const card = mk('div', 'order daily'), av = mk('canvas'), top = mk('div', 'order-top'), side = mk('div', 'order-side');
+      card.dataset.state = !open ? 'locked' : rec ? 'delivered' : 'new';
+      av.width = av.height = 104; av.setAttribute('aria-hidden', 'true'); drawAvatar(av, open ? 4 : 3, C.customer.avatar);
+      top.append(mk('b', '', C.title), mk('span', 'order-streak', streak ? '🔥 ' + streak + (streak === 1 ? ' day' : ' days') : ''));
+      const sub = mk('div', 'order-sub', 'DAILY DISPATCH · ' + remix.name.toUpperCase() + ' · ' + cargo + ' · PAR ' + fmtTime(C.par).replace(/\.0$/, ''));
+      const res = rec && rec.result;
+      const line = !open ? 'Deliver ' + this.courseFor(ROUTES[0].id).title + ' to unlock'
+        : res ? "Today's ride: " + fmtMoney(res.tip) + ' · ' + fmtTime(res.time) + ' · ' + Math.round(res.condition) + '% ' + cargo.toLowerCase() + '. New route tomorrow.'
+        : rec ? "Today's ride didn't finish. Practice is open; new route tomorrow." : 'Same route for everyone today. One scored ride. ' + remix.note;
+      const tag = mk('span', 'order-tag', !open ? 'LOCKED' : rec ? 'DONE TODAY' : 'TODAY');
+      const ride = mk('button', 'btn' + (open && !rec ? ' primary' : ''), !open ? '🔒 LOCKED' : rec ? 'PRACTICE' : 'RIDE');
+      ride.dataset.act = rec ? 'daily-practice' : 'daily'; ride.disabled = !open;
+      ride.setAttribute('aria-label', !open ? 'Daily Dispatch, locked. ' + line : (rec ? 'Practice ' : 'Ride ') + C.title + ', ' + remix.name + '. ' + line);
+      side.append(tag, ride);
+      if (open && !rec) { const pr = mk('button', 'chip', 'PRACTICE'); pr.dataset.act = 'daily-practice'; pr.setAttribute('aria-label', 'Practice ' + C.title + ', unscored'); side.append(pr); }
+      card.append(av, top, side, sub, mk('div', 'order-best', line));
+      box.appendChild(card);
+      return open && !rec ? ride : null;
+    }
     showBoard() {
       this.toMenu('board');
       const box = document.getElementById('board-orders'), states = unlockState(ROUTES, this.progress, this.unlockAll), mk = (tag, cls, text) => {
         const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e;
       };
       box.textContent = '';
-      let first = null;
+      let first = this.dailyCard(box, mk);
       states.forEach((s, i) => {
         const C = this.courseFor(s.id), cu = C.customer, best = cleanBest(this.store.get('best:' + s.id, null)), goals = this.progress.goals[s.id] || [];
         const card = mk('div', 'order'), av = mk('canvas'), top = mk('div', 'order-top'), side = mk('div', 'order-side');
@@ -5308,7 +5432,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (w.delivered || w.drill) this.saveProgress(applyRun(this.progress, mode, C.id, { goals, stamp }));
       const routesAfter = unlockState(ROUTES, this.progress, this.unlockAll), drillsAfter = drillStates(DRILLS, this.progress, this.unlockAll);
       $('rv-brand').textContent = cu.brand;
-      $('rv-order').textContent = mode === 'free' ? 'FREE RIDE · NOTHING SAVED' : cu.order;
+      $('rv-order').textContent = mode === 'free' ? (this.run.daily ? 'PRACTICE · ' : 'FREE RIDE · ') + 'NOTHING SAVED' : mode === 'daily' ? cu.order + ' · SCORED' : cu.order;
       $('rv-name').textContent = cu.name + ' · ' + cu.role.split(',')[0];
       if (drill) { this.starsHtml($('rv-stars'), stamp, 3, 'Stamp: ' + STAMPS[stamp]); $('rv-quote').textContent = PAT_VERDICTS[stamp]; }
       else { this.starsHtml($('rv-stars'), rv.stars, 5, rv.stars + ' out of 5 stars'); $('rv-quote').textContent = rv.text; }
@@ -5339,7 +5463,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (drill) {
         el.textContent = stamp > oldStamp ? 'NEW BEST STAMP: ' + STAMPS[stamp] : 'Best stamp: ' + STAMPS[Math.max(stamp, oldStamp)];
         if (stamp > oldStamp) el.classList.add('new');
-      } else if (!w.best) el.textContent = 'Free ride: nothing saved.' + (this.freeStats.bestAir > 0 ? ' Best air ' + this.freeStats.bestAir.toFixed(2) + ' s.' : '');
+      } else if (w.daily) {
+        const spec = dailySpec(this.run.daily), rec = finishDaily(this.store.get('daily', null), spec, r, rv.stars), st = cleanStreak(this.store.get('streak', null));
+        if (rec) this.store.set('daily', rec);
+        el.textContent = (rec ? 'HILLARIOUS #' + spec.number + ' logged.' : 'Already logged today.') + ' Streak: ' + st.count + (st.count === 1 ? ' day' : ' days') + (st.best > st.count ? ' (best ' + st.best + ')' : '');
+        if (rec) el.classList.add('new');
+      } else if (!w.best) el.textContent = (this.run.daily ? "Practice on today's route: nothing saved." : 'Free ride: nothing saved.') + (this.freeStats.bestAir > 0 ? ' Best air ' + this.freeStats.bestAir.toFixed(2) + ' s.' : '');
       else {
         const key = 'best:' + C.id, best = cleanBest(this.store.get(key, null));
         const better = !best || r.tip > best.tip || (r.tip === best.tip && r.time < best.time);
@@ -5362,12 +5491,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (drill && drill.id === 'drillExam' && stamp > 0 && !oldStamp) news.push('CERTIFIED COURIER! HR HAS UPDATED YOUR FILE');
       $('rv-unlock').textContent = news.join(' · ');
       const ts = drill ? null : troubleSpot(C, r.log), tbox = $('rv-trouble');
-      this.trouble = ts ? { route: C.id, cp: ts.cp, cargo: r.kind, traffic: true, unbreakable: false, slowmo: false } : null;
+      this.trouble = ts ? { route: C.id, daily: this.run.daily, cp: ts.cp, cargo: r.kind, traffic: true, unbreakable: false, slowmo: false } : null;
       tbox.hidden = !ts;
       if (ts) $('rv-trouble-text').textContent = 'Most trouble: ' + ts.label + ' · ' + (ts.crashes ? ts.crashes + (ts.crashes === 1 ? ' crash, ' : ' crashes, ') : '') + '−' + Math.round(ts.lost) + cargoWords(r.kind).unit;
       const next = $('rv-next'), again = $('rv-again'), alt = $('rv-alt');
       const set = (b, act, text) => { b.dataset.act = act; (b === next ? $('rv-next-label') : b).textContent = text; };
       if (mode === 'shift') { const last = this.lastDelivery; set(next, last ? 'final' : 'next', last ? 'PERFORMANCE REVIEW' : 'NEXT DELIVERY'); set(again, 'again', 'RIDE AGAIN'); set(alt, 'title', 'TITLE'); }
+      else if (mode === 'daily' || this.run.daily) { set(next, 'board', 'DISPATCH'); set(again, 'daily-practice', 'PRACTICE'); set(alt, 'title', 'TITLE'); }
       else if (mode === 'single') { set(next, 'board', 'DISPATCH'); set(again, 'again', 'RIDE AGAIN'); set(alt, 'title', 'TITLE'); }
       else if (drill) {
         const di = DRILLS.indexOf(drill), open = di + 1 < DRILLS.length && drillsAfter[di + 1].state !== 'locked';
@@ -5910,12 +6040,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (C.venue && C.venue.x1 > xa && C.venue.x0 < xb) {
         const gy = T.height(C.venue.arch) + ROAD.walk;
         R.toScreen(cam, C.venue.arch, gy + 5.35, p);
+        const [signName, signSub] = cargoView(C.cargo).venueSign || CARGO_VIEW.cake.venueSign;
         ctx.font = '900 ' + (S * 0.36).toFixed(1) + 'px ' + FONT_DISPLAY;
-        const tw = ctx.measureText('LOMBARD GARDENS').width + S * 0.6;
+        const tw = ctx.measureText(signName).width + S * 0.6;
         ctx.fillStyle = 'rgba(255,246,229,0.95)'; rrect(ctx, p.x - tw / 2, p.y - S * 0.36, tw, S * 0.95, S * 0.15); ctx.fill();
         ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = '#c2584a'; ctx.fillText('LOMBARD GARDENS', p.x, p.y - S * 0.06);
-        ctx.font = '800 ' + Math.max(7, S * 0.15).toFixed(1) + 'px ' + FONT_BODY; ctx.fillStyle = COL.ink; ctx.fillText('WEDDING TODAY · CAKE ENTRANCE →', p.x, p.y + S * 0.33);
+        ctx.fillStyle = '#c2584a'; ctx.fillText(signName, p.x, p.y - S * 0.06);
+        ctx.font = '800 ' + Math.max(7, S * 0.15).toFixed(1) + 'px ' + FONT_BODY; ctx.fillStyle = COL.ink; ctx.fillText(signSub, p.x, p.y + S * 0.33);
       }
       const walk = W.obstacles && W.obstacles.boardwalk;
       if (walk && walk.x0 + 5 > xa - 6 && walk.x0 + 5 < xb + 6) {
@@ -6025,7 +6156,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       panel(pad, pad, lw, u * 3.6);
       ctx.fillStyle = COL.coral; ctx.font = '900 ' + (u * 0.78).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'left';
       const head = this.mode === 'drill' ? 'DRILL ' + (DRILLS.findIndex((D) => D.id === C.id) + 1) + '/' + DRILLS.length + ' · ACADEMY'
-        : this.mode === 'free' ? 'FREE RIDE · ' + (C.loop ? 'LAP ' + (W.laps + 1) : C.hood) : this.mode === 'single' ? 'SINGLE ORDER · ' + C.hood
+        : this.mode === 'daily' ? 'DAILY DISPATCH · ' + C.hood : this.mode === 'free' ? (this.run.daily ? 'PRACTICE · ' : 'FREE RIDE · ') + (C.loop ? 'LAP ' + (W.laps + 1) : C.hood) : this.mode === 'single' ? 'SINGLE ORDER · ' + C.hood
           : 'DELIVERY ' + (this.deliveryIndex + 1) + '/' + this.shiftRoutes.length + ' · ' + C.hood;
       ctx.fillText(head, pad + u * 0.8, pad + u * 0.95);
       ctx.fillStyle = COL.ink; ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_DISPLAY;

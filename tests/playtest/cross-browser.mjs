@@ -25,21 +25,30 @@ async function run(name, engine, sizeName, size) {
     page.on('pageerror', (e) => r.errors.push('pageerror: ' + e.message));
     page.on('console', (m) => { if (m.type() === 'error') r.errors.push('console: ' + m.text()); });
     const touch = !!size.hasTouch;
+    // Playwright's Firefox fires touchstart and touchend for a tap but no click (1.4.0 and 1.5.0 alike), so it clicks.
+    const tap = (sel) => (name === 'firefox' ? page.click(sel) : page.tap(sel));
 
     // Player flow: start, the intro waits, then ride.
     await page.goto(URL);
     await page.waitForFunction(() => window.HILL && HILL.game && HILL.game.state === 'title');
-    if (touch) await page.tap('#s-title [data-act="start"]'); else { await page.waitForTimeout(100); await page.keyboard.press('Enter'); }
+    // Daily Dispatch (F-34): every engine must build the same route from the same date.
+    r.dailyHash = await page.evaluate(() => {
+      const C = HILL.buildDaily('2026-11-20'), T = C.terrain;
+      let h = 0x811c9dc5;
+      for (let x = Math.ceil(T.minX); x <= T.maxX; x++) for (const ch of T.height(x).toFixed(9)) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+      return h.toString(16) + ' par ' + C.par;
+    });
+    if (touch) await tap('#s-title [data-act="start"]'); else { await page.waitForTimeout(100); await page.keyboard.press('Enter'); }
     await page.waitForTimeout(2000);
     r.introWaits = await page.evaluate(() => HILL.game.state === 'intro');
-    if (touch) await page.tap('#s-intro [data-act="go"]'); else await page.keyboard.press('Enter');
+    if (touch) await tap('#s-intro [data-act="go"]'); else await page.keyboard.press('Enter');
     await page.waitForTimeout(800);
     r.riding = await page.evaluate(() => HILL.game.state === 'riding');
     r.device = await page.evaluate(() => HILL.game.input.device);
     await page.screenshot({ path: `${SHOTS}/${name}-${sizeName}-ride.png` });
 
     // Dispatch shows the locks (fresh profile), Training lists the drills, and a Free Ride starts.
-    const press = (sel) => (touch ? page.tap(sel) : page.click(sel));
+    const press = (sel) => (touch ? tap(sel) : page.click(sel));
     await page.goto(URL);
     await page.waitForFunction(() => window.HILL && HILL.game && HILL.game.state === 'title');
     await press('#s-title [data-act="board"]');
@@ -80,4 +89,6 @@ async function run(name, engine, sizeName, size) {
 const results = [];
 for (const [name, engine] of Object.entries(engines)) for (const [sizeName, size] of Object.entries(sizes)) results.push(await run(name, engine, sizeName, size));
 console.log(JSON.stringify(results, null, 1));
-if (results.some((r) => r.errors.length)) process.exitCode = 1;
+const hashes = new Set(results.map((r) => r.dailyHash).filter(Boolean));
+console.log('daily route hash:', [...hashes].join(' | '), hashes.size === 1 ? '(same in every browser)' : '(DIFFERS)');
+if (results.some((r) => r.errors.length) || hashes.size !== 1) process.exitCode = 1;
