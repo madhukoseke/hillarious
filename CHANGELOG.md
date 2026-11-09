@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Developer
+- Route generator, the groundwork for Daily Dispatch: `generateRoute(seed, rules)` lays out a route from 5–7 hand-made segments taken from the three hand-written routes, using only the seed and integer choices, so every browser builds the same route. Difficulty never falls along the route, there is at most one difficulty-5 segment and never two blind hazards in a row, and par (35–50 s) comes from each segment's measured design time. Not in the game yet.
+- Fairness: every push rides generated seeds 1–5 with every cargo and all four riders; a nightly workflow rides seeds 1–2000 (`FAIRNESS_SEEDS`, `FAIRNESS_FROM`).
+
 ## [1.5.0] - 2026-11-08
 
 ### Added

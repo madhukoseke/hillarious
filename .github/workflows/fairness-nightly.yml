@@ -1,0 +1,25 @@
+name: Fairness (all generated seeds)
+
+# Every push rides generated seeds 1–5 (tests.yml). This rides seeds 1–2000 with every cargo and every autopilot
+# rider, in eight shards of 250 seeds. One failing seed means a generator rule gets fixed, not a seed skipped (F-33).
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  seeds:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/fairness.test.mjs
+        env:
+          FAIRNESS_FROM: ${{ matrix.shard * 250 + 1 }}
+          FAIRNESS_SEEDS: 250
