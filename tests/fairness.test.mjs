@@ -21,7 +21,17 @@ function ride(build, profile) {
 const GEN_FROM = Number(process.env.FAIRNESS_FROM) || 1, GEN_COUNT = Number(process.env.FAIRNESS_SEEDS) || 5;
 const GEN_SEEDS = Array.from({ length: GEN_COUNT }, (_, i) => GEN_FROM + i);
 const generated = GEN_SEEDS.flatMap((seed) => ['coffee', 'cake', 'bouquet'].map((cargo) => ({ id: `gen-${seed}-${cargo}`, build: () => H.buildGenerated(seed, { cargo }) })));
-const content = [...H.ROUTES.map((R) => ({ id: R.id, build: R.build })), ...H.DRILLS.map((D) => ({ id: D.id, build: D.build })), ...generated];
+// Daily routes (F-34): the first FAIRNESS_DAYS days from launch (default 7, which covers every remix);
+// FAIRNESS_DAY_FROM moves the start, so the nightly run can split 2,000 days.
+const DAY_FROM = Number(process.env.FAIRNESS_DAY_FROM) || 0, DAY_COUNT = Number(process.env.FAIRNESS_DAYS) || 7;
+const DAYS = Array.from({ length: DAY_COUNT }, (_, i) => H.keyForDay(H.dayIndex(H.DAILY_EPOCH) + DAY_FROM + i));
+const dailies = DAYS.map((key) => ({ id: `daily-${key}`, build: () => H.buildDaily(key) }));
+const content = [...H.ROUTES.map((R) => ({ id: R.id, build: R.build })), ...H.DRILLS.map((D) => ({ id: D.id, build: D.build })), ...generated, ...dailies];
+
+test('fairness: the daily routes ridden on every push cover every remix', () => {
+  if (DAY_FROM !== 0 || DAY_COUNT < 7) return;
+  assert.equal(new Set(DAYS.map((k) => H.dailySpec(k).remix)).size, H.DAILY_REMIXES.length);
+});
 
 test('fairness: the generated seeds ridden on every push use every segment', () => {
   if (GEN_FROM !== 1 || GEN_COUNT < 5) return;
