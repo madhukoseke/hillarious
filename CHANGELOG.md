@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-08
+
 ### Added
 - Crash replays: after a crash, the last couple of seconds play back once, slowing down and zooming in on the moment it went wrong, before you get back on the bike. Press hop (SPACE, HOP, or A) to skip. Replays are off when your device asks for reduced motion, or with `?replay=off`.
 - Style is its own score: each receipt shows the style points you earned (near misses, clean landings, big air) and your best on that route, with NEW BEST when you beat it. Tips still depend only on the delivery.
@@ -131,7 +133,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Keyboard, touch, and gamepad controls.
 - A single offline `index.html` with no build step.
 
-[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/madhukoseke/hillarious/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/madhukoseke/hillarious/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/madhukoseke/hillarious/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/madhukoseke/hillarious/compare/v1.1.1...v1.2.0
