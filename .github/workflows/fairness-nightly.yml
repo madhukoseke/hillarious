@@ -19,9 +19,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test tests/fairness.test.mjs
+      # Expressions can't do arithmetic, so the shard's starting seed and day are worked out in the shell.
+      - run: |
+          export FAIRNESS_FROM=$(( SHARD * 250 + 1 )) FAIRNESS_SEEDS=250 FAIRNESS_DAY_FROM=$(( SHARD * 250 )) FAIRNESS_DAYS=250
+          echo "seeds $FAIRNESS_FROM-$(( FAIRNESS_FROM + 249 )), days $FAIRNESS_DAY_FROM-$(( FAIRNESS_DAY_FROM + 249 ))"
+          node --test tests/fairness.test.mjs
         env:
-          FAIRNESS_FROM: ${{ matrix.shard * 250 + 1 }}
-          FAIRNESS_SEEDS: 250
-          FAIRNESS_DAY_FROM: ${{ matrix.shard * 250 }}
-          FAIRNESS_DAYS: 250
+          SHARD: ${{ matrix.shard }}
