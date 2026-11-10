@@ -1353,3 +1353,31 @@ test('splits: deltas, the fastest complete run is kept, and corrupt records are 
   assert.deepEqual(plain(H.cleanSplits({ splits: [1, 2], date: '2026-11-20', junk: 1 })), { v: 1, splits: [1, 2], date: '2026-11-20' });
   assert.equal(H.fmtDelta(-0.84), '−0.8'); assert.equal(H.fmtDelta(1.25), '+1.3'); assert.equal(H.fmtDelta(0.02), '±0.0');
 });
+
+/* ------------------------------- feel (F-38) ------------------------------- */
+
+test('feel: the camera looks further ahead with speed, and further still downhill', () => {
+  assert.equal(H.cameraLead(0, 0), 0);
+  assert.equal(H.cameraLead(10, 0), 10 * H.CAM_LEAD.perSpeed, 'on the flat, as before');
+  assert.ok(H.cameraLead(15, -0.3) > H.cameraLead(15, 0) + 2, 'a steep descent at speed adds over 2 m');
+  assert.equal(H.cameraLead(15, 0.2), H.cameraLead(15, 0), 'climbing adds nothing');
+  assert.equal(H.cameraLead(15, -2), H.cameraLead(15, -H.CAM_LEAD.maxGrade), 'the grade effect is capped');
+  assert.equal(H.cameraLead(40, -0.4), H.CAM_LEAD.max); assert.equal(H.cameraLead(-20, 0), H.CAM_LEAD.min);
+  assert.equal(H.cameraLead(30, 0), 7.5, 'flat ground keeps the old 7.5 m cap');
+  for (let v = 0; v < 20; v += 0.5) assert.ok(H.cameraLead(v + 0.5, -0.2) >= H.cameraLead(v, -0.2), 'never shrinks as speed grows');
+});
+
+test('feel: the music dips only for real air, while riding', () => {
+  assert.ok(H.airDuckWanted('riding', false, H.AIR_DUCK.after + 0.01));
+  assert.ok(!H.airDuckWanted('riding', false, 0.1), 'not for a small hop');
+  assert.ok(!H.airDuckWanted('riding', true, 1), 'not on the ground');
+  assert.ok(!H.airDuckWanted('crashed', false, 1), 'a crash has its own duck');
+  const w = new H.World(H.buildNobHill()), ap = new H.Autopilot('fast');
+  let air = 0, landings = 0, was = false;
+  while (w.state !== 'done' && w.t < 120) {
+    w.step(ap.input(w));
+    const on = H.airDuckWanted(w.state, w.bike.grounded, w.bike.airTime);
+    if (on) air++; if (was && !on) landings++; was = on;
+  }
+  assert.ok(air > 0 && landings > 0, `a fast Nob Hill ride dips the music (${(air / 120).toFixed(1)} s) and brings it back (${landings}×)`);
+});

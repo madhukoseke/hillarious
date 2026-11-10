@@ -629,6 +629,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     crashBase: 15, crashExtra: 5,
   };
   const CRASH_TIME = 1.45;
+  // Feel (F-38). The camera looks further ahead with speed, and further still down a steep grade (slope < 0 is downhill),
+  // so a fast descent shows what's coming. The music dips while the bike is properly airborne and returns on landing.
+  const CAM_LEAD = { perSpeed: 0.42, downhill: 0.6, maxGrade: 0.4, min: -2, flatMax: 7.5, max: 10 }; // flat: as before 1.6
+  function cameraLead(vx, slope) {
+    const down = slope < 0 ? Math.min(-slope, CAM_LEAD.maxGrade) * clamp(vx, 0, 20) * CAM_LEAD.downhill : 0;
+    return clamp(clamp(vx * CAM_LEAD.perSpeed, CAM_LEAD.min, CAM_LEAD.flatMax) + down, CAM_LEAD.min, CAM_LEAD.max);
+  }
+  const AIR_DUCK = { after: 0.25, level: 0.35 }; // seconds in the air before the music dips, and how far (share of normal)
+  const airDuckWanted = (state, grounded, airTime) => state === 'riding' && !grounded && airTime > AIR_DUCK.after;
   const AMBIENT_GAP = 4.5;
   const ROAD = { far: 0.85, curb: 1.0, walk: 1.3, front: 0.16 };
 
@@ -3272,7 +3281,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   const HILL = {
     STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
-    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, REPLAY, packInput, unpackInput, CrashReplay,
+    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -3488,8 +3497,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       l.start(t0); l.stop(t0 + dur + 0.05);
     }
     // Tiny music sequencer: a laid-back title loop and a bouncy ride loop (F - Dm - Bb - C), scheduled just ahead.
-    setMusic(mode) { this.musicMode = mode; }
-    duck(t, level) { if (this.ctx && this.mus) { const n = this.ctx.currentTime; this.mus.gain.cancelScheduledValues(n); this.mus.gain.setTargetAtTime((level === undefined ? 0.07 : level) * this.vol.music, n, 0.04); this.mus.gain.setTargetAtTime(this.level('music'), n + t, 0.4); } }
+    setMusic(mode) { this.musicMode = mode; if (this.airDucked) { this.airDucked = false; if (this.ctx && this.mus) this.mus.gain.setTargetAtTime(this.level('music'), this.ctx.currentTime, 0.15); } }
+    // Music dips while airborne (F-38); a crash's own duck (below) wins until it has run its course.
+    airDuck(on) {
+      if (!this.ctx || !this.mus || on === !!this.airDucked) return;
+      const n = this.ctx.currentTime;
+      if (n < (this.duckUntil || 0)) return;
+      this.airDucked = on;
+      this.mus.gain.setTargetAtTime(this.level('music') * (on ? AIR_DUCK.level : 1), n, on ? 0.08 : 0.15);
+    }
+    duck(t, level) { if (this.ctx && this.mus) { const n = this.ctx.currentTime; this.duckUntil = n + t; this.airDucked = false; this.mus.gain.cancelScheduledValues(n); this.mus.gain.setTargetAtTime((level === undefined ? 0.07 : level) * this.vol.music, n, 0.04); this.mus.gain.setTargetAtTime(this.level('music'), n + t, 0.4); } }
     tickMusic() {
       if (!this.ctx || this.ctx.state !== 'running' || !this.seq) return;
       const c = this.ctx, q = this.seq, mode = this.musicMode || null, now = c.currentTime;
@@ -3662,10 +3679,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   /* ---------- 16. CAMERA ---------- */
   class Camera {
     constructor() { this.x = 0; this.y = 0; this.vy = 0; this.zoom = 1; this.lead = 0; this.trauma = 0; this.sx = 0; this.sy = 0; }
-    snap(x, y, vx) { this.lead = clamp(vx * 0.42, -2, 7.5); this.x = x + this.lead; this.y = y + 1.0; this.vy = 0; }
+    snap(x, y, vx, slope = 0) { this.lead = cameraLead(vx, slope); this.x = x + this.lead; this.y = y + 1.0; this.vy = 0; }
     shake(a) { this.trauma = Math.min(1, this.trauma + a); }
     update(dt, tx, ty, vx, speed, T, time, reduced) {
-      const leadT = clamp(vx * 0.42, -2, 7.5);
+      const leadT = cameraLead(vx, T.slope(tx));
       this.lead += (leadT - this.lead) * (1 - Math.exp(-dt * 2.5));
       this.x += (tx + this.lead - this.x) * (1 - Math.exp(-dt * 7));
       const ahead = T.height(tx + 6 + this.lead * 0.5) - T.height(tx);
@@ -5899,6 +5916,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.cam.update(dt, fx, fy, fvx, Math.hypot(b.vx, b.vy), W.terrain, this.time, this.reducedMotion);
       this.particles.update(dt * this.timeScale, W.terrain);
       this.audio.update(W, true);
+      this.audio.airDuck(airDuckWanted(W.state, b.grounded, b.airTime));
       const half = Math.floor(b.crank / Math.PI);
       if (b.pedalIn && half !== this.lastCrankHalf) { this.lastCrankHalf = half; this.audio.play('tick'); }
       this.updateHumor(dt);
