@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Split times: each checkpoint and the finish pop your time, and once you have a best run on that route, how far ahead (green) or behind (red) you are. The receipt lists every split. Your fastest complete run on each route is kept to race next time; on Daily Dispatch, practice races the day's scored ride.
 - Share your Daily Dispatch: after the scored ride, COPY RESULT puts a spoiler-free card on the clipboard (`🚲 HILLARIOUS #12 · 💐 95% · ⭐⭐⭐⭐⭐ · 💥×0 · ⏱ 0:35.7` and one square per block: 🟩 clean, 🟨 cargo lost, 💥 crash), and the X and LinkedIn buttons post the same text. SAVE CARD makes a 1200×630 picture of your review, through the share sheet on phones or as a download elsewhere. Nothing is uploaded. The Dispatch board's SHARE chip copies it again later in the day.
 
+### Changed
+- Going downhill fast, the camera looks further ahead (up to 10 m instead of 7.5 m), so you see what's coming on a steep descent. On flat ground it's as before.
+- The music dips while you're properly airborne and comes back when you land.
+
 ### Fixed
 - The sign over Telegraph Hill's finish said "Lombard Gardens · wedding today · cake entrance"; it now says Telegraph Blooms, flower drop-off.
 
