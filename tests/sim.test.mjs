@@ -1317,3 +1317,39 @@ test('replay: a crash in the first seconds replays from the start, and never pas
   while (rp.advance(1)) {}
   assert.equal(rp.i, w.inputLog.length, 'stops where the log ends');
 });
+
+/* ---------------------------- split times (F-35) ---------------------------- */
+
+test('splits: a ride records its time at each checkpoint and the finish, in order', () => {
+  for (const build of ['buildNobHill', 'buildTelegraphHill']) {
+    const w = new H.World(H[build]()), ap = new H.Autopilot('typical'), seen = [];
+    while (w.state !== 'done' && w.t < 150) { w.step(ap.input(w)); for (const e of w.drain()) if (e.type === 'CHECKPOINT' || e.type === 'FINISH_LINE') seen.push(e.split); }
+    const s = w.result().splits, n = w.course.checkpoints.length;
+    assert.equal(s.length, n, 'one per checkpoint after the start, plus the finish');
+    assert.ok(s.every((t, i) => Number.isFinite(t) && (i === 0 || t >= s[i - 1])), `${build}: ${s}`);
+    assert.equal(s.at(-1), w.result().time, 'the last split is the delivery time');
+    assert.deepEqual(plain(seen), plain(s), 'each split is announced as it happens');
+  }
+});
+
+test('splits: none for a run that starts at a later checkpoint, or loops', () => {
+  assert.equal(new H.World(H.buildNobHill(), { startCp: 2 }).result().splits, null);
+  assert.equal(new H.World(H.buildTestHill()).result().splits, null);
+  const w = new H.World(H.buildNobHill());
+  assert.ok(w.result().splits.every((t) => t === null), 'not reached yet');
+});
+
+test('splits: deltas, the fastest complete run is kept, and corrupt records are ignored', () => {
+  assert.deepEqual(plain(H.splitDeltas([10, 21, null, 40], [11, 20, 30, null])), [-1, 1, null, null]);
+  assert.deepEqual(plain(H.splitDeltas([10, 20], null)), [null, null]);
+  const first = H.recordSplits(null, [10, 20, 30]);
+  assert.ok(first.isNew); assert.deepEqual(plain(first.best), { v: 1, splits: [10, 20, 30] });
+  assert.ok(!H.recordSplits(first.best, [9, 19, 31]).isNew, 'a slower finish keeps the old run, even if it led early');
+  assert.ok(H.recordSplits(first.best, [12, 22, 29]).isNew, 'a faster finish replaces it');
+  assert.ok(!H.recordSplits(first.best, [9, null, 25]).isNew, 'an unfinished run never counts');
+  assert.ok(H.recordSplits(first.best, [1, 2, 3, 4]).isNew, 'a different checkpoint count replaces an old layout');
+  for (const bad of [null, {}, { splits: [] }, { splits: [3, 2] }, { splits: [1, 'x'] }, { splits: [-1, 2] }, { splits: [1, 2], date: 'soon' }]) assert.equal(H.cleanSplits(bad), null, JSON.stringify(bad));
+  assert.equal(H.cleanSplits({ splits: [1, 2] }, 3), null, 'wrong length for the route');
+  assert.deepEqual(plain(H.cleanSplits({ splits: [1, 2], date: '2026-11-20', junk: 1 })), { v: 1, splits: [1, 2], date: '2026-11-20' });
+  assert.equal(H.fmtDelta(-0.84), '−0.8'); assert.equal(H.fmtDelta(1.25), '+1.3'); assert.equal(H.fmtDelta(0.02), '±0.0');
+});
