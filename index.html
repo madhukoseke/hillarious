@@ -258,7 +258,10 @@ blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--cream); }
 .chip:disabled { opacity: 0.4; cursor: not-allowed; }
 .rc-goals { font: 700 12.5px var(--mono); margin: 0 0 10px; }
-.rc-goals:empty, .rc-unlock:empty { display: none; }
+.rc-goals:empty, .rc-unlock:empty, .rc-splits:empty { display: none; }
+.rc-splits { font: 700 12px var(--mono); margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.rc-splits b { color: var(--ink-soft); font-weight: 900; }
+.rc-splits .ahead { color: #2f7d4a; } .rc-splits .behind { color: #c2584a; }
 .rc-goals div { display: flex; gap: 8px; padding: 1px 0; color: var(--ink-soft); }
 .rc-goals .met { color: var(--ink); }
 .rc-goals i { font-style: normal; color: var(--mustard); text-shadow: 0 1px 0 var(--ink); }
@@ -494,6 +497,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         </div>
         <blockquote id="rv-quote"></blockquote>
         <div class="rc-goals" id="rv-goals" aria-label="Goals"></div>
+        <div class="rc-splits" id="rv-splits" aria-label="Split times"></div>
         <div class="rc-unlock" id="rv-unlock" role="status"></div>
         <div class="rc-trouble" id="rv-trouble" hidden><span id="rv-trouble-text"></span><button class="chip" data-act="practice" aria-label="Practice this spot in Free Ride">PRACTICE THIS SPOT</button></div>
       </div>
@@ -1179,6 +1183,29 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       length: true,
     };
   }
+  // Split records (F-35): hillarious:splits:<route> { v, splits } keeps the fastest complete run; Daily Dispatch keeps
+  // the scored ride's as hillarious:splits:daily { v, date, splits }.
+  function cleanSplits(rec, n) {
+    const s = rec && Array.isArray(rec.splits) ? rec.splits : null;
+    if (!s || !s.length || (n !== undefined && s.length !== n)) return null;
+    for (let i = 0; i < s.length; i++) if (!Number.isFinite(s[i]) || s[i] < 0 || (i && s[i] < s[i - 1])) return null;
+    const out = { v: RECORD_VERSION, splits: s.slice() };
+    if (rec.date !== undefined) { if (!validDateKey(rec.date)) return null; out.date = rec.date; }
+    return out;
+  }
+  const completeSplits = (s) => Array.isArray(s) && s.length > 0 && s.every((t) => Number.isFinite(t));
+  // Seconds ahead (negative) or behind (positive) at each split; null where either run has no time.
+  function splitDeltas(splits, ref) {
+    return (splits || []).map((t, i) => (t == null || !ref || ref[i] == null ? null : t - ref[i]));
+  }
+  // Keeps the faster complete run (by finish time).
+  function recordSplits(prev, splits) {
+    const old = cleanSplits(prev, splits ? splits.length : undefined);
+    if (!completeSplits(splits)) return { isNew: false, best: old };
+    if (old && old.splits[old.splits.length - 1] <= splits[splits.length - 1]) return { isNew: false, best: old };
+    return { isNew: true, best: { v: RECORD_VERSION, splits: splits.slice() } };
+  }
+  const fmtDelta = (d) => { const t = Math.abs(d).toFixed(1); return (t === '0.0' ? '±' : d < 0 ? '−' : '+') + t; };
   function buildGenerated(seed, rules) { return buildRoute('gen-' + (seed >>> 0), generateRoute(seed, rules)); }
 
   // Daily Dispatch (F-34). Everyone gets the same route on the same local date: the date gives the seed, and the seed
@@ -2787,6 +2814,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.feats = { bigLipAir: 0, rampCrash: false, gustLoss: 0 }; // goal and drill evidence
       this.runLog = []; this.laps = 0;                // crashes and spills by position, for "Practice this spot"
       this.inputLog = [];                             // every step's input, packed (packInput), for crash replays (F-32)
+      this.splits = [];                               // ride time at each checkpoint after the start, then at the finish (F-35)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
@@ -2857,7 +2885,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           this.progress(inp, dt);
           if (b.x >= this.course.finishX) {
             if (this.course.loop) this.lap();
-            else { this.state = 'finishing'; this.emit('FINISH_LINE', {}); }
+            else { this.state = 'finishing'; this.splits[this.course.checkpoints.length - 1] = this.score.time; this.emit('FINISH_LINE', { split: this.score.time }); }
           }
           break;
         }
@@ -2901,7 +2929,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     progress(inp, dt) {
       const b = this.bike, C = this.course;
-      while (this.cpIndex + 1 < C.checkpoints.length && b.x >= C.checkpoints[this.cpIndex + 1].x) { this.cpIndex++; this.emit('CHECKPOINT', { i: this.cpIndex }); }
+      while (this.cpIndex + 1 < C.checkpoints.length && b.x >= C.checkpoints[this.cpIndex + 1].x) {
+        this.cpIndex++;
+        if (!C.loop) this.splits[this.cpIndex - 1] = this.score.time;
+        this.emit('CHECKPOINT', { i: this.cpIndex, split: this.score.time });
+      }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
       if (b.brakeAmt > 0.85 && b.grounded && b.vx > 10 && this.t - this.brakeT > 3) { this.brakeT = this.t; this.emit('HARD_BRAKE', { speed: b.vx }); }
       const sp = Math.hypot(b.vx, b.vy);
@@ -3051,8 +3083,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         stops: this.zones.filter((z) => z.done).length, stopZones: this.zones.length,
         potholesHit: O.potholes.filter((p) => p.hit).length, potholeCount: O.potholes.length,
         bigLipClean: this.feats.bigLipAir > 0, bigLipAir: this.feats.bigLipAir,
-        rampClean: O.ramps.length > 0 && !this.feats.rampCrash, gustLoss: this.feats.gustLoss, log: this.runLog.slice(),
+        rampClean: O.ramps.length > 0 && !this.feats.rampCrash, gustLoss: this.feats.gustLoss, log: this.runLog.slice(), splits: this.splitList(),
       });
+    }
+    // Split times (F-35): one per checkpoint after the start, then the finish; null where not reached. A run that started
+    // at a later checkpoint (Free Ride) or loops (The Test Hill) has none.
+    splitList() {
+      if (this.course.loop || (this.opts.startCp | 0) > 0) return null;
+      return Array.from({ length: this.course.checkpoints.length }, (_, i) => (this.splits[i] === undefined ? null : this.splits[i]));
     }
     finite() {
       const b = this.bike, c = this.cargo, m = c.stability();
@@ -3193,7 +3231,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   const HILL = {
     STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
-    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, REPLAY, packInput, unpackInput, CrashReplay,
+    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, REPLAY, packInput, unpackInput, CrashReplay,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -5213,6 +5251,22 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       return C;
     }
+    // The run to race (F-35): the day's scored ride on a Daily route, otherwise the fastest complete run on the route.
+    // None when the run starts past the first checkpoint or loops.
+    splitReference(spec, C) {
+      if (C.loop || (spec.mode === 'free' && (spec.cp | 0) > 0)) return null;
+      const n = C.checkpoints.length;
+      if (spec.daily) { const rec = cleanSplits(this.store.get('splits:daily', null), n); return rec && rec.date === spec.daily ? rec.splits : null; }
+      const rec = cleanSplits(this.store.get('splits:' + C.id, null), n);
+      return rec ? rec.splits : null;
+    }
+    // A split as the bike passes a checkpoint or the finish: the time, and how far ahead or behind the reference run.
+    showSplit(i, t) {
+      const ref = this.splitRef, n = this.world.course.checkpoints.length, last = i === n - 1;
+      const label = (last ? 'FINISH ' : 'SPLIT ' + (i + 1) + '/' + (n - 1) + ' ') + fmtTime(t);
+      if (ref && ref[i] != null) { const d = t - ref[i]; this.pop(label + ' · ' + fmtDelta(d), d <= 0 ? 'good' : 'bad', 2.2); }
+      else this.pop(label, 'info', 1.8);
+    }
     newWorld(spec) {
       this.run = spec; this.mode = spec.mode;
       if (spec.mode === 'shift') this.deliveryIndex = this.shiftRoutes.findIndex((r) => r.id === spec.route);
@@ -5224,6 +5278,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.crashOrder = CRASH_LINES.slice();
       this.scarf.ok = false; this.acc = 0; this.slowT = 0; this.timeScale = 1; this.bellT = 0;
       this.replay = null; this.replaying = false; this.dailyStarted = false;
+      this.splitRef = this.splitReference(spec, C);
       this.practiceScale = spec.mode === 'free' && spec.slowmo ? 0.5 : 1;
       this.freeStats = { bestAir: 0, totalAir: 0 };
       this.autopilot = this.autopilotName ? new Autopilot(this.autopilotName) : null;
@@ -5474,6 +5529,21 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         const better = !best || r.tip > best.tip || (r.tip === best.tip && r.time < best.time);
         if (better) { this.store.set(key, { v: RECORD_VERSION, tip: r.tip, condition: r.condition, time: r.time }); el.textContent = best ? 'NEW PERSONAL BEST TIP!' : 'First delivery logged. HR is watching.'; el.classList.add('new'); }
         else el.textContent = 'Personal best: ' + fmtMoney(best.tip) + ' · ' + fmtTime(best.time);
+      }
+      // Split times (F-35): this run against the reference it raced; then keep the fastest complete run.
+      const sbox = $('rv-splits'); sbox.textContent = '';
+      if (r.splits && r.splits.some((t) => t != null)) {
+        const deltas = splitDeltas(r.splits, this.splitRef), head = document.createElement('b');
+        head.textContent = this.splitRef ? (this.run.daily && mode !== 'daily' ? 'VS SCORED RIDE' : 'VS BEST') : 'SPLITS'; sbox.appendChild(head);
+        r.splits.forEach((t, i) => {
+          if (t == null) return;
+          const sp = document.createElement('span'), d = deltas[i];
+          sp.textContent = (i === r.splits.length - 1 ? '🏁 ' : '') + fmtTime(t) + (d == null ? '' : ' ' + fmtDelta(d));
+          if (d != null) sp.className = d <= 0 ? 'ahead' : 'behind';
+          sbox.appendChild(sp);
+        });
+        if (w.best) { const rec = recordSplits(this.store.get('splits:' + C.id, null), r.splits); if (rec.isNew) this.store.set('splits:' + C.id, rec.best); }
+        else if (mode === 'daily' && completeSplits(r.splits)) this.store.set('splits:daily', { v: RECORD_VERSION, date: this.run.daily, splits: r.splits.slice() });
       }
       const gbox = $('rv-goals'); gbox.textContent = '';
       (w.delivered ? ROUTE_GOALS[C.id] || [] : []).forEach((g, i) => { // ★ per goal: met this run, met before, or not yet
@@ -5881,6 +5951,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           const b = W.bike; this.cam.snap(b.x, b.y, b.vx); this.scarf.ok = false;
           break;
         }
+        case 'CHECKPOINT': if (W.splitList()) this.showSplit(e.i - 1, e.split); break;
+        case 'FINISH_LINE': if (W.splitList()) this.showSplit(W.course.checkpoints.length - 1, e.split); break;
         case 'HINT': if (!this.autopilot) this.fx.hint = { text: e.text, keys: controlKeys(e.actions, this.input.device), id: e.id, t: 0 }; break;
         case 'DELIVERED': {
           this.state = 'delivered'; this.deliveredT = 0; this.fx.stamp = 0; A.setMusic(null);
@@ -6200,7 +6272,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ctx.font = '900 ' + (u * 0.95).toFixed(1) + 'px ' + FONT_DISPLAY;
         const y = iy + u * 0.5 + i * u * 1.35 - p.t * u * 0.6;
         ctx.lineWidth = 4; ctx.strokeStyle = COL.ink; ctx.strokeText(p.text, Wd - pad, y);
-        ctx.fillStyle = p.kind === 'good' ? '#9fe0a8' : '#ffb3a5'; ctx.fillText(p.text, Wd - pad, y);
+        ctx.fillStyle = p.kind === 'good' ? '#9fe0a8' : p.kind === 'info' ? '#fff6e5' : '#ffb3a5'; ctx.fillText(p.text, Wd - pad, y);
         ctx.globalAlpha = 1;
       });
       const sp = {}, warn = (wx, wy, d) => { // off-screen hazard arrows
