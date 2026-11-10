@@ -18,6 +18,7 @@ No installation or account required. Open the link in a modern browser.
 - Delivery missions, obstacles, and playful customer feedback
 - **Daily Dispatch:** a new route every day, the same for everyone, with one scored ride, unlimited practice, and a streak
 - Split times at every checkpoint against your best run
+- A spoiler-free Daily Dispatch share card: copy the text, post it, or save a picture of your review
 - A Dispatch board to pick single deliveries, which unlock one by one, each with three goals to master
 - Courier Academy: six training drills graded by Pat from HR, plus Free Ride from any checkpoint and The Test Hill sandbox
 - Cable cars, traffic, and recognizable SF-inspired scenery

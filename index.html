@@ -271,6 +271,9 @@ blockquote::before { content: "\201C"; } blockquote::after { content: "\201D"; }
   font: 900 13px var(--mono); letter-spacing: 0.06em; text-align: center; background: #fff3ea; }
 .screen.on .rc-unlock { animation: unlockin 0.5s 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
 @keyframes unlockin { from { transform: rotate(-1.5deg) scale(2); opacity: 0; } to { transform: rotate(-1.5deg) scale(1); opacity: 1; } }
+.rc-share { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 10px; font: 800 12px var(--mono); }
+.rc-share[hidden] { display: none; }
+.rc-share-status { color: #2f7d4a; flex-basis: 100%; min-height: 1em; }
 .rc-trouble { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; margin: 0 0 10px; padding: 7px 10px;
   border: 2px dashed var(--ink-soft); border-radius: 8px; font: 700 12px var(--mono); color: var(--ink); }
 .rc-trouble[hidden] { display: none; }
@@ -499,6 +502,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         <div class="rc-goals" id="rv-goals" aria-label="Goals"></div>
         <div class="rc-splits" id="rv-splits" aria-label="Split times"></div>
         <div class="rc-unlock" id="rv-unlock" role="status"></div>
+        <div class="rc-share" id="rv-share" hidden><span>Share today's ride</span>
+          <button class="chip" data-act="daily-copy">COPY RESULT</button><button class="chip" data-act="daily-card">SAVE CARD</button>
+          <a class="chip" id="rv-share-x" target="_blank" rel="noopener noreferrer">X</a><a class="chip" id="rv-share-li" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <span class="rc-share-status" id="rv-share-status" role="status"></span></div>
         <div class="rc-trouble" id="rv-trouble" hidden><span id="rv-trouble-text"></span><button class="chip" data-act="practice" aria-label="Practice this spot in Free Ride">PRACTICE THIS SPOT</button></div>
       </div>
       <div class="rc-col">
@@ -1244,7 +1251,23 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     R.daily = spec;
     return R;
   }
-  function buildDaily(key) { const C = buildRoute('daily', dailyRoute(key)); C.daily = dailySpec(key); return C; }
+  // Where each generated segment starts and ends on the road (for the share card's grid).
+  function segmentSpans(R) {
+    const J = joinPieces(R), out = [];
+    let x = R.origin[0];
+    for (const p of J.pieceShapes) {
+      const g = R.plan.find((q) => q.mark === p.mark);
+      if (g) { if (out.length) out[out.length - 1].x1 = x; out.push({ id: g.id, x0: x, x1: Infinity }); }
+      x += p.length;
+    }
+    return out;
+  }
+  function buildDaily(key) {
+    const R = dailyRoute(key), C = buildRoute('daily', R);
+    C.daily = dailySpec(key); C.segments = segmentSpans(R);
+    if (C.segments.length) C.segments[C.segments.length - 1].x1 = C.finishX; // exactly the course's finish line
+    return C;
+  }
   // Saved as hillarious:daily { v, date, seed, result } (result is null until the scored ride finishes, and stays null if
   // it never does), and hillarious:streak { v, count, best, last }.
   const DAILY_RESULT_KEYS = ['time', 'condition', 'crashes', 'tip', 'stars'];
@@ -1254,6 +1277,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     if (rec.result != null) {
       if (typeof rec.result !== 'object' || !DAILY_RESULT_KEYS.every((k) => Number.isFinite(rec.result[k]) && rec.result[k] >= 0)) return null;
       result = Object.fromEntries(DAILY_RESULT_KEYS.map((k) => [k, rec.result[k]]));
+      result.grid = cleanGrid(rec.result.grid);
     }
     return { v: RECORD_VERSION, date: rec.date, seed: rec.seed, result };
   }
@@ -1274,10 +1298,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     if (old && old.date === spec.date) return { scored: false, rec: old, streak: cleanStreak(streak) };
     return { scored: true, rec: { v: RECORD_VERSION, date: spec.date, seed: spec.seed, result: null }, streak: nextStreak(streak, spec.date) };
   }
-  function finishDaily(rec, spec, r, stars) {
+  function finishDaily(rec, spec, r, stars, grid = '') {
     const old = cleanDaily(rec);
     if (!old || old.date !== spec.date || old.result) return null; // only the day's first scored ride counts
-    return { ...old, result: { time: r.time, condition: r.condition, crashes: r.crashes, tip: r.tip, stars } };
+    return { ...old, result: { time: r.time, condition: r.condition, crashes: r.crashes, tip: r.tip, stars, grid: cleanGrid(grid) } };
   }
 
 
@@ -2458,9 +2482,26 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     const crashes = S.crashes === 1 ? '1 crash' : (S.crashes || 0) + ' crashes';
     return 'I earned ' + fmtMoney(S.tips || 0) + ' in tips on my HILLARIOUS delivery shift in ' + (S.place || 'San Francisco') + ' (' + (S.avgStars || 0).toFixed(1) + '★, ' + crashes + '). Can you beat it? 🚲 ' + GAME_URL;
   }
-  function shareLinks(S) {
-    const t = encodeURIComponent(shareText(S));
+  function intentLinks(text) {
+    const t = encodeURIComponent(text);
     return { x: 'https://x.com/intent/post?text=' + t, linkedin: 'https://www.linkedin.com/feed/?shareActive=true&text=' + t };
+  }
+  function shareLinks(S) { return intentLinks(shareText(S)); }
+  // Daily Dispatch share card (F-36): spoiler-free, one emoji per segment (🟩 clean, 🟨 cargo lost, 💥 crash).
+  const CARGO_EMOJI = { coffee: '☕', cake: '🎂', bouquet: '💐' };
+  const GRID_EMOJI = ['🟩', '🟨', '💥'], GRID_LOSS = 3; // percent lost in a segment that earns a 🟨
+  function segmentGrid(segments, log) {
+    return (segments || []).map((g) => {
+      const here = (log || []).filter((e) => e.x >= g.x0 && e.x < g.x1);
+      if (here.some((e) => e.kind === 'crash')) return '💥';
+      return here.reduce((t, e) => t + (e.amount || 0), 0) >= GRID_LOSS ? '🟨' : '🟩';
+    }).join('');
+  }
+  const cleanGrid = (g) => (typeof g === 'string' && [...g].length <= 7 && [...g].every((c) => GRID_EMOJI.includes(c)) ? g : '');
+  function dailyShareText(spec, res) {
+    const stars = '⭐'.repeat(res.stars) + '☆'.repeat(Math.max(0, 5 - res.stars));
+    const head = ['🚲 HILLARIOUS #' + spec.number, (CARGO_EMOJI[spec.cargo] || '📦') + ' ' + Math.round(res.condition) + '%', stars, '💥×' + res.crashes, '⏱ ' + fmtTime(res.time)].join(' · ');
+    return [head, cleanGrid(res.grid), GAME_URL].filter(Boolean).join('\n');
   }
   // A spill episode is named after whatever did the most damage in it.
   const SPILL_CAUSES = { brake: 'Hard brake', landing: 'Rough landing', pothole: 'Pothole', bump: 'Bump', rough: 'Bumpy ride' };
@@ -3231,7 +3272,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   const HILL = {
     STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
-    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, REPLAY, packInput, unpackInput, CrashReplay,
+    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, REPLAY, packInput, unpackInput, CrashReplay,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -5059,6 +5100,35 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   /* ---------- 21. GAME (state machine + loop) ---------- */
+  // The Daily Dispatch share card (F-36): verdict, stars, tip, date, and the segment grid, on a 1200×630 canvas.
+  function drawShareCard(cv, spec, res) {
+    const ctx = cv.getContext('2d'), W = cv.width, H = cv.height, remix = DAILY_REMIXES.find((x) => x.id === spec.remix);
+    const rv = reviewFor(reviewsFor(spec.cargo), res.condition), words = cargoWords(spec.cargo);
+    ctx.fillStyle = COL.cream; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = COL.coral; ctx.fillRect(0, 0, W, 120);
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    ctx.fillStyle = COL.cream; ctx.font = '900 64px ' + FONT_DISPLAY; ctx.fillText('HILLARIOUS #' + spec.number, 60, 62);
+    ctx.textAlign = 'right'; ctx.font = '800 26px ' + FONT_MONO; ctx.fillText('DAILY DISPATCH · ' + spec.date, W - 60, 48);
+    ctx.fillText(remix.name.toUpperCase() + ' · ' + words.name, W - 60, 84);
+    const av = document.createElement('canvas'); av.width = av.height = 128; drawAvatar(av, res.stars, 'founder');
+    ctx.drawImage(av, 60, 165, 150, 150);
+    ctx.textAlign = 'left'; ctx.fillStyle = COL.mustard; ctx.font = '900 58px ' + FONT_BODY;
+    ctx.fillText('★'.repeat(res.stars), 240, 205); ctx.fillStyle = '#d8d1c4'; ctx.fillText('★'.repeat(5 - res.stars), 240 + ctx.measureText('★'.repeat(res.stars)).width, 205);
+    ctx.fillStyle = COL.ink; ctx.font = 'italic 800 36px ' + FONT_BODY;
+    let line = '', y = 275; const maxW = W - 300;
+    for (const word of ('“' + rv.text + '”').split(' ')) { const t = line ? line + ' ' + word : word; if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, 240, y); y += 44; line = word; } else line = t; }
+    ctx.fillText(line, 240, y);
+    const stats = [['TIP', fmtMoney(res.tip)], [words.short.toUpperCase(), Math.round(res.condition) + '%'], ['TIME', fmtTime(res.time)], ['CRASHES', String(res.crashes)]];
+    stats.forEach(([k, v], i) => {
+      const x = 60 + i * 280;
+      ctx.fillStyle = COL.ink; ctx.font = '800 22px ' + FONT_MONO; ctx.fillText(k, x, 420);
+      ctx.fillStyle = i === 0 ? '#2f7d4a' : COL.ink; ctx.font = '900 56px ' + FONT_DISPLAY; ctx.fillText(v, x, 468);
+    });
+    if (res.grid) { ctx.font = '48px ' + FONT_BODY; ctx.fillText(res.grid, 60, 548); }
+    ctx.fillStyle = COL.teal; ctx.fillRect(0, H - 50, W, 50);
+    ctx.fillStyle = COL.cream; ctx.font = '800 24px ' + FONT_MONO; ctx.textAlign = 'center';
+    ctx.fillText(GAME_URL.replace(/^https:\/\//, '') + ' · same route for everyone today', W / 2, H - 25);
+  }
   class Game {
     constructor() {
       this.params = new URLSearchParams(root.location ? root.location.search : '');
@@ -5222,6 +5292,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'free-go': this.store.set('free', this.freeCfg); this.startRun(Object.assign({ mode: 'free' }, this.freeCfg)); break;
         case 'daily': this.startDailyRun(false); break;
         case 'daily-practice': this.startDailyRun(true); break;
+        case 'daily-copy': this.copyDaily(); break;
+        case 'daily-card': this.saveDailyCard(); break;
         case 'practice': if (this.trouble) this.startRun(Object.assign({}, this.freeCfg, this.trouble, { mode: 'free' })); break;
         case 'go': this.beginRide(); break;
         case 'resume': this.resume(); break;
@@ -5319,6 +5391,53 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (practice || this.dailyRecord(key)) this.startRun({ mode: 'free', daily: key, traffic: true });
       else this.startRun({ mode: 'daily', daily: key });
     }
+    // Today's share text (F-36), from the saved record, so it also works from the Dispatch board.
+    dailyShare() {
+      const key = this.todayKey(), rec = this.dailyRecord(key);
+      return rec && rec.result ? { spec: dailySpec(key), res: rec.result, text: dailyShareText(dailySpec(key), rec.result) } : null;
+    }
+    shareStatus(msg) {
+      const el = document.getElementById(this.state === 'review' ? 'rv-share-status' : 'board-note');
+      if (el) el.textContent = msg;
+      this.announce(msg);
+    }
+    // Copies the share text: the clipboard API where allowed, else a hidden text box and the copy command.
+    copyDaily() {
+      const sh = this.dailyShare();
+      if (!sh) return;
+      const done = () => this.shareStatus('Copied! Paste it anywhere.');
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = sh.text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        ta.remove();
+        if (ok) done(); else this.shareStatus('Copy blocked by the browser. Your result: ' + sh.text.split('\n')[0]);
+      };
+      if (root.navigator && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(sh.text).then(done, fallback);
+      else fallback();
+    }
+    // A 1200×630 PNG of today's review, shared through the phone's share sheet or saved as a file. Nothing is uploaded.
+    saveDailyCard() {
+      const sh = this.dailyShare();
+      if (!sh) return;
+      const cv = document.createElement('canvas');
+      cv.width = 1200; cv.height = 630;
+      drawShareCard(cv, sh.spec, sh.res);
+      this.lastCard = cv; // tests read it
+      cv.toBlob((blob) => {
+        if (!blob) { this.shareStatus('Could not draw the card in this browser.'); return; }
+        const name = 'hillarious-' + sh.spec.number + '.png', file = root.File ? new File([blob], name, { type: 'image/png' }) : null;
+        if (file && this.input.touchMode && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], text: sh.text }).then(() => this.shareStatus('Shared.'), () => this.shareStatus('Not shared.'));
+          return;
+        }
+        const a = document.createElement('a'), url = URL.createObjectURL(blob);
+        a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        this.shareStatus('Saved ' + name + '.');
+      }, 'image/png');
+    }
     beginRide() {
       if (this.mode === 'daily' && !this.dailyStarted) { // the attempt is used from here: quitting or restarting won't give another
         const res = startDaily(this.store.get('daily', null), this.store.get('streak', null), dailySpec(this.run.daily));
@@ -5358,6 +5477,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ride.dataset.act = rec ? 'daily-practice' : 'daily'; ride.disabled = !open;
       ride.setAttribute('aria-label', !open ? 'Daily Dispatch, locked. ' + line : (rec ? 'Practice ' : 'Ride ') + C.title + ', ' + remix.name + '. ' + line);
       side.append(tag, ride);
+      if (res) { const sh = mk('button', 'chip', 'SHARE'); sh.dataset.act = 'daily-copy'; sh.setAttribute('aria-label', "Copy today's result to share"); side.append(sh); }
       if (open && !rec) { const pr = mk('button', 'chip', 'PRACTICE'); pr.dataset.act = 'daily-practice'; pr.setAttribute('aria-label', 'Practice ' + C.title + ', unscored'); side.append(pr); }
       card.append(av, top, side, sub, mk('div', 'order-best', line));
       box.appendChild(card);
@@ -5519,7 +5639,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         el.textContent = stamp > oldStamp ? 'NEW BEST STAMP: ' + STAMPS[stamp] : 'Best stamp: ' + STAMPS[Math.max(stamp, oldStamp)];
         if (stamp > oldStamp) el.classList.add('new');
       } else if (w.daily) {
-        const spec = dailySpec(this.run.daily), rec = finishDaily(this.store.get('daily', null), spec, r, rv.stars), st = cleanStreak(this.store.get('streak', null));
+        const spec = dailySpec(this.run.daily), rec = finishDaily(this.store.get('daily', null), spec, r, rv.stars, segmentGrid(C.segments, r.log)), st = cleanStreak(this.store.get('streak', null));
         if (rec) this.store.set('daily', rec);
         el.textContent = (rec ? 'HILLARIOUS #' + spec.number + ' logged.' : 'Already logged today.') + ' Streak: ' + st.count + (st.count === 1 ? ' day' : ' days') + (st.best > st.count ? ' (best ' + st.best + ')' : '');
         if (rec) el.classList.add('new');
@@ -5545,6 +5665,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (w.best) { const rec = recordSplits(this.store.get('splits:' + C.id, null), r.splits); if (rec.isNew) this.store.set('splits:' + C.id, rec.best); }
         else if (mode === 'daily' && completeSplits(r.splits)) this.store.set('splits:daily', { v: RECORD_VERSION, date: this.run.daily, splits: r.splits.slice() });
       }
+      // Share card (F-36): only for the day's scored ride, once it is logged.
+      const shareRec = mode === 'daily' ? this.dailyRecord(this.run.daily) : null, shareBox = $('rv-share');
+      shareBox.hidden = !(shareRec && shareRec.result); $('rv-share-status').textContent = '';
+      if (!shareBox.hidden) { const links = intentLinks(dailyShareText(dailySpec(this.run.daily), shareRec.result)); $('rv-share-x').href = links.x; $('rv-share-li').href = links.linkedin; }
       const gbox = $('rv-goals'); gbox.textContent = '';
       (w.delivered ? ROUTE_GOALS[C.id] || [] : []).forEach((g, i) => { // ★ per goal: met this run, met before, or not yet
         const row = document.createElement('div'), star = document.createElement('i'), txt = document.createElement('span');

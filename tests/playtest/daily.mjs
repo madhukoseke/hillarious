@@ -19,7 +19,7 @@ const clock = () => {
 };
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
 await ctx.addInitScript(clock);
 const page = await ctx.newPage(), errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -68,10 +68,26 @@ if (shots) await page.screenshot({ path: `${shots}/daily-receipt.png` });
 const logged = await saved();
 check('the result is saved', logged.daily.result && logged.daily.result.tip >= 0 && logged.daily.result.stars >= 1, logged.daily);
 
+// 2b. Sharing (F-36): copy the text card, save the PNG, and the X / LinkedIn links carry the same text.
+const share = await page.evaluate(() => ({ hidden: document.getElementById('rv-share').hidden, x: decodeURIComponent(document.getElementById('rv-share-x').href.split('text=')[1] || '') }));
+check('the scored receipt offers sharing, and the X link carries the share text', !share.hidden && /^🚲 HILLARIOUS #12 · 💐 \d+% · ⭐+☆* · 💥×\d+ · ⏱ \d:\d\d\.\d\n[🟩🟨💥]+\nhttps:\/\/hillarious\.pages\.dev$/u.test(share.x), share);
+await page.click('#rv-share [data-act="daily-copy"]');
+await page.waitForTimeout(200);
+const clip = await page.evaluate(() => navigator.clipboard.readText());
+check('COPY RESULT puts the same text on the clipboard', clip === share.x && /Copied/.test(await page.evaluate(() => document.getElementById('rv-share-status').textContent)), clip);
+const [download] = await Promise.all([page.waitForEvent('download'), page.click('#rv-share [data-act="daily-card"]')]);
+const png = await page.evaluate(() => ({ w: HILL.game.lastCard.width, h: HILL.game.lastCard.height, png: HILL.game.lastCard.toDataURL('image/png') }));
+check('SAVE CARD downloads a 1200×630 PNG', download.suggestedFilename() === 'hillarious-12.png' && png.w === 1200 && png.h === 630, { file: download.suggestedFilename(), w: png.w, h: png.h });
+if (shots) { const fs = await import('node:fs'); fs.writeFileSync(`${shots}/daily-card.png`, Buffer.from(png.png.split(',')[1], 'base64')); }
+
 // 3. Back on the board: done for today, practice only.
 await page.evaluate(() => HILL.game.action('board'));
 const done = await card();
 check('the card shows today\'s result and offers practice', done.state === 'delivered' && done.button === 'PRACTICE' && /Today's ride: \$/.test(done.line) && /1 day/.test(done.streak), done);
+await page.evaluate(() => navigator.clipboard.writeText(''));
+await page.click('#board-orders .order.daily [data-act="daily-copy"]');
+await page.waitForTimeout(200);
+check('the board\'s SHARE chip copies the same text', (await page.evaluate(() => navigator.clipboard.readText())) === share.x);
 if (shots) await page.screenshot({ path: `${shots}/daily-done.png` });
 
 // 4. Practice saves nothing.
