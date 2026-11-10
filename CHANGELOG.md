@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - Daily Dispatch: a new route every day, the same for everyone, at the top of the Dispatch board once you've delivered your first order. Each day brings its own cargo and a twist (Classic, Short haul, or Calm day). You get one scored ride a day, and it counts from the moment you set off, so a restart turns it into practice. Practice is unlimited and saves nothing. Riding on consecutive days builds a 🔥 streak.
 - Split times: each checkpoint and the finish pop your time, and once you have a best run on that route, how far ahead (green) or behind (red) you are. The receipt lists every split. Your fastest complete run on each route is kept to race next time; on Daily Dispatch, practice races the day's scored ride.
+- Share your Daily Dispatch: after the scored ride, COPY RESULT puts a spoiler-free card on the clipboard (`🚲 HILLARIOUS #12 · 💐 95% · ⭐⭐⭐⭐⭐ · 💥×0 · ⏱ 0:35.7` and one square per block: 🟩 clean, 🟨 cargo lost, 💥 crash), and the X and LinkedIn buttons post the same text. SAVE CARD makes a 1200×630 picture of your review, through the share sheet on phones or as a download elsewhere. Nothing is uploaded. The Dispatch board's SHARE chip copies it again later in the day.
 
 ### Fixed
 - The sign over Telegraph Hill's finish said "Lombard Gardens · wedding today · cake entrance"; it now says Telegraph Blooms, flower drop-off.

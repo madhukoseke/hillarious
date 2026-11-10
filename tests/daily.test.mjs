@@ -60,7 +60,7 @@ test('daily: one scored attempt a day; restarting or coming back later is practi
   const again = H.startDaily(first.rec, first.streak, spec);
   assert.ok(!again.scored, 'the second start the same day is unscored, even before a result');
   const done = H.finishDaily(first.rec, spec, { time: 41.5, condition: 88, crashes: 1, tip: 4.2 }, 4);
-  assert.deepEqual(plain(done.result), { time: 41.5, condition: 88, crashes: 1, tip: 4.2, stars: 4 });
+  assert.deepEqual(plain(done.result), { time: 41.5, condition: 88, crashes: 1, tip: 4.2, stars: 4, grid: '' });
   assert.equal(H.finishDaily(done, spec, { time: 30, condition: 100, crashes: 0, tip: 9 }, 5), null, 'a later ride cannot overwrite it');
   assert.equal(H.finishDaily(first.rec, H.dailySpec('2026-11-21'), { time: 30, condition: 100, crashes: 0, tip: 9 }, 5), null, 'nor can another day\'s');
   assert.ok(H.startDaily(done, first.streak, H.dailySpec('2026-11-21')).scored, 'a new day, a new attempt');
@@ -86,4 +86,50 @@ test('daily: corrupt saved records are ignored', () => {
     assert.deepEqual(plain(H.cleanStreak(bad)), { v: 1, count: 0, best: 0, last: null }, JSON.stringify(bad));
   }
   assert.ok(H.startDaily({ date: 'garbage' }, { count: 'x' }, H.dailySpec('2026-11-20')).scored, 'a corrupt record never blocks the day\'s attempt');
+});
+
+/* ------------------------------ share card (F-36) ------------------------------ */
+
+test('share: a daily route knows where each segment starts and ends', () => {
+  for (let d = 0; d < 60; d++) {
+    const key = H.keyForDay(H.dayIndex(H.DAILY_EPOCH) + d), C = H.buildDaily(key), R = H.dailyRoute(key);
+    assert.equal(C.segments.length, R.plan.length);
+    assert.deepEqual(C.segments.map((g) => g.id), R.plan.map((g) => g.id));
+    for (let i = 0; i < C.segments.length; i++) {
+      const g = C.segments[i];
+      assert.ok(g.x1 > g.x0, `${key} ${g.id}`);
+      if (i) assert.equal(g.x0, C.segments[i - 1].x1, 'segments meet');
+    }
+    assert.ok(C.segments[0].x0 > C.start, 'the first segment starts after the plateau');
+    assert.equal(C.segments.at(-1).x1, C.finishX, 'the last one ends at the finish line');
+  }
+});
+
+test('share: the grid has one emoji per segment: crash, cargo lost, or clean', () => {
+  const segs = [{ x0: 0, x1: 10 }, { x0: 10, x1: 20 }, { x0: 20, x1: 30 }, { x0: 30, x1: 40 }];
+  const log = [{ kind: 'spill', x: 12, amount: 2 }, { kind: 'spill', x: 18, amount: 1.5 }, { kind: 'crash', x: 25, amount: 0 }, { kind: 'spill', x: 31, amount: 1 }];
+  assert.equal(H.segmentGrid(segs, log), '🟩🟨💥🟩');
+  assert.equal(H.segmentGrid(segs, []), '🟩🟩🟩🟩');
+  assert.equal(H.cleanGrid('🟩💥'), '🟩💥');
+  for (const bad of ['<b>', '🟩🟩🟩🟩🟩🟩🟩🟩', 7, null, '🟩x']) assert.equal(H.cleanGrid(bad), '', String(bad));
+});
+
+test('share: the text card reads like the spec and links reuse it', () => {
+  const spec = { number: 42, cargo: 'bouquet' }, res = { condition: 86.7, stars: 3, crashes: 1, time: 39.04, grid: '🟩🟨💥🟩🟩' };
+  const text = H.dailyShareText(spec, res);
+  assert.equal(text.split('\n')[0], '🚲 HILLARIOUS #42 · 💐 87% · ⭐⭐⭐☆☆ · 💥×1 · ⏱ 0:39.0');
+  assert.equal(text.split('\n')[1], '🟩🟨💥🟩🟩');
+  assert.equal(text.split('\n')[2], 'https://hillarious.pages.dev');
+  assert.ok(!H.dailyShareText(spec, { ...res, grid: '<script>' }).includes('<script>'), 'a bad grid is dropped');
+  const links = H.intentLinks(text);
+  assert.equal(decodeURIComponent(links.x.split('text=')[1]), text);
+  assert.equal(decodeURIComponent(links.linkedin.split('text=')[1]), text);
+});
+
+test('share: a finished daily ride keeps its grid; a corrupt grid is dropped, not the record', () => {
+  const spec = H.dailySpec('2026-11-20'), first = H.startDaily(null, null, spec);
+  const done = H.finishDaily(first.rec, spec, { time: 40, condition: 90, crashes: 0, tip: 5 }, 4, '🟩🟩🟨');
+  assert.equal(done.result.grid, '🟩🟩🟨');
+  const rec = H.cleanDaily({ ...done, result: { ...done.result, grid: 'javascript:' } });
+  assert.ok(rec && rec.result.grid === '');
 });
