@@ -506,6 +506,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           <button class="chip" data-act="daily-copy">COPY RESULT</button><button class="chip" data-act="daily-card">SAVE CARD</button>
           <a class="chip" id="rv-share-x" target="_blank" rel="noopener noreferrer">X</a><a class="chip" id="rv-share-li" target="_blank" rel="noopener noreferrer">LinkedIn</a>
           <span class="rc-share-status" id="rv-share-status" role="status"></span></div>
+        <div class="rc-share" id="rv-clip" hidden><span>That crash deserves an audience.</span>
+          <button class="chip" data-act="clip" id="rv-clip-btn">SAVE WIPEOUT CLIP</button><span class="rc-share-status" id="rv-clip-status" role="status"></span></div>
         <div class="rc-trouble" id="rv-trouble" hidden><span id="rv-trouble-text"></span><button class="chip" data-act="practice" aria-label="Practice this spot in Free Ride">PRACTICE THIS SPOT</button></div>
       </div>
       <div class="rc-col">
@@ -3191,6 +3193,29 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     get alpha() { return clamp(this.acc / STEP, 0, 1); }
     get progress() { return clamp((this.i - this.from) / Math.max(1, this.to - this.from), 0, 1); }
   }
+  // Wipeout clips (F-37). The clip is the run's most costly crash (the latest one on a tie).
+  function pickWipeout(crashes) {
+    let best = null;
+    for (const c of crashes || []) if (c && Number.isInteger(c.step) && c.step > 0 && (!best || (c.lost || 0) >= (best.lost || 0))) best = c;
+    return best;
+  }
+  // The first video type the browser can record: WebM where possible, MP4 on Safari. null: no clips here.
+  const CLIP_TYPES = [['video/webm;codecs=vp9', 'webm'], ['video/webm;codecs=vp8', 'webm'], ['video/webm', 'webm'], ['video/mp4;codecs=avc1', 'mp4'], ['video/mp4', 'mp4']];
+  function clipType(isSupported) {
+    if (typeof isSupported !== 'function') return null;
+    for (const [mime, ext] of CLIP_TYPES) { try { if (isSupported(mime)) return { mime, ext }; } catch (e) { /* try the next */ } }
+    return null;
+  }
+  // The replay as frames at a fixed rate: what a clip shows, frame by frame (the clip itself records in real time).
+  function replayFrames(rp, fps = 30) {
+    const out = [];
+    rp.prepare();
+    do {
+      const W = rp.world, r = W.state === 'crashed' && W.rag.on ? W.rag : W.bike;
+      out.push({ i: rp.i, state: W.state, x: r.x, y: r.y, a: r.a, rate: rp.rate(), zoom: rp.zoomTarget() });
+    } while (rp.advance(1 / fps) && out.length < 100000);
+    return out;
+  }
 
   /* =====================================================================
    * 11. AUTOPILOT: scripted riders for tests and ?autopilot=
@@ -3281,7 +3306,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   const HILL = {
     STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
-    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay,
+    DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay, pickWipeout, CLIP_TYPES, clipType, replayFrames,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
@@ -5310,6 +5335,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'daily': this.startDailyRun(false); break;
         case 'daily-practice': this.startDailyRun(true); break;
         case 'daily-copy': this.copyDaily(); break;
+        case 'clip': this.startClip(); break;
         case 'daily-card': this.saveDailyCard(); break;
         case 'practice': if (this.trouble) this.startRun(Object.assign({}, this.freeCfg, this.trouble, { mode: 'free' })); break;
         case 'go': this.beginRide(); break;
@@ -5366,7 +5392,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.particles.clear(); this.resetFx(); this.timers = []; this.greeted = new Set();
       this.crashOrder = CRASH_LINES.slice();
       this.scarf.ok = false; this.acc = 0; this.slowT = 0; this.timeScale = 1; this.bellT = 0;
-      this.replay = null; this.replaying = false; this.dailyStarted = false;
+      this.replay = null; this.replaying = false; this.dailyStarted = false; this.crashLog = [];
       this.splitRef = this.splitReference(spec, C);
       this.practiceScale = spec.mode === 'free' && spec.slowmo ? 0.5 : 1;
       this.freeStats = { bestAir: 0, totalAir: 0 };
@@ -5682,6 +5708,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (w.best) { const rec = recordSplits(this.store.get('splits:' + C.id, null), r.splits); if (rec.isNew) this.store.set('splits:' + C.id, rec.best); }
         else if (mode === 'daily' && completeSplits(r.splits)) this.store.set('splits:daily', { v: RECORD_VERSION, date: this.run.daily, splits: r.splits.slice() });
       }
+      $('rv-clip').hidden = !this.canSaveClip(); $('rv-clip-status').textContent = ''; // F-37: only after a crash, where recording works
       // Share card (F-36): only for the day's scored ride, once it is logged.
       const shareRec = mode === 'daily' ? this.dailyRecord(this.run.daily) : null, shareBox = $('rv-share');
       shareBox.hidden = !(shareRec && shareRec.result); $('rv-share-status').textContent = '';
@@ -5852,6 +5879,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
             if (this.reviewT <= 0) this.action(document.getElementById('rv-next').dataset.act);
           }
           if (this.state === 'riding' || this.state === 'delivered') this.updateRiding(dt);
+          else if (this.state === 'clip') this.updateClip(dt);
           this.renderWorld();
         }
       } catch (err) {
@@ -5883,7 +5911,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const rp = this.replay, skip = this.input.sample().jumpPressed;
       this.replayT += dt;
       if ((skip && this.replayT > 0.25) || !rp.advance(dt)) { this.endReplay(); return; }
-      const W = rp.world, b = W.bike;
+      this.followReplay(dt);
+    }
+    // The replay's camera: on the rider (or the flying body), pushing in for the slow-motion part.
+    followReplay(dt) {
+      const rp = this.replay, W = rp.world, b = W.bike;
       if (!this.replayHit && W.state === 'crashed') { this.replayHit = true; this.cam.shake(0.6); this.audio.play('crash'); }
       let fx = lerp(b.px, b.x, rp.alpha), fy = lerp(b.py, b.y, rp.alpha), fvx = b.vx;
       if (W.state === 'crashed' && W.rag.on) { fx = lerp(fx, W.rag.x, 0.6); fy = lerp(fy, W.rag.y, 0.6); fvx = W.rag.vx * 0.5; }
@@ -5891,6 +5923,60 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       rp.zoom += (rp.zoomTarget() - rp.zoom) * (1 - Math.exp(-dt * 4));
       this.cam.zoom = rp.zoom;
       this.particles.update(dt * rp.rate(), W.terrain);
+    }
+    // Wipeout clips (F-37): replay the run's worst crash on screen and record the canvas. The file stays on the device.
+    clipFormat() {
+      if (this.clipFmt === undefined) {
+        const ok = root.MediaRecorder && this.R.cv && typeof this.R.cv.captureStream === 'function';
+        this.clipFmt = ok ? clipType((m) => MediaRecorder.isTypeSupported(m)) : null;
+      }
+      return this.clipFmt;
+    }
+    canSaveClip() { return !!(this.world && this.clipFormat() && pickWipeout(this.crashLog)); }
+    startClip() {
+      const fmt = this.clipFormat(), pick = pickWipeout(this.crashLog), W = this.world;
+      if (!fmt || !pick || !W || this.state !== 'review') return;
+      this.replay = new CrashReplay(this.runCourse(this.run), W.opts, W.inputLog, pick.step);
+      this.replay.prepare();
+      this.replaying = true; this.replayT = 0; this.replayHit = false; this.reviewT = null;
+      this.state = 'clip'; this.show(null); this.particles.clear(); this.scarf.ok = false;
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // so SPACE cancels, not re-clicks
+      const b = this.replay.world.bike; this.cam.snap(b.x, b.y, b.vx); this.cam.trauma = 0;
+      const chunks = [], rec = new MediaRecorder(this.R.cv.captureStream(30), { mimeType: fmt.mime });
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = () => { if (this.clipKeep && chunks.length) this.saveClip(new Blob(chunks, { type: fmt.mime.split(';')[0] }), fmt.ext); };
+      this.clipRec = rec; this.clipKeep = false;
+      rec.start(250);
+      this.announce('Recording your wipeout. ' + controlKeys(['hop'], this.input.device).join(' or ') + ' cancels.');
+    }
+    updateClip(dt) {
+      const rp = this.replay, skip = this.input.sample().jumpPressed;
+      this.replayT += dt;
+      if (skip && this.replayT > 0.25) { this.finishClip(false); return; }
+      if (!rp.advance(dt)) { this.finishClip(true); return; }
+      this.followReplay(dt);
+    }
+    finishClip(keep) {
+      this.clipKeep = keep;
+      if (this.clipRec && this.clipRec.state !== 'inactive') this.clipRec.stop();
+      this.clipRec = null; this.replaying = false; this.replay = null; this.cam.zoom = 1;
+      this.particles.clear(); this.scarf.ok = false;
+      const W = this.world, b = W.bike; this.cam.snap(b.x, b.y, 0);
+      this.state = 'review'; this.show('review', document.getElementById('rv-clip-btn'));
+      document.getElementById('rv-clip-status').textContent = keep ? 'Saving…' : 'Clip cancelled.';
+    }
+    saveClip(blob, ext) {
+      const name = 'hillarious-wipeout-' + String(this.world.course.id).replace(/[^\w-]/g, '') + '.' + ext, status = document.getElementById('rv-clip-status');
+      this.lastClip = { size: blob.size, type: blob.type, name }; // tests read it
+      const file = root.File ? new File([blob], name, { type: blob.type }) : null;
+      if (file && this.input.touchMode && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file] }).then(() => { status.textContent = 'Shared.'; }, () => { status.textContent = 'Not shared.'; });
+        return;
+      }
+      const a = document.createElement('a'), url = URL.createObjectURL(blob);
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      status.textContent = 'Saved ' + name + '.'; this.announce(status.textContent);
     }
     updateRiding(dt) {
       if (this.replaying) { this.updateReplay(dt); return; }
@@ -6077,6 +6163,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
           break;
         case 'CRASH': {
           this.slowT = 0.75; A.play('crash'); A.duck(1.6); this.cam.shake(0.9);
+          if (e.step) this.crashLog.push({ step: e.step, lost: e.lost || 0 }); // for the wipeout clip (F-37)
           if (this.replaysOn() && e.step) this.replay = new CrashReplay(this.runCourse(this.run), W.opts, W.inputLog, e.step);
           if (!this.crashOrder.length) this.crashOrder = CRASH_LINES.slice();
           this.fx.caption = { text: this.crashOrder.shift(), t: 0 }; this.fx.bubble = null; this.announce(this.fx.caption.text);
@@ -6189,7 +6276,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.fillStyle = '#fff6e5'; ctx.textAlign = 'left'; ctx.fillText('REPLAY', u * 2.6, bar / 2);
       if (rp.rate() < 1) { ctx.fillStyle = '#f2b134'; ctx.fillText('SLOW-MO', u * 2.6 + ctx.measureText('REPLAY  ').width, bar / 2); }
       ctx.font = '700 ' + u.toFixed(1) + 'px system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff6e5';
-      ctx.fillText(controlKeys(['hop'], this.input.device).join(' / ') + '  skip', w - u * 1.2, h - bar / 2);
+      ctx.fillText(controlKeys(['hop'], this.input.device).join(' / ') + (this.state === 'clip' ? '  cancel' : '  skip'), w - u * 1.2, h - bar / 2);
+      if (this.state === 'clip') { ctx.fillText('HILLARIOUS · ' + GAME_URL.replace(/^https:\/\//, ''), w - u * 1.2, bar / 2); } // the clip says where it's from
       ctx.fillStyle = 'rgba(255,246,229,0.25)'; ctx.fillRect(0, h - bar, w, 3);
       ctx.fillStyle = '#f2b134'; ctx.fillRect(0, h - bar, w * rp.progress, 3);
       ctx.restore();

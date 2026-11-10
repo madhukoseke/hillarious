@@ -19,6 +19,7 @@ No installation or account required. Open the link in a modern browser.
 - **Daily Dispatch:** a new route every day, the same for everyone, with one scored ride, unlimited practice, and a streak
 - Split times at every checkpoint against your best run
 - A spoiler-free Daily Dispatch share card: copy the text, post it, or save a picture of your review
+- Slow-motion crash replays, and wipeout clips you can save as a video
 - A Dispatch board to pick single deliveries, which unlock one by one, each with three goals to master
 - Courier Academy: six training drills graded by Pat from HR, plus Free Ride from any checkpoint and The Test Hill sandbox
 - Cable cars, traffic, and recognizable SF-inspired scenery
@@ -59,7 +60,7 @@ The headless simulation and scoring tests need Node.js 22 or later and no other 
 node --test "tests/*.test.mjs"
 ```
 
-They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`. `dispatch-training.js` walks Dispatch, a drill, Free Ride, and The Test Hill from a fresh profile. `crash-replay.mjs`, `daily.mjs`, `splits.mjs`, and `review-cards.mjs` run on a controlled clock and check crash replays and every delivery's review card.
+They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`. `dispatch-training.js` walks Dispatch, a drill, Free Ride, and The Test Hill from a fresh profile. `crash-replay.mjs`, `daily.mjs`, `splits.mjs`, `wipeout.mjs`, and `review-cards.mjs` run on a controlled clock and check crash replays and every delivery's review card.
 
 `tests/playtest/cross-browser.mjs` opens Dispatch, Training, and Free Ride, then plays a shift on Chromium, Firefox, and WebKit at desktop and phone sizes. It takes an optional URL argument; setup steps are at the top of the file. Results and the real-device checklist live in [docs/browser-matrix.md](docs/browser-matrix.md).
 

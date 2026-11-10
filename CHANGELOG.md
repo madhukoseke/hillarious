@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Daily Dispatch: a new route every day, the same for everyone, at the top of the Dispatch board once you've delivered your first order. Each day brings its own cargo and a twist (Classic, Short haul, or Calm day). You get one scored ride a day, and it counts from the moment you set off, so a restart turns it into practice. Practice is unlimited and saves nothing. Riding on consecutive days builds a 🔥 streak.
 - Split times: each checkpoint and the finish pop your time, and once you have a best run on that route, how far ahead (green) or behind (red) you are. The receipt lists every split. Your fastest complete run on each route is kept to race next time; on Daily Dispatch, practice races the day's scored ride.
 - Share your Daily Dispatch: after the scored ride, COPY RESULT puts a spoiler-free card on the clipboard (`🚲 HILLARIOUS #12 · 💐 95% · ⭐⭐⭐⭐⭐ · 💥×0 · ⏱ 0:35.7` and one square per block: 🟩 clean, 🟨 cargo lost, 💥 crash), and the X and LinkedIn buttons post the same text. SAVE CARD makes a 1200×630 picture of your review, through the share sheet on phones or as a download elsewhere. Nothing is uploaded. The Dispatch board's SHARE chip copies it again later in the day.
+- Wipeout clips: after a ride with a crash, the receipt offers SAVE WIPEOUT CLIP. It replays your worst crash in slow motion and saves it as a short video (WebM, or MP4 in Safari), through the share sheet on phones or as a download elsewhere. Nothing is uploaded, and SPACE cancels. The button only appears where your browser can record.
 
 ### Changed
 - Going downhill fast, the camera looks further ahead (up to 10 m instead of 7.5 m), so you see what's coming on a steep descent. On flat ground it's as before.
@@ -20,7 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Developer
 - Route generator, the groundwork for Daily Dispatch: `generateRoute(seed, rules)` lays out a route from 5–7 hand-made segments taken from the three hand-written routes, using only the seed and integer choices, so every browser builds the same route. Difficulty never falls along the route, there is at most one difficulty-5 segment and never two blind hazards in a row, and par (35–50 s) comes from each segment's measured design time. Not in the game yet.
 - Fairness: every push rides generated seeds 1–5 with every cargo and all four riders, plus the first 7 daily routes; a nightly workflow rides seeds 1–2000 and the first 2,000 days (`FAIRNESS_SEEDS`, `FAIRNESS_FROM`, `FAIRNESS_DAYS`, `FAIRNESS_DAY_FROM`).
-- Daily records: `hillarious:daily` `{ v, date, seed, result }` and `hillarious:streak` `{ v, count, best, last }`; corrupt records are ignored. `?daily=YYYY-MM-DD` plays another day. `tests/playtest/daily.mjs` and `tests/playtest/splits.mjs` check the flows in the browser, and `cross-browser.mjs` checks that every engine builds the same daily route.
+- Daily records: `hillarious:daily` `{ v, date, seed, result }` and `hillarious:streak` `{ v, count, best, last }`; corrupt records are ignored. `?daily=YYYY-MM-DD` plays another day. `tests/playtest/daily.mjs`, `splits.mjs`, and `wipeout.mjs` check the flows in the browser, and `cross-browser.mjs` checks that every engine builds the same daily route.
 
 ## [1.5.0] - 2026-11-08
 
