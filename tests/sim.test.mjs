@@ -1381,3 +1381,33 @@ test('feel: the music dips only for real air, while riding', () => {
   }
   assert.ok(air > 0 && landings > 0, `a fast Nob Hill ride dips the music (${(air / 120).toFixed(1)} s) and brings it back (${landings}×)`);
 });
+
+/* ---------------------------- wipeout clips (F-37) ---------------------------- */
+
+test('clips: the clip is the most costly crash, the latest on a tie', () => {
+  assert.equal(H.pickWipeout([]), null);
+  assert.equal(H.pickWipeout([{ step: 0, lost: 9 }, { step: 'x', lost: 9 }]), null, 'bad steps are ignored');
+  assert.equal(H.pickWipeout([{ step: 100, lost: 5 }, { step: 400, lost: 20 }, { step: 900, lost: 3 }]).step, 400);
+  assert.equal(H.pickWipeout([{ step: 100, lost: 5 }, { step: 400, lost: 5 }]).step, 400);
+});
+
+test('clips: WebM where the browser records it, MP4 otherwise (Safari), none where it records nothing', () => {
+  assert.deepEqual(plain(H.clipType((m) => m.startsWith('video/webm'))), { mime: 'video/webm;codecs=vp9', ext: 'webm' });
+  assert.deepEqual(plain(H.clipType((m) => m === 'video/mp4')), { mime: 'video/mp4', ext: 'mp4' });
+  assert.equal(H.clipType(() => false), null);
+  assert.equal(H.clipType(undefined), null);
+  assert.equal(H.clipType(() => { throw new Error('nope'); }), null, 'a throwing check counts as unsupported');
+});
+
+test('clips: the crash replays into the same frames every time', () => {
+  const w = new H.World(H.buildNobHill()), ap = new H.Autopilot('reckless'), crashes = [];
+  while (w.state !== 'done' && w.t < 90) { w.step(ap.input(w)); for (const e of w.drain()) if (e.type === 'CRASH') crashes.push({ step: e.step, lost: e.lost }); }
+  const pick = H.pickWipeout(crashes);
+  assert.ok(pick, 'the reckless rider crashes');
+  const frames = () => H.replayFrames(new H.CrashReplay(H.buildNobHill(), w.opts, w.inputLog, pick.step), 30);
+  const a = frames(), b = frames();
+  assert.equal(JSON.stringify(a), JSON.stringify(b), 'identical frame by frame');
+  assert.ok(a.some((f) => f.state === 'crashed') && a[0].state === 'riding', 'it shows the run-up and the crash');
+  assert.ok(a.length > 60 && a.length < 400, `${a.length} frames at 30 fps`);
+  assert.ok(a.at(-1).zoom > a[0].zoom && a.at(-1).rate < 1, 'it ends zoomed in, in slow motion');
+});
