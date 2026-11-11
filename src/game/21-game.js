@@ -979,6 +979,9 @@
         case 'CAKE_DECOR': this.dropDecor(e); if (!e.crash) this.say('CAKE_DECOR'); break;
         case 'CAKE_GROOM': this.dropDecor(e); this.say('CAKE_GROOM'); break;
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
+        case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
+        case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
+        case 'DISCO_ROLL': this.say('DISCO_ROLL'); break;
         case 'CLEAN_LANDING': this.pop('+$0.25 clean landing', 'good'); A.play('coin'); this.say('CLEAN_LANDING'); break;
         case 'BIG_LIP': this.pop('Landed it level · ' + e.airTime.toFixed(2) + ' s air', 'good'); break;
         case 'STOP_ZONE': this.pop(e.left ? 'Stopped! ' + e.left + ' to go' : 'Stopped! Every box done', 'good'); A.play('coin'); break;
@@ -1280,6 +1283,12 @@
       ctx.restore();
       ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
+    }
+    drawDiscoIcon(ctx, x, y, h, frac) { // a ball whose tiles go dark as condition drops
+      const r = h * 0.42, cy = y + h * 0.5, n = 12, lit = Math.ceil(frac * n);
+      ctx.save(); ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU); ctx.clip();
+      for (let i = 0; i < n; i++) { const col = i % 4, row = (i / 4) | 0; ctx.fillStyle = i < lit ? (i % 2 ? '#e8eef5' : '#b9c7d6') : '#3a3642'; ctx.fillRect(x - r + col * r / 2, cy - r + row * (2 * r / 3), r / 2 - 0.5, 2 * r / 3 - 0.5); }
+      ctx.restore(); ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU); ctx.stroke();
     }
     drawBouquetIcon(ctx, x, y, h, frac) { // one bloom per 20% of petals left
       const n = Math.max(0, Math.ceil(frac * 5));

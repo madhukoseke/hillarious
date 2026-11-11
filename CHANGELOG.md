@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- A fourth cargo, the disco ball: a mirrored ball loose in an open crate on the rear rack. Braking, speeding up, and pitching roll it; hitting a crate wall chips mirror tiles (missing ones show as dark squares); a big landing pops it out and back in with a boing, which costs condition but isn't a crash. Ride it in Free Ride on any hill; its own route, Twin Peaks, comes later.
+
 ### Developer
 - Source split (TD-14): the source now lives in `src/`: the page, the styles, and the game script in 15 files named after its sections. `tools/build.mjs` builds the same single offline `index.html`, which stays committed, so the game still opens straight from the file. The first build reproduced the old file byte for byte. `npm run build` writes it, `npm run check` (now in CI) fails when it is stale, and `tests/build.test.mjs` checks it without installs. `three` and `esbuild` are exact-pinned dev dependencies for the diorama renderer.
 

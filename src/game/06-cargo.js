@@ -193,12 +193,96 @@
 
   // Bouquet (Telegraph Hill, 1.4 prototype): no liquid or swinging mass. Petals are lost to gusts at speed, rough
   // landings, bumps, and crashes. Same interface as the other cargo; `update` also takes the wind for the gust rule.
+  // Disco ball (Twin Peaks, F-39): a mirrored ball loose in an open crate on the rear rack. It rolls along the crate
+  // floor under the effective gravity in the rack frame (so braking, accelerating, and pitch all roll it), chips mirror
+  // tiles when it hits a crate wall hard, and a big jolt pops it out. A pop-out costs condition but is not a crash: the
+  // ball bounces back in. Gusts push it too.
+  const DISCO = {
+    mountX: -0.58, mountY: -0.25, tau: 0.03, // the crate sits where the cake rack is
+    half: 0.13, r: 0.16,                     // crate half-width the ball's centre can travel; ball radius (m)
+    roll: 5 / 7, drag: 1.1, wind: 0.09,      // solid-sphere rolling; rolling resistance (1/s); gust push per m/s
+    bounce: 0.45, hitMin: 0.55, hitPct: 7,   // wall hits: % per m/s over hitMin
+    landMin: 5.5, landPct: 0.9,              // landings jolt it: % per unit of impact over landMin
+    popMin: 8.5, popCost: 6, popPct: 1.2,    // a landing over popMin pops it out of the crate
+    bumpPop: 9, airTime: 0.55,               // a bump this fast pops it too; time out of the crate (visual)
+    crashBase: 10, crashExtra: 16, tiles: 24,
+  };
+  class DiscoCargo {
+    constructor() { this.kind = 'disco'; this.amount = 100; this.shield = false; this.events = []; this.resetSlosh(); }
+    refill() { this.amount = 100; this.resetSlosh(); }
+    resetSlosh() { this.p = 0; this.v = 0; this.spin = 0; this.air = 0; this.afx = 0; this.afy = 0; this.pvx = NaN; this.pvy = 0; this.gMag = 1; this.spilling = 0; }
+    get condition() { return this.amount; }
+    get slosh() { return 0; }   // no liquid; the world's finite check reads these
+    get sloshV() { return 0; }
+    tilesLeft() { return Math.ceil((this.amount / 100) * DISCO.tiles); }
+    update(dt, b, frozen, wind = 0) {
+      const D = DISCO, ca = Math.cos(b.a), sa = Math.sin(b.a);
+      const rx = D.mountX * ca - D.mountY * sa, ry = D.mountX * sa + D.mountY * ca;
+      const vx = b.vx - b.w * ry, vy = b.vy + b.w * rx;
+      if (Number.isNaN(this.pvx)) { this.pvx = vx; this.pvy = vy; }
+      const ax = clamp((vx - this.pvx) / dt, -140, 140), ay = clamp((vy - this.pvy) / dt, -140, 140);
+      this.pvx = vx; this.pvy = vy;
+      const k = 1 - Math.exp(-dt / D.tau);
+      this.afx += (ax - this.afx) * k; this.afy += (ay - this.afy) * k;
+      const gx = -this.afx, gy = -b.P.g - this.afy;
+      const lgx = gx * ca + gy * sa, lgy = -gx * sa + gy * ca;   // effective gravity in the crate frame
+      this.gMag = Math.hypot(lgx, lgy) / b.P.g;
+      if (this.air > 0) this.air = Math.max(0, this.air - dt);
+      this.v += (D.roll * lgx - D.drag * this.v + D.wind * wind) * dt;
+      this.p += this.v * dt;
+      this.spin += (this.v / D.r) * dt;
+      let dmg = 0;
+      if (Math.abs(this.p) > D.half) { // a crate wall
+        const sgn = Math.sign(this.p), hit = Math.abs(this.v);
+        this.p = sgn * D.half;
+        if (this.v * sgn > 0) this.v *= -D.bounce;
+        if (hit > D.hitMin && !frozen) { dmg += absorbHit(this, (hit - D.hitMin) * D.hitPct); this.events.push({ type: 'DISCO_TILE', hit }); }
+      }
+      dmg = Math.min(this.amount, dmg);
+      this.amount -= dmg;
+      this.spilling = dmg > 0 ? Math.min(1, this.spilling + dt * 8) : Math.max(0, this.spilling - dt * 3);
+      return dmg;
+    }
+    popOut(extra) { // out of the crate and back in with a boing: not a crash
+      this.air = DISCO.airTime; this.p = 0; this.v = 0;
+      const amt = absorbHit(this, Math.min(this.amount, DISCO.popCost + extra));
+      if (amt > 0 || !this.shield) this.events.push({ type: 'DISCO_POP' });
+      return amt;
+    }
+    splash(impact, rel, frozen) {
+      const D = DISCO;
+      if (impact <= D.landMin) return 0;
+      this.v += (rel < 0 ? 1 : -1) * (impact - D.landMin) * 0.12; // nose-first landings throw it forward
+      if (frozen) return 0;
+      const amt = impact > D.popMin ? this.popOut((impact - D.popMin) * D.popPct) : absorbHit(this, Math.min(this.amount, (impact - D.landMin) * D.landPct));
+      this.amount -= amt;
+      return amt;
+    }
+    bump(speed, frozen) {
+      this.v -= 0.3 + speed * 0.08;
+      if (frozen) return 0;
+      const amt = speed > DISCO.bumpPop ? this.popOut(0) : absorbHit(this, Math.min(this.amount, Math.max(0, speed - 2.5) * 0.6));
+      this.amount -= amt;
+      return amt;
+    }
+    kick(v) { this.v += v * 0.5; }
+    windShare() { return 0; }
+    stability() { return this.p + this.v; }
+    alarm() { return Math.abs(this.v) > 0.9 && this.air === 0 ? 'DISCO_ROLL' : null; }
+    crashLoss(sev) {
+      const lost = absorbHit(this, Math.min(this.amount, DISCO.crashBase + DISCO.crashExtra * clamp(sev, 0, 1)));
+      this.amount -= lost;
+      this.resetSlosh();
+      return lost;
+    }
+  }
   const BOUQUET = { windMin: 2.5, windRate: 1.4, windFloor: 6, windSpeed: 8, landMin: 6, landPct: 3, bumpMin: 2, bumpPct: 0.8, crashBase: 12, crashExtra: 20 };
   // Player-facing words for each cargo, so labels and HUD text stay in step.
   const CARGO_WORDS = {
     coffee: { name: 'LATTE', short: 'Latte', noun: 'Coffee', unit: '% latte', condition: 'Coffee remaining', lost: 'Coffee lost' },
     cake: { name: 'CAKE', short: 'Cake', noun: 'Cake', unit: '% cake', condition: 'Cake integrity', lost: 'Cake damage' },
     bouquet: { name: 'BOUQUET', short: 'Bouquet', noun: 'Bouquet', unit: '% petals', condition: 'Petals left', lost: 'Petals lost' },
+    disco: { name: 'DISCO BALL', short: 'Disco ball', noun: 'Disco ball', unit: '% sparkle', condition: 'Mirror tiles left', lost: 'Tiles lost' },
   };
   // Unknown or inherited keys (such as "constructor") fall back to the latte, so saves and URLs can't break a label.
   function cleanCargo(kind) { return Object.prototype.hasOwnProperty.call(CARGO_WORDS, kind) ? kind : 'coffee'; }
