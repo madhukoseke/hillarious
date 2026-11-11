@@ -2037,12 +2037,96 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
 
   // Bouquet (Telegraph Hill, 1.4 prototype): no liquid or swinging mass. Petals are lost to gusts at speed, rough
   // landings, bumps, and crashes. Same interface as the other cargo; `update` also takes the wind for the gust rule.
+  // Disco ball (Twin Peaks, F-39): a mirrored ball loose in an open crate on the rear rack. It rolls along the crate
+  // floor under the effective gravity in the rack frame (so braking, accelerating, and pitch all roll it), chips mirror
+  // tiles when it hits a crate wall hard, and a big jolt pops it out. A pop-out costs condition but is not a crash: the
+  // ball bounces back in. Gusts push it too.
+  const DISCO = {
+    mountX: -0.58, mountY: -0.25, tau: 0.03, // the crate sits where the cake rack is
+    half: 0.13, r: 0.16,                     // crate half-width the ball's centre can travel; ball radius (m)
+    roll: 5 / 7, drag: 1.1, wind: 0.09,      // solid-sphere rolling; rolling resistance (1/s); gust push per m/s
+    bounce: 0.45, hitMin: 0.55, hitPct: 7,   // wall hits: % per m/s over hitMin
+    landMin: 5.5, landPct: 0.9,              // landings jolt it: % per unit of impact over landMin
+    popMin: 8.5, popCost: 6, popPct: 1.2,    // a landing over popMin pops it out of the crate
+    bumpPop: 9, airTime: 0.55,               // a bump this fast pops it too; time out of the crate (visual)
+    crashBase: 10, crashExtra: 16, tiles: 24,
+  };
+  class DiscoCargo {
+    constructor() { this.kind = 'disco'; this.amount = 100; this.shield = false; this.events = []; this.resetSlosh(); }
+    refill() { this.amount = 100; this.resetSlosh(); }
+    resetSlosh() { this.p = 0; this.v = 0; this.spin = 0; this.air = 0; this.afx = 0; this.afy = 0; this.pvx = NaN; this.pvy = 0; this.gMag = 1; this.spilling = 0; }
+    get condition() { return this.amount; }
+    get slosh() { return 0; }   // no liquid; the world's finite check reads these
+    get sloshV() { return 0; }
+    tilesLeft() { return Math.ceil((this.amount / 100) * DISCO.tiles); }
+    update(dt, b, frozen, wind = 0) {
+      const D = DISCO, ca = Math.cos(b.a), sa = Math.sin(b.a);
+      const rx = D.mountX * ca - D.mountY * sa, ry = D.mountX * sa + D.mountY * ca;
+      const vx = b.vx - b.w * ry, vy = b.vy + b.w * rx;
+      if (Number.isNaN(this.pvx)) { this.pvx = vx; this.pvy = vy; }
+      const ax = clamp((vx - this.pvx) / dt, -140, 140), ay = clamp((vy - this.pvy) / dt, -140, 140);
+      this.pvx = vx; this.pvy = vy;
+      const k = 1 - Math.exp(-dt / D.tau);
+      this.afx += (ax - this.afx) * k; this.afy += (ay - this.afy) * k;
+      const gx = -this.afx, gy = -b.P.g - this.afy;
+      const lgx = gx * ca + gy * sa, lgy = -gx * sa + gy * ca;   // effective gravity in the crate frame
+      this.gMag = Math.hypot(lgx, lgy) / b.P.g;
+      if (this.air > 0) this.air = Math.max(0, this.air - dt);
+      this.v += (D.roll * lgx - D.drag * this.v + D.wind * wind) * dt;
+      this.p += this.v * dt;
+      this.spin += (this.v / D.r) * dt;
+      let dmg = 0;
+      if (Math.abs(this.p) > D.half) { // a crate wall
+        const sgn = Math.sign(this.p), hit = Math.abs(this.v);
+        this.p = sgn * D.half;
+        if (this.v * sgn > 0) this.v *= -D.bounce;
+        if (hit > D.hitMin && !frozen) { dmg += absorbHit(this, (hit - D.hitMin) * D.hitPct); this.events.push({ type: 'DISCO_TILE', hit }); }
+      }
+      dmg = Math.min(this.amount, dmg);
+      this.amount -= dmg;
+      this.spilling = dmg > 0 ? Math.min(1, this.spilling + dt * 8) : Math.max(0, this.spilling - dt * 3);
+      return dmg;
+    }
+    popOut(extra) { // out of the crate and back in with a boing: not a crash
+      this.air = DISCO.airTime; this.p = 0; this.v = 0;
+      const amt = absorbHit(this, Math.min(this.amount, DISCO.popCost + extra));
+      if (amt > 0 || !this.shield) this.events.push({ type: 'DISCO_POP' });
+      return amt;
+    }
+    splash(impact, rel, frozen) {
+      const D = DISCO;
+      if (impact <= D.landMin) return 0;
+      this.v += (rel < 0 ? 1 : -1) * (impact - D.landMin) * 0.12; // nose-first landings throw it forward
+      if (frozen) return 0;
+      const amt = impact > D.popMin ? this.popOut((impact - D.popMin) * D.popPct) : absorbHit(this, Math.min(this.amount, (impact - D.landMin) * D.landPct));
+      this.amount -= amt;
+      return amt;
+    }
+    bump(speed, frozen) {
+      this.v -= 0.3 + speed * 0.08;
+      if (frozen) return 0;
+      const amt = speed > DISCO.bumpPop ? this.popOut(0) : absorbHit(this, Math.min(this.amount, Math.max(0, speed - 2.5) * 0.6));
+      this.amount -= amt;
+      return amt;
+    }
+    kick(v) { this.v += v * 0.5; }
+    windShare() { return 0; }
+    stability() { return this.p + this.v; }
+    alarm() { return Math.abs(this.v) > 0.9 && this.air === 0 ? 'DISCO_ROLL' : null; }
+    crashLoss(sev) {
+      const lost = absorbHit(this, Math.min(this.amount, DISCO.crashBase + DISCO.crashExtra * clamp(sev, 0, 1)));
+      this.amount -= lost;
+      this.resetSlosh();
+      return lost;
+    }
+  }
   const BOUQUET = { windMin: 2.5, windRate: 1.4, windFloor: 6, windSpeed: 8, landMin: 6, landPct: 3, bumpMin: 2, bumpPct: 0.8, crashBase: 12, crashExtra: 20 };
   // Player-facing words for each cargo, so labels and HUD text stay in step.
   const CARGO_WORDS = {
     coffee: { name: 'LATTE', short: 'Latte', noun: 'Coffee', unit: '% latte', condition: 'Coffee remaining', lost: 'Coffee lost' },
     cake: { name: 'CAKE', short: 'Cake', noun: 'Cake', unit: '% cake', condition: 'Cake integrity', lost: 'Cake damage' },
     bouquet: { name: 'BOUQUET', short: 'Bouquet', noun: 'Bouquet', unit: '% petals', condition: 'Petals left', lost: 'Petals lost' },
+    disco: { name: 'DISCO BALL', short: 'Disco ball', noun: 'Disco ball', unit: '% sparkle', condition: 'Mirror tiles left', lost: 'Tiles lost' },
   };
   // Unknown or inherited keys (such as "constructor") fall back to the latte, so saves and URLs can't break a label.
   function cleanCargo(kind) { return Object.prototype.hasOwnProperty.call(CARGO_WORDS, kind) ? kind : 'coffee'; }
@@ -2414,6 +2498,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { min: 1, stars: 2, text: 'Mostly stems. Very dramatic stems.' },
     { min: 0, stars: 1, text: 'Ruth asked for a receipt for the petals.' },
   ];
+  const DISCO_REVIEWS = [
+    { min: 90, stars: 5, text: "Flawless. It's giving Studio 54." },
+    { min: 60, stars: 4, text: 'A few tiles short. So are we all, honey.' },
+    { min: 30, stars: 3, text: 'Half disco, half ball.' },
+    { min: 1, stars: 2, text: "It's a ball. Barely." },
+    { min: 0, stars: 1, text: 'You delivered a crate. A very sparkly crate.' },
+  ];
   // The cargo registry (F-27): the one list of cargo types. Each class keeps its own rules behind the same methods
   // (update, splash, bump, kick, crashLoss, refill, resetSlosh, windShare, stability, alarm, condition); this table adds
   // what the world needs around it: how to make one, its review lines, and how it flies off the bike in a crash.
@@ -2422,6 +2513,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     coffee: { make: () => new CoffeeCargo(), reviews: COFFEE_REVIEWS, crashThrow: { mx: CARGO.mountX, my: 0.15, vx: 1.5, vy: 4.2, w: -9 } },
     cake: { make: () => new CakeCargo(), reviews: CAKE_REVIEWS, crashThrow: { mx: CAKE.mountX, my: 0.2, vx: 0.5, vy: 3.2, w: -4 } },
     bouquet: { make: () => new BouquetCargo(), reviews: BOUQUET_REVIEWS, crashThrow: { mx: CARGO.mountX, my: 0.15, vx: 1.5, vy: 4.2, w: -9 } },
+    disco: { make: () => new DiscoCargo(), reviews: DISCO_REVIEWS, crashThrow: { mx: DISCO.mountX, my: 0.25, vx: 1.2, vy: 4.6, w: -7 } },
   };
   function cargoType(kind) { return CARGO_TYPES[cleanCargo(kind)]; } // unknown kinds fall back to the latte, like cleanCargo
   function makeCargo(kind) { return cargoType(kind).make(); }
@@ -2500,7 +2592,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
   function shareLinks(S) { return intentLinks(shareText(S)); }
   // Daily Dispatch share card (F-36): spoiler-free, one emoji per segment (🟩 clean, 🟨 cargo lost, 💥 crash).
-  const CARGO_EMOJI = { coffee: '☕', cake: '🎂', bouquet: '💐' };
+  const CARGO_EMOJI = { coffee: '☕', cake: '🎂', bouquet: '💐', disco: '🪩' };
   const GRID_EMOJI = ['🟩', '🟨', '💥'], GRID_LOSS = 3; // percent lost in a segment that earns a 🟨
   function segmentGrid(segments, log) {
     return (segments || []).map((g) => {
@@ -2757,6 +2849,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'r-stairs', trigger: 'STAIRS', speaker: 'rider', text: 'Macondray Lane: technically a shortcut.', priority: 2 },
     { id: 'r-bubble', trigger: 'POWERUP_BUBBLE', speaker: 'rider', text: 'Engineering solved packaging.', priority: 3 },
     { id: 'r-espresso', trigger: 'POWERUP_ESPRESSO', speaker: 'rider', text: 'Caffeine is a performance-enhancing substance.', priority: 3 },
+    { id: 'r-boing', trigger: 'DISCO_POP', speaker: 'rider', text: "Boing! It's back in. Nobody saw that.", priority: 3, cargo: 'disco' },
+    { id: 'r-roll', trigger: 'DISCO_ROLL', speaker: 'rider', text: 'Keep rolling, baby. No, not like that.', priority: 2, cargo: 'disco' },
     { id: 'r-pop', trigger: 'SHIELD_POP', speaker: 'rider', text: 'Bubble wrap took the hit. Pop pop!', priority: 3 },
     { id: 'r-close', trigger: 'NEAR_MISS', speaker: 'rider', text: 'Totally meant to do that.', priority: 2 },
     // Customer texts (phone channel)
@@ -3308,7 +3402,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HILL = {
     STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
     DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay, pickWipeout, CLIP_TYPES, clipType, replayFrames,
-    buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
+    buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, DiscoCargo, DISCO, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
     RECOVER_LINE, CrossTraffic, Autopilot, AUTOPILOT_PROFILES, Store, clamp, wrapAngle, mulberry32, NO_INPUT,
     ROUTES, CHAPTERS, chapterRoutes, THEMES, MID_LAYERS, themeFor, COMING_SOON, ROUTE_GOALS, routeGoals, STAMPS, DRILLS, drillStamp, migrateProgress, unlockState, drillStates,
@@ -3556,7 +3650,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     play(name, k) {
       if (!this.ctx || this.ctx.state !== 'running') return;
-      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, bark: 0.6, shutter: 0.5, wobble: 0.7 };
+      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, boing: 0.4, glint: 0.12, bark: 0.6, shutter: 0.5, wobble: 0.7 };
       const now = this.ctx.currentTime;
       if (MIN[name] && now - (this.last[name] || -9) < MIN[name]) return;
       this.last[name] = now;
@@ -3598,6 +3692,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'pop': this.noiseHit(t, 0.03, 0.4, 'highpass', 1800, 0, 0.8); this.noiseHit(t + 0.06, 0.025, 0.25, 'highpass', 2200, 0, 0.8); break;
         case 'powerup': [523.3, 659.3, 784, 1046.5].forEach((f, i) => this.osc('triangle', f, f, t + i * 0.06, 0.12, 0.12)); break;
         case 'espresso': this.osc('sawtooth', 220, 1400, t, 0.28, 0.06); this.osc('triangle', 784, 1568, t + 0.12, 0.2, 0.08); break;
+        case 'boing': { const o = this.osc('sine', 220, 520, t, 0.32, 0.18); this.vibrato(o, t, 14, 40, 0.32); break; } // the disco ball pops back in
+        case 'glint': this.osc('triangle', 2637, 2637, t, 0.08, 0.06); this.osc('triangle', 3520, 3520, t + 0.05, 0.1, 0.04); break; // a mirror tile chips
         case 'wobble': { const o = this.osc('sine', 180, 140, t, 0.45, 0.16); this.vibrato(o, t, 9, 30, 0.45); break; }
         case 'decor': this.osc('sine', v(1500), 500, t, 0.18, 0.08); break;
         case 'bark': for (let i = 0; i < 2; i++) { this.noiseHit(t + i * 0.16, 0.08, 0.3, 'bandpass', 700, 420, 2.5); this.osc('square', v(330), 180, t + i * 0.16, 0.08, 0.05); } break;
@@ -4560,6 +4656,37 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     ctx.fillStyle = '#d64545'; rrect(ctx, -0.14, 0, 0.28, 0.05, 0.02); ctx.fill();
     ctx.restore();
   }
+  // Disco ball (F-39): a mirror-tiled ball rolling in an open crate on the rack. Missing tiles are dark squares.
+  function drawDiscoBall(ctx, r, spin, left, t) {
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.clip();
+    ctx.fillStyle = '#9aa8b8'; ctx.fillRect(-r, -r, 2 * r, 2 * r);
+    const cols = 6, rows = 4, cw = (2 * r) / cols * 1.25, rh = (2 * r) / rows, off = ((spin * r) % cw + cw) % cw;
+    for (let j = 0; j < rows; j++) for (let i = -1; i <= cols; i++) {
+      const k = j * cols + ((i % cols) + cols) % cols, x = -r + i * cw - off, y = -r + j * rh;
+      ctx.fillStyle = k >= left ? '#2d2a32' : (i + j + Math.floor(t * 3)) % 3 === 0 ? '#ffffff' : (i + j) % 2 ? '#dbe3ec' : '#b9c7d6';
+      ctx.fillRect(x + 0.004, y + 0.004, cw - 0.008, rh - 0.008);
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#2d2a32'; ctx.lineWidth = 0.012; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(-r * 0.4, r * 0.45, r * 0.18, 0, TAU); ctx.fill(); // highlight (y is up)
+  }
+  function drawDiscoInCrate(ctx, c, t) {
+    const D = DISCO, w = D.half + D.r + 0.02, hop = c.air > 0 ? Math.sin((1 - c.air / D.airTime) * Math.PI) * 0.45 : 0;
+    ctx.save(); ctx.translate(D.mountX, D.mountY + 0.03);
+    ctx.fillStyle = '#c99a5b'; ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 0.014;
+    rrect(ctx, -w, 0, 2 * w, 0.05, 0.01); ctx.fill(); ctx.stroke();                 // crate floor
+    for (const sx of [-1, 1]) { rrect(ctx, sx * w - 0.02, 0, 0.04, 0.17, 0.01); ctx.fill(); ctx.stroke(); } // low walls
+    ctx.save(); ctx.translate(c.p, 0.05 + D.r + hop); ctx.rotate(-c.spin);
+    drawDiscoBall(ctx, D.r, 0, c.tilesLeft(), t);
+    ctx.restore();
+    if (c.shield) drawBubbleWrap(ctx, -w, 0, 2 * w, 0.3, t);
+    ctx.restore();
+  }
+  function drawFlyingDisco(ctx, x, y, a, c, t) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a * 2);
+    drawDiscoBall(ctx, DISCO.r, 0, c ? c.tilesLeft() : DISCO.tiles, t || 0);
+    ctx.restore();
+  }
   function drawFlyingBouquet(ctx, x, y, a) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.translate(0, -0.25);
     ctx.fillStyle = '#f29ab0';
@@ -4598,6 +4725,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const out = (Math.random() - 0.5) * (burst ? 3 : 1.6), up = 0.8 + Math.random() * (burst ? 2.4 : 1.2);
       const vx = b.vx * 0.7 + out * ca - up * sa, vy = b.vy * 0.7 + out * sa + up * ca;
       P.spawn(PK.CONFETTI, rim.x + (Math.random() - 0.5) * 0.2, rim.y, vx, vy, 1.8, 0.03 + Math.random() * 0.02, i % 3 ? '#f29ab0' : '#fff2f5');
+    }
+  }
+  function discoBits(game, n, burst) { // mirror shards
+    const W = game.world, b = W.bike, P = game.particles, rim = b.localToWorld(DISCO.mountX + (W.cargo.p || 0), 0.2, { x: 0, y: 0 });
+    const ca = Math.cos(b.a), sa = Math.sin(b.a);
+    for (let i = 0; i < n; i++) {
+      const out = (Math.random() - 0.5) * (burst ? 3 : 1.8), up = 1 + Math.random() * (burst ? 2.6 : 1.4);
+      const vx = b.vx * 0.7 + out * ca - up * sa, vy = b.vy * 0.7 + out * sa + up * ca;
+      P.spawn(PK.CONFETTI, rim.x, rim.y, vx, vy, 1.4, 0.025 + Math.random() * 0.015, i % 3 ? '#dbe3ec' : '#ffffff');
     }
   }
   const cupSpill = (game, e) => { game.audio.play('slosh'); game.spawnCargoBits(Math.min(9, 2 + Math.round(e.amount * 4)), false); };
@@ -4642,6 +4778,19 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       splashSound: 'wobble', bits: petalBits, onSpill: (game, e) => game.spawnCargoBits(Math.min(6, 1 + Math.round(e.amount * 3)), false),
       spillLine: true, condNote: () => '',
     },
+  };
+  CARGO_VIEW.disco = {
+    venueSign: ['THE MIRROR ROOM', 'DRAG BRUNCH TODAY · SPARKLE ENTRANCE →'],
+    pose: (c) => c,
+    rack: drawDiscoInCrate,
+    worried: (c) => Math.abs(c.v) > 0.8 || c.air > 0 || c.spilling > 0.2, lookX: -1,
+    flying: (ctx, x, y, a, c, t) => drawFlyingDisco(ctx, x, y, a, c, t),
+    hudIcon: (game, ctx, x, top, u, frac) => game.drawDiscoIcon(ctx, x, top + u * 0.5, u * 2.5, frac),
+    meter: (c) => ({ label: 'ROLL ', value: Math.min(1, Math.abs(c.v) / 1.4) }),
+    debug: (c) => 'ball p ' + c.p.toFixed(3) + '  v ' + c.v.toFixed(2) + '  air ' + c.air.toFixed(2) + '  tiles ' + c.tilesLeft() + '/' + DISCO.tiles + '  ' + c.amount.toFixed(1) + '%',
+    pauseLine: 'The disco ball is still spinning. And judgmental.', dropLabel: ' m to the sparkle drop',
+    arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
+    splashSound: 'glint', bits: discoBits, onSpill: () => {}, spillLine: false, condNote: (r) => ' · ' + Math.ceil((r.condition / 100) * DISCO.tiles) + '/' + DISCO.tiles + ' tiles',
   };
   function cargoView(kind) { return CARGO_VIEW[cleanCargo(kind)]; }
   const EMPTY_RACK = {}; // nothing on the rack or in the basket
@@ -6123,6 +6272,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'CAKE_DECOR': this.dropDecor(e); if (!e.crash) this.say('CAKE_DECOR'); break;
         case 'CAKE_GROOM': this.dropDecor(e); this.say('CAKE_GROOM'); break;
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
+        case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
+        case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
+        case 'DISCO_ROLL': this.say('DISCO_ROLL'); break;
         case 'CLEAN_LANDING': this.pop('+$0.25 clean landing', 'good'); A.play('coin'); this.say('CLEAN_LANDING'); break;
         case 'BIG_LIP': this.pop('Landed it level · ' + e.airTime.toFixed(2) + ' s air', 'good'); break;
         case 'STOP_ZONE': this.pop(e.left ? 'Stopped! ' + e.left + ' to go' : 'Stopped! Every box done', 'good'); A.play('coin'); break;
@@ -6424,6 +6576,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.restore();
       ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
+    }
+    drawDiscoIcon(ctx, x, y, h, frac) { // a ball whose tiles go dark as condition drops
+      const r = h * 0.42, cy = y + h * 0.5, n = 12, lit = Math.ceil(frac * n);
+      ctx.save(); ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU); ctx.clip();
+      for (let i = 0; i < n; i++) { const col = i % 4, row = (i / 4) | 0; ctx.fillStyle = i < lit ? (i % 2 ? '#e8eef5' : '#b9c7d6') : '#3a3642'; ctx.fillRect(x - r + col * r / 2, cy - r + row * (2 * r / 3), r / 2 - 0.5, 2 * r / 3 - 0.5); }
+      ctx.restore(); ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU); ctx.stroke();
     }
     drawBouquetIcon(ctx, x, y, h, frac) { // one bloom per 20% of petals left
       const n = Math.max(0, Math.ceil(frac * 5));

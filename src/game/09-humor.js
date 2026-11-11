@@ -56,6 +56,8 @@
     { id: 'r-stairs', trigger: 'STAIRS', speaker: 'rider', text: 'Macondray Lane: technically a shortcut.', priority: 2 },
     { id: 'r-bubble', trigger: 'POWERUP_BUBBLE', speaker: 'rider', text: 'Engineering solved packaging.', priority: 3 },
     { id: 'r-espresso', trigger: 'POWERUP_ESPRESSO', speaker: 'rider', text: 'Caffeine is a performance-enhancing substance.', priority: 3 },
+    { id: 'r-boing', trigger: 'DISCO_POP', speaker: 'rider', text: "Boing! It's back in. Nobody saw that.", priority: 3, cargo: 'disco' },
+    { id: 'r-roll', trigger: 'DISCO_ROLL', speaker: 'rider', text: 'Keep rolling, baby. No, not like that.', priority: 2, cargo: 'disco' },
     { id: 'r-pop', trigger: 'SHIELD_POP', speaker: 'rider', text: 'Bubble wrap took the hit. Pop pop!', priority: 3 },
     { id: 'r-close', trigger: 'NEAR_MISS', speaker: 'rider', text: 'Totally meant to do that.', priority: 2 },
     // Customer texts (phone channel)
