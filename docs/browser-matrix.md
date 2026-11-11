@@ -32,6 +32,12 @@ Each run starts a shift as a player (the intro must wait for input), rides, then
 | 2026-11-08 | 1.5.0 | Firefox 142 | Landscape phone 844×390, clicks | Pass | No errors; same tips. Run with clicks instead of taps: in a freshly launched Playwright Firefox, a touch tap fires touchstart and touchend but never a click, on 1.4.0 as well as 1.5.0, so the tap version timed out. Touch on real Android Firefox is still a TD-07 device check. |
 | 2026-11-08 | 1.5.0 | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | No errors. Same tips as Chromium. |
 | 2026-11-08 | 1.5.0 | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | No errors. Same tips as Chromium. |
+| 2026-11-11 | 1.6.0 | Chromium 141 | Desktop 1280×720, keyboard | Pass | Shift to the final review in 154 s; no console or page errors. Tips $5.04 / $4.85 / $4.70. Daily route hash `ea1c0bca`, par 43. Records clips as WebM (VP9). |
+| 2026-11-11 | 1.6.0 | Chromium 141 | Landscape phone 844×390, touch | Pass | Touch labels shown; same tips and daily hash. |
+| 2026-11-11 | 1.6.0 | Firefox 142 | Desktop 1280×720, keyboard | Pass | No errors; same tips and daily hash. Records clips as WebM (VP8). |
+| 2026-11-11 | 1.6.0 | Firefox 142 | Landscape phone 844×390, clicks | Pass | No errors; same tips and daily hash. The script clicks in Firefox (Playwright's Firefox fires no click for a tap). |
+| 2026-11-11 | 1.6.0 | WebKit 26 (Safari engine) | Desktop 1280×720, keyboard | Pass | No errors; same tips and daily hash. Playwright's WebKit records WebM (VP9); real Safari may pick MP4, still to check on a device. |
+| 2026-11-11 | 1.6.0 | WebKit 26 (Safari engine) | Landscape phone 844×390, touch | Pass | No errors; same tips and daily hash. |
 
 All six runs produced identical tips, so the simulation is deterministic across engines.
 

@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-10
+
 ### Added
 - Daily Dispatch: a new route every day, the same for everyone, at the top of the Dispatch board once you've delivered your first order. Each day brings its own cargo and a twist (Classic, Short haul, or Calm day). You get one scored ride a day, and it counts from the moment you set off, so a restart turns it into practice. Practice is unlimited and saves nothing. Riding on consecutive days builds a 🔥 streak.
 - Split times: each checkpoint and the finish pop your time, and once you have a best run on that route, how far ahead (green) or behind (red) you are. The receipt lists every split. Your fastest complete run on each route is kept to race next time; on Daily Dispatch, practice races the day's scored ride.
@@ -151,7 +153,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Keyboard, touch, and gamepad controls.
 - A single offline `index.html` with no build step.
 
-[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/madhukoseke/hillarious/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/madhukoseke/hillarious/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/madhukoseke/hillarious/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/madhukoseke/hillarious/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/madhukoseke/hillarious/compare/v1.2.0...v1.3.0
