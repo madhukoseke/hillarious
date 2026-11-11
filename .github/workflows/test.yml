@@ -13,4 +13,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      # index.html is built from src/ and committed (TD-14). Rebuild it, diorama bundle included, and fail if the
+      # committed file differs: someone edited index.html by hand or forgot to run npm run build.
+      - run: npm ci
+      - run: npm run check
       - run: node --test "tests/*.test.mjs"

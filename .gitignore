@@ -2,3 +2,4 @@
 tech_debt.md
 kanban.md
 .playwright-mcp/
+node_modules/

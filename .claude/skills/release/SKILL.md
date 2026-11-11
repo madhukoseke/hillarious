@@ -10,6 +10,7 @@ Run these steps in order from the repository root. Stop and report if a step fai
 1. **Check the starting point.**
    - Run `git status --short` and `git branch --show-current`. You should be on `main`.
    - If any changes are unrelated to this release, ask before including them.
+   - Run `npm ci` if `node_modules/` is missing, then `npm run check`. If it fails, `index.html` is stale: run `npm run build` and include the rebuilt file. `index.html` is generated from `src/`; never edit it by hand.
    - Run `node --test "tests/*.test.mjs"`. Do not release with failing tests.
    - If the release changes anything players see, run `tests/playtest/cross-browser.mjs` and add the results to `docs/browser-matrix.md`.
 
@@ -35,7 +36,7 @@ Run these steps in order from the repository root. Stop and report if a step fai
 5. **Check `README.md`.** If the release changes player-facing features, controls, commands, or links, update it.
 
 6. **Commit and tag.**
-   - Stage only the release files: `git add CHANGELOG.md README.md` plus any code that belongs in the release. Never stage `tech_debt.md` or `kanban.md`.
+   - Stage only the release files: `git add CHANGELOG.md README.md` plus any code that belongs in the release (its `src/` files and the built `index.html` together). Never stage `tech_debt.md` or `kanban.md`.
    - Commit with the subject `Release X.Y.Z: <short summary>`. In the body, list the main changelog bullets.
    - Tag it: `git tag -a vX.Y.Z -m "HILLARIOUS X.Y.Z: <short summary>"`.
 

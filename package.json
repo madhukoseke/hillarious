@@ -1,0 +1,17 @@
+{
+  "name": "hillarious",
+  "private": true,
+  "description": "A chaotic little bicycle-delivery game set on the hills of San Francisco. The game is the built index.html.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "check": "node tools/build.mjs --check",
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "three": "0.186.1"
+  }
+}

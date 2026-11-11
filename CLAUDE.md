@@ -1,9 +1,10 @@
 # HILLARIOUS: project instructions
 
-A single-file browser game. Everything ships in `index.html`. The engine section (everything before `if (HEADLESS || typeof document === 'undefined') return;`) runs headless in the tests and is exported on `window.HILL`. The presentation layer after it is browser-only; the running game is `HILL.game`.
+A browser game that ships as one offline `index.html`, built from `src/` by `tools/build.mjs` (TD-14). **Edit `src/`, never `index.html`**, then run `npm run build`; the built file is committed, so the game still opens straight from it and the tests read it. The page is `src/index.html` (markup and `<!-- build:* -->` markers) and `src/style.css`. The game script is `src/game/*.js`: slices of one script (not modules), joined in file-name order and named after the section banners inside them (`05-bicycle.js` is section 5). Files up to `11-autopilot-storage.js` are the engine: it ends with `if (HEADLESS || typeof document === 'undefined') return;`, runs headless in the tests, and is exported on `window.HILL`. From `13-input-audio.js` on is the browser-only presentation layer; the running game is `HILL.game`.
 
 ## Commands
 
+- Build: `npm ci` once, then `npm run build` after every change under `src/`. `npm run check` (run in CI) fails if `index.html` is not what `src/` builds; `tests/build.test.mjs` checks the same without installs. `three` and `esbuild` are exact-pinned dev dependencies.
 - Tests: `node --test "tests/*.test.mjs"` (Node.js 22+; a bare `tests/` directory argument fails on Node 22).
 - Port check: `tests/ports.test.mjs` compares every course and ride against `tests/golden/ports.json`. Refactors must pass it unchanged. Only an intended gameplay change may rewrite it (`node tests/golden/update.mjs`), and the commit must say so.
 - Cargo: each type is a class plus one entry in `CARGO_TYPES` (engine) and `CARGO_VIEW` (presentation). Do not branch on `cargo.kind` elsewhere.
@@ -24,7 +25,7 @@ A single-file browser game. Everything ships in `index.html`. The engine section
 
 Do all of these in the same piece of work, without being asked:
 
-1. **Tests:** run the suite, and keep it passing. Add a test for every new engine rule, scoring rule, or sanitizer. Export new engine helpers on `HILL` so they can be tested.
+1. **Tests:** run `npm run build`, then the suite, and keep it passing. Commit the rebuilt `index.html` with its `src/` changes. Add a test for every new engine rule, scoring rule, or sanitizer. Export new engine helpers on `HILL` so they can be tested.
 2. **Browser check:** when the UI changes, serve the game and check it in a browser, including the console for errors.
 3. **CHANGELOG.md:** add plain-language bullets under `## [Unreleased]`, grouped as Added, Changed, Fixed, or Removed. Describe the effect for players first; keep developer-only changes brief. Never edit a released version's entry.
 4. **tech_debt.md and kanban.md** (both local only and gitignored, so skip this step if they are missing). `tech_debt.md` is the source of truth, and its section 1 explains the IDs, statuses, and lineage. `kanban.md` is its one-line-per-card board.
@@ -43,7 +44,8 @@ Use the `/release` skill. Version numbers follow semver: patch for fixes only, m
 
 ## Constraints
 
-- No runtime network requests or external assets. A test enforces this. Outbound links are allowed only when a player clicks them, and each one must be allow-listed in that test.
+- `index.html` is generated: never edit it by hand. Change `src/` and rebuild.
+- No runtime network requests or external assets. A test enforces this on the built `index.html`, so anything `src/` pulls in (such as three.js) is inlined at build time. Outbound links are allowed only when a player clicks them, and each one must be allow-listed in that test.
 - Save data goes through the `Store` class, under `localStorage` keys prefixed `hillarious:`. Keep existing saved records readable.
 - Text entered by players is rendered with `textContent`, never `innerHTML`. Profile handles go through `cleanHandle` before they are used in an `href`.
 - Keep autopilot timings short (the `this.autopilotName ? ... :` branches), so demos and tests stay fast.

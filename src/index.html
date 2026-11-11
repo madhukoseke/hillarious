@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<!-- Built from src/ by tools/build.mjs. Edit src/, not this file, then run: npm run build -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#9fd3f0">
+<meta name="description" content="HILLARIOUS: a San Francisco physics comedy. Deliver a lidless $9 latte down Nob Hill and a three-tier wedding cake across Russian Hill, by bicycle. It's all downhill from here.">
+<title>HILLARIOUS: It's All Downhill From Here</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f2b134'/%3E%3Cpath d='M19 18h26l-4 30H23z' fill='%23fff6e5' stroke='%232d2a32' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M21.5 28h21l-2.6 18H24z' fill='%237a4a2e'/%3E%3C/svg%3E">
+<style>
+<!-- build:style -->
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="HILLARIOUS game view"></canvas>
+<div id="ui">
+  <section id="s-title" class="screen" aria-labelledby="logo">
+    <div class="title-wrap">
+      <h1 id="logo" class="logo" aria-label="Hillarious"><span style="--i:0">H</span><span style="--i:1">I</span><span style="--i:2">L</span><span style="--i:3">L</span><span style="--i:4">A</span><span style="--i:5">R</span><span style="--i:6">I</span><span style="--i:7">O</span><span style="--i:8">U</span><span style="--i:9">S</span></h1>
+      <p class="tagline">It's all downhill from here.</p>
+      <p class="sub">San Francisco's least reliable delivery service.</p>
+      <div class="btns">
+        <button class="btn primary" data-act="start">START SHIFT</button>
+        <button class="btn" data-act="board">DISPATCH</button>
+        <button class="btn" data-act="train">TRAINING</button>
+      </div>
+      <ol class="hs-board title-board" id="title-board" aria-label="High scores"></ol>
+      <p class="best" id="title-best"></p>
+      <div class="title-mini"><span class="press" id="title-press">Press <b>SPACE</b> to ride</span><button class="chip" data-act="howto">How to play</button><button class="chip" data-act="mute" id="title-mute" aria-pressed="false">Sound: on</button></div>
+      <div class="vol" aria-label="Volume">
+        <label>Music <input type="range" min="0" max="100" step="5" data-vol="music"></label>
+        <label>Effects <input type="range" min="0" max="100" step="5" data-vol="sfx"></label>
+      </div>
+    </div>
+    <div class="keys" id="title-keys" aria-label="Controls">
+      <span><kbd>↑</kbd>pedal</span><span><kbd>↓</kbd>brake</span><span><kbd>←</kbd><kbd>→</kbd>lean</span>
+      <span><kbd>SPACE</kbd>hop</span><span><kbd>P</kbd>pause</span><span><kbd>M</kbd>mute</span><span><kbd>R</kbd>restart</span>
+    </div>
+  </section>
+
+  <section id="s-howto" class="screen scrim" aria-labelledby="howto-h">
+    <div class="card howto">
+      <h2 id="howto-h">How to deliver (mostly) intact</h2>
+      <div class="rows" id="howto-rows">
+        <div class="row"><span><kbd>↑</kbd><kbd>W</kbd></span><span><b>Pedal.</b> More speed, more drama.</span></div>
+        <div class="row"><span><kbd>↓</kbd><kbd>S</kbd></span><span><b>Brake.</b> Hard stops surge the latte forward.</span></div>
+        <div class="row"><span><kbd>←</kbd><kbd>A</kbd></span><span><b>Lean back.</b> Wheelie, or rotate backward in the air.</span></div>
+        <div class="row"><span><kbd>→</kbd><kbd>D</kbd></span><span><b>Lean forward.</b> Nose down, or rotate forward in the air.</span></div>
+        <div class="row"><span><kbd>SPACE</kbd></span><span><b>Hop.</b> Tap for small, hold for big. Press just before landing to hop again.</span></div>
+        <div class="row"><span><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd></span><span>Pause · Mute · Restart delivery</span></div>
+      </div>
+      <ul>
+        <li>The latte forgives normal riding. Hard brakes, big landings and crashes cost you.</li>
+        <li>Intersections end in lips. Speed plus <b data-control="hop">SPACE</b> at the edge means big air.</li>
+        <li>Land on the downslope with the bike level. Crashing only costs time, coffee and dignity.</li>
+        <li id="howto-touch" hidden>Use both thumbs: lean and brake on the left, pedal and hop on the right. Hold HOP for a bigger hop.</li>
+      </ul>
+      <div class="btns"><button class="btn primary" data-act="back">GOT IT</button></div>
+    </div>
+  </section>
+
+  <section id="s-board" class="screen scrim" aria-labelledby="board-h">
+    <div class="card board">
+      <div class="eyebrow">HILLARIOUS DISPATCH · ORDERS NEAR YOU</div>
+      <h2 id="board-h">Pick an order</h2>
+      <div class="orders" id="board-orders"></div>
+      <p class="small" id="board-note">Single orders keep your best tips. Only a full shift goes on the high scores.</p>
+      <div class="btns"><button class="btn" data-act="start">FULL SHIFT</button><button class="btn" data-act="back">BACK</button></div>
+    </div>
+  </section>
+
+  <section id="s-train" class="screen scrim" aria-labelledby="train-h">
+    <div class="card train">
+      <div class="eyebrow">HILLARIOUS COURIER ACADEMY · MANDATORY · UNPAID</div>
+      <h2 id="train-h">Training</h2>
+      <p class="cert" id="train-cert" hidden>CERTIFIED COURIER</p>
+      <div class="drills" id="train-drills"></div>
+      <div class="btns"><button class="btn" data-act="free-setup">FREE RIDE</button><button class="btn" data-act="back">BACK</button></div>
+    </div>
+  </section>
+
+  <section id="s-free" class="screen scrim" aria-labelledby="free-h">
+    <div class="card free">
+      <div class="eyebrow">COURIER ACADEMY · FREE RIDE · NOTHING SAVED</div>
+      <h2 id="free-h">Free ride</h2>
+      <div class="opts" id="free-opts"></div>
+      <div class="btns"><button class="btn primary" data-act="free-go">START FREE RIDE</button><button class="btn" data-act="train">BACK</button></div>
+    </div>
+  </section>
+
+  <section id="s-intro" class="screen scrim" aria-labelledby="intro-h">
+    <div class="card intro">
+      <div class="eyebrow" id="intro-eyebrow">DELIVERY 1 OF 2 · NOB HILL</div>
+      <h2 id="intro-h">THE $9 LATTE</h2>
+      <div class="route" id="intro-route">Down California Street to the Financial District</div>
+      <div class="phone" aria-label="Customer messages">
+        <div class="phone-head"><canvas id="intro-avatar" width="88" height="88" aria-hidden="true"></canvas><div><b id="intro-name">Skyler</b><span id="intro-role">Founder &amp; CEO, Meetingless</span></div></div>
+        <div id="intro-msgs"></div>
+      </div>
+      <p class="cargo-note" id="intro-cargo"></p>
+      <div class="btns"><button class="btn primary" data-act="go"><span id="intro-go">START DELIVERY</span> <i class="count" id="intro-count" hidden></i></button></div>
+    </div>
+  </section>
+
+  <section id="s-pause" class="screen scrim" aria-labelledby="pause-h">
+    <div class="card pause">
+      <h2 id="pause-h">PAUSED</h2>
+      <p id="pause-line">The latte is getting cold. And judgmental.</p>
+      <div class="btns col">
+        <button class="btn primary" data-act="resume">RESUME</button>
+        <button class="btn" data-act="restart" id="pause-restart">RESTART DELIVERY</button>
+        <button class="btn" data-act="mute" id="pause-mute" aria-pressed="false">SOUND: ON</button>
+        <button class="btn" data-act="quit">QUIT TO TITLE</button>
+      </div>
+      <div class="vol" aria-label="Volume">
+        <label>Music <input type="range" min="0" max="100" step="5" data-vol="music"></label>
+        <label>Effects <input type="range" min="0" max="100" step="5" data-vol="sfx"></label>
+      </div>
+      <p class="small" id="pause-sound"></p>
+    </div>
+  </section>
+
+  <section id="s-review" class="screen scrim" aria-labelledby="rv-brand">
+    <div class="receipt" role="dialog" aria-labelledby="rv-brand">
+      <div class="rc-col">
+        <div class="rc-top">
+          <div class="rc-brand" id="rv-brand">MEETINGLESS HQ</div>
+          <div class="rc-sub" id="rv-order">ORDER #0009 · OAT LATTE (L) · NO LID</div>
+        </div>
+        <div class="rc-cust">
+          <canvas id="rv-avatar" width="128" height="128" aria-hidden="true"></canvas>
+          <div><div class="rc-name" id="rv-name">Skyler · Founder &amp; CEO</div><div class="stars" id="rv-stars"></div></div>
+        </div>
+        <blockquote id="rv-quote"></blockquote>
+        <div class="rc-goals" id="rv-goals" aria-label="Goals"></div>
+        <div class="rc-splits" id="rv-splits" aria-label="Split times"></div>
+        <div class="rc-unlock" id="rv-unlock" role="status"></div>
+        <div class="rc-share" id="rv-share" hidden><span>Share today's ride</span>
+          <button class="chip" data-act="daily-copy">COPY RESULT</button><button class="chip" data-act="daily-card">SAVE CARD</button>
+          <a class="chip" id="rv-share-x" target="_blank" rel="noopener noreferrer">X</a><a class="chip" id="rv-share-li" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <span class="rc-share-status" id="rv-share-status" role="status"></span></div>
+        <div class="rc-share" id="rv-clip" hidden><span>That crash deserves an audience.</span>
+          <button class="chip" data-act="clip" id="rv-clip-btn">SAVE WIPEOUT CLIP</button><span class="rc-share-status" id="rv-clip-status" role="status"></span></div>
+        <div class="rc-trouble" id="rv-trouble" hidden><span id="rv-trouble-text"></span><button class="chip" data-act="practice" aria-label="Practice this spot in Free Ride">PRACTICE THIS SPOT</button></div>
+      </div>
+      <div class="rc-col">
+        <div class="rc-lines">
+          <div><span id="rv-cond-label">Coffee remaining</span><b id="rv-cond"></b></div>
+          <div><span id="rv-time-label">Delivery time</span><b id="rv-time"></b></div>
+          <div><span>Near misses</span><b id="rv-near"></b></div>
+          <div><span>Clean landings</span><b id="rv-clean"></b></div>
+          <div><span>Crashes</span><b id="rv-crash"></b></div>
+          <div><span>Style</span><b id="rv-style"></b></div>
+        </div>
+        <div class="rc-items" id="rv-items"></div>
+        <div class="rc-total"><span id="rv-total-label">TIP</span><b id="rv-tip"></b></div>
+        <div class="rc-best" id="rv-best"></div>
+        <div class="rc-shift" id="rv-shift"></div>
+        <div class="btns">
+          <button class="btn primary" data-act="next" id="rv-next"><span id="rv-next-label">NEXT DELIVERY</span> <i class="count" id="rv-count" hidden></i></button>
+          <button class="btn" data-act="again" id="rv-again">RIDE AGAIN</button>
+          <button class="btn" data-act="title" id="rv-alt">TITLE</button>
+        </div>
+        <div class="rc-foot">Thank you for choosing HILLARIOUS. Gravity included at no extra charge.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-final" class="screen scrim" aria-labelledby="fr-h">
+    <div class="card final" role="dialog" aria-labelledby="fr-h">
+      <div class="eyebrow">HILLARIOUS DELIVERY CO. · HUMAN RESOURCES</div>
+      <h2 id="fr-h">Employee Performance Review</h2>
+      <div class="fr-meta" id="fr-meta">Courier #0042 · Shift summary</div>
+      <div class="fr-rows" id="fr-rows"></div>
+      <div class="fr-verdict"><div class="fr-stamp" id="fr-stamp">ACCEPTABLE</div><p id="fr-v1"></p><p id="fr-v2"></p></div>
+      <div class="fr-best" id="fr-best"></div>
+      <form class="hs-form" id="hs-form" autocomplete="off">
+        <label>Name <input id="hs-name" maxlength="20" placeholder="Your name" required></label>
+        <label>X handle <input id="hs-x" maxlength="30" placeholder="@yourhandle (optional)"></label>
+        <label>LinkedIn <input id="hs-li" maxlength="80" placeholder="linkedin.com/in/yourname (optional)"></label>
+        <p class="hs-status" id="hs-status" aria-live="polite"></p>
+        <div class="btns">
+          <button class="btn primary" type="submit">SAVE TO HIGH SCORES</button>
+          <button class="btn" type="button" data-act="skip-save">SKIP</button>
+        </div>
+      </form>
+      <ol class="hs-board" id="hs-board" aria-label="High scores"></ol>
+      <div class="share">Share your shift:
+        <a class="chip" id="share-x" target="_blank" rel="noopener noreferrer">Post on X</a>
+        <a class="chip" id="share-li" target="_blank" rel="noopener noreferrer">Post on LinkedIn</a>
+      </div>
+      <div class="btns">
+        <button class="btn primary" data-act="start">PLAY AGAIN</button>
+        <button class="btn" data-act="title">TITLE</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="touch" aria-hidden="true">
+    <div class="tc tc-sm tc-back" data-key="leanBack">&#10226;<small>LEAN</small></div>
+    <div class="tc tc-sm tc-fwd" data-key="leanFwd">&#10227;<small>LEAN</small></div>
+    <div class="tc tc-big tc-brake" data-key="brake">BRAKE</div>
+    <div class="tc tc-big tc-hop" data-key="jump">HOP</div>
+    <div class="tc tc-big tc-pedal" data-key="pedal">PEDAL</div>
+    <div class="tc tc-pause" data-key="pause">II</div>
+  </div>
+  <div id="rotate" aria-hidden="true">Turn your phone sideways. Hills look better wide.</div>
+  <div id="live" class="sr-only" aria-live="polite"></div>
+</div>
+<noscript>HILLARIOUS needs JavaScript. The latte is disappointed.</noscript>
+
+<script id="game">
+<!-- build:game -->
+</script>
+</body>
+</html>
