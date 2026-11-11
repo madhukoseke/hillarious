@@ -28,7 +28,7 @@ No installation or account required. Open the link in a modern browser.
 - Keyboard, touch, and gamepad controls, with on-screen labels that match the device you use
 - A local high-score board with optional X and LinkedIn handles, plus one-click "Share your shift" posts
 - Separate music and effects volume
-- **One `index.html` file** — no framework or build step needed
+- **One `index.html` file**: no install, no framework, and it works offline. It's built from `src/` by a small Node script
 
 ## 🕹️ How to play
 
@@ -52,6 +52,21 @@ cd hillarious
 
 For this self-contained game, you can open `index.html` directly in your browser.
 
+## Develop
+
+`index.html` is built from the source in `src/` and committed, so playing needs no install. To change the game, edit `src/`, never `index.html`, then rebuild (Node.js 22 or later):
+
+```bash
+npm ci          # once: the pinned build tools
+npm run build   # writes index.html
+npm run check   # fails if index.html is out of date (CI runs this)
+```
+
+- `src/index.html`: the page markup, with markers where the build inlines the styles and scripts
+- `src/style.css`: the styles
+- `src/game/`: the game script in order, one file per section (`05-bicycle.js` is section 5). Files up to `11-autopilot-storage.js` are the engine, which the tests run without a browser; the rest draws the game and runs the menus
+- `tools/build.mjs`: joins the pieces into one offline `index.html`
+
 ## Tests
 
 The headless simulation and scoring tests need Node.js 22 or later and no other installs:
@@ -60,7 +75,7 @@ The headless simulation and scoring tests need Node.js 22 or later and no other 
 node --test "tests/*.test.mjs"
 ```
 
-They also run on every push to `main` through GitHub Actions. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`. `dispatch-training.js` walks Dispatch, a drill, Free Ride, and The Test Hill from a fresh profile. `crash-replay.mjs`, `daily.mjs`, `splits.mjs`, `wipeout.mjs`, and `review-cards.mjs` run on a controlled clock and check crash replays and every delivery's review card.
+They also run on every push to `main` through GitHub Actions, after `npm run check` confirms that `index.html` matches `src/`. `tests/playtest/` holds browser playtest scripts for Playwright; they expect the game served at `http://127.0.0.1:8765/`. `dispatch-training.js` walks Dispatch, a drill, Free Ride, and The Test Hill from a fresh profile. `crash-replay.mjs`, `daily.mjs`, `splits.mjs`, `wipeout.mjs`, and `review-cards.mjs` run on a controlled clock and check crash replays and every delivery's review card.
 
 `tests/playtest/cross-browser.mjs` opens Dispatch, Training, and Free Ride, then plays a shift on Chromium, Firefox, and WebKit at desktop and phone sizes. It takes an optional URL argument; setup steps are at the top of the file. Results and the real-device checklist live in [docs/browser-matrix.md](docs/browser-matrix.md).
 

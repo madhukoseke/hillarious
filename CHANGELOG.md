@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Developer
+- Source split (TD-14): the source now lives in `src/`: the page, the styles, and the game script in 15 files named after its sections. `tools/build.mjs` builds the same single offline `index.html`, which stays committed, so the game still opens straight from the file. The first build reproduced the old file byte for byte. `npm run build` writes it, `npm run check` (now in CI) fails when it is stale, and `tests/build.test.mjs` checks it without installs. `three` and `esbuild` are exact-pinned dev dependencies for the diorama renderer.
+
 ## [1.6.0] - 2026-11-10
 
 ### Added
