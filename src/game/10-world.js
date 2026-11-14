@@ -26,6 +26,7 @@
       this.inputLog = [];                             // every step's input, packed (packInput), for crash replays (F-32)
       this.splits = [];                               // ride time at each checkpoint after the start, then at the finish (F-35)
       this.fogHz = fogHazards(course); this.fogIdx = 0; this.inFog = false; // fog warnings (F-40)
+      this.socks = sockGusts(course); this.sockIdx = 0;                     // windsock warnings (F-41)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
@@ -148,6 +149,13 @@
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
       if (this.fogHz.length || C.fogs) this.fogStep(b);
+      if (this.socks.length) {
+        const range = warnDist(b.vx, WIND);
+        while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 - b.x <= range) {
+          const g = this.socks[this.sockIdx++];
+          if (g.x0 >= b.x) this.emit('GUST_WARN', { x: g.x0, x1: g.x1, wind: g.wind, d: g.x0 - b.x });
+        }
+      }
       if (b.brakeAmt > 0.85 && b.grounded && b.vx > 10 && this.t - this.brakeT > 3) { this.brakeT = this.t; this.emit('HARD_BRAKE', { speed: b.vx }); }
       const sp = Math.hypot(b.vx, b.vy);
       if (sp > 16 && b.grounded && this.t - this.fastT > 8) { this.fastT = this.t; this.emit('PLAYER_FAST', { speed: sp }); }
@@ -171,7 +179,10 @@
         if (h.x >= b.x) this.emit('FOG_WARN', { kind: h.kind, x: h.x, d: h.x - b.x });
       }
     }
-    fogFrom(x) { this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false; }
+    fogFrom(x) {
+      this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false;
+      this.sockIdx = 0; while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 <= x) this.sockIdx++;
+    }
     sinceEvent(type) { return this.lastT[type] !== undefined ? this.t - this.lastT[type] : 1e9; }
     trackDamage(amount, dt) {
       const S = this.spill;

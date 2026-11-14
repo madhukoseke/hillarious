@@ -142,7 +142,7 @@
     gust(p) {
       const f = fragment('gust', p.mark, p);
       if (p.enter) f.path.push(['ease', ...p.enter]);
-      f.path.push(['mark', p.mark], ['straight', p.len], ['gust', p.mark, p.wind]);
+      f.path.push(['mark', p.mark], ['straight', p.len], p.sock ? ['gust', p.mark, p.wind, 1] : ['gust', p.mark, p.wind]); // sock: a windsock warns (F-41)
       if (p.exit) f.path.push(['ease', ...p.exit]);
       f.hazards.push('gust');
       for (const h of p.hints || []) hint(f, { ...(HAZARD_HINTS[h.hazard] || {}), ...h });
@@ -304,11 +304,16 @@
   // beep and an amber light, once the bike is within warnDist of it. warnDist assumes the bike keeps accelerating
   // downhill, so at any rider's speed the warning comes at least 2 s ahead (the fog rule, tested on every route).
   const FOG = { lead: 2.4, accel: 3, minDist: 14, tail: 8, rule: 2 };
+  // Summit wind (F-41): a gust with a windsock warns (windsock, leaves, a whoosh) at least 1.5 s before it starts.
+  const WIND = { lead: 1.8, accel: 3, minDist: 10, rule: 1.5 };
+  // How far ahead to warn at speed v so the warning comes `lead` s early even while speeding up at `accel`.
+  const warnDist = (v, k) => Math.max(k.minDist, Math.max(0, v) * k.lead + 0.5 * k.accel * k.lead * k.lead);
   function fogAt(C, x) {
     for (const f of C.fogs || []) if (x >= f.x0 && x <= f.x1) return f.density;
     return 0;
   }
-  const fogWarnDist = (v) => Math.max(FOG.minDist, Math.max(0, v) * FOG.lead + 0.5 * FOG.accel * FOG.lead * FOG.lead);
+  const fogWarnDist = (v) => warnDist(v, FOG);
+  const sockGusts = (C) => (C.gusts || []).filter((g) => g.sock).sort((a, b) => a.x0 - b.x0);
   // Every hazard inside a fog bank (or within FOG.tail past it), in road order: { kind, x }.
   function fogHazards(C) {
     if (!C.fogs || !C.fogs.length) return [];
@@ -345,7 +350,7 @@
       else if (op === 'intersection') C.intersections.push({ x0: a[0], x1: a[1], name: a[2] });
       else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
       else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
-      else if (op === 'gust') (C.gusts || (C.gusts = [])).push({ x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else if (op === 'gust') (C.gusts || (C.gusts = [])).push(a[2] ? { x0: marks[a[0]], x1: b.x, wind: a[1], sock: true } : { x0: marks[a[0]], x1: b.x, wind: a[1] });
       else if (op === 'fog') (C.fogs || (C.fogs = [])).push({ x0: marks[a[0]], x1: b.x, density: a[1] });
       else throw new Error(`route ${id}: unknown path step "${op}"`);
     }

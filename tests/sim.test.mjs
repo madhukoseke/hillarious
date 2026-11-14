@@ -1550,3 +1550,50 @@ test('fog: a respawn warns again of the hazards ahead of the checkpoint', () => 
   while (w.bike.x < hz[0].x + 1 && w.t < 30) { w.step(ap.input(w)); for (const e of w.drain()) if (e.type === 'FOG_WARN') kinds.push(e.kind); }
   assert.equal(kinds[0], 'pothole');
 });
+
+// Summit wind (F-41). Two exposed blocks with windsocks at the top of a descent, carrying the disco ball.
+const SUMMIT_ROUTE = (wind = -6) => ({
+  meta: { index: 9, title: 'SUMMIT TEST', hood: 'TWIN PEAKS', street: 'TWIN PEAKS BLVD', theme: 'nob', cargo: 'disco', par: 60, seed: 9 },
+  origin: [-60, 0], start: 3, park: { x0: -60, x1: 1 },
+  pieces: [
+    ['plateau', { len: 90, street: [3, 12, 'CHRISTMAS TREE PT'], checkpoints: ['start'] }],
+    ['gust', { mark: 'g1', enter: [-0.08, 6], len: 36, wind, sock: true, exit: [-0.14, 6], difficulty: 2, checkpoints: [10] }],
+    ['gust', { mark: 'g2', len: 36, wind, sock: true, exit: [0, 6], difficulty: 3 }],
+    ['block', { mark: 'out', len: 40 }],
+    ['finish', { mark: 'fin', len: 90 }],
+  ],
+  finish: { at: 'fin', office: { x0: 12, x1: 30 } },
+  customer: { name: 'Test', role: 'Tester', avatar: 'founder', brand: 'TEST', order: 'ORDER #0000', route: 'Summit test', messages: ['a', 'b'], cargoNote: 'n', cargoLabel: 'l' },
+});
+const summitCourse = (wind) => { H.ROUTE_DATA.__summit = SUMMIT_ROUTE(wind); try { return H.buildRoute('__summit'); } finally { delete H.ROUTE_DATA.__summit; } };
+
+test('summit wind: a gust with a windsock is marked, and a plain gust (Telegraph Hill) is not', () => {
+  const C = summitCourse();
+  assert.equal(H.sockGusts(C).length, 2);
+  assert.ok(C.gusts.every((g) => g.sock && g.wind === -6));
+  assert.equal(H.sockGusts(H.buildTelegraphHill()).length, 0);
+  for (const v of [0, 4, 9, 15]) { const d = H.warnDist(v, H.WIND), a = H.WIND.accel; assert.ok((-v + Math.sqrt(v * v + 2 * a * d)) / a >= H.WIND.rule, `${v} m/s`); }
+});
+
+test('summit wind: every rider sees the windsock at least 1.5 s before each gust, and the gust rolls the disco ball', () => {
+  const C = summitCourse(), calm = summitCourse(0);
+  for (const profile of ['careful', 'typical', 'fast', 'reckless']) {
+    const w = new H.World(C), ap = new H.Autopilot(profile), warned = [];
+    let push = 0, n = 0;
+    while (w.t < 200 && w.state !== 'done') {
+      w.step(ap.input(w));
+      for (const e of w.drain()) if (e.type === 'GUST_WARN') warned.push({ x: e.x, at: e.t, reached: null });
+      for (const h of warned) if (h.reached === null && w.bike.x >= h.x) h.reached = w.t;
+      if (w.windAt(w.bike.x, w.bike.y)) { push += w.cargo.p; n++; }
+    }
+    assert.equal(w.state, 'done', `${profile} finishes`);
+    assert.equal(warned.length, 2, `${profile} warned of both gusts`);
+    for (const h of warned) assert.ok(h.reached - h.at >= H.WIND.rule, `${profile}: warned ${(h.reached - h.at).toFixed(2)} s ahead`);
+    if (profile === 'typical') {
+      // The gust pushes the ball toward the wind: on average it sits further that way in the crate than on a calm day.
+      const c = new H.World(calm), cap = new H.Autopilot(profile); let cp = 0, cn = 0;
+      while (c.t < 200 && c.state !== 'done') { c.step(cap.input(c)); c.drain(); if (C.gusts.some((g) => c.bike.x >= g.x0 && c.bike.x <= g.x1)) { cp += c.cargo.p; cn++; } }
+      assert.ok(push / n < cp / cn - 0.005, `the gust pushes the ball upwind (mean ${(push / n).toFixed(3)} vs calm ${(cp / cn).toFixed(3)})`);
+    }
+  }
+});
