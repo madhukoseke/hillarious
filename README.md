@@ -16,6 +16,7 @@ No installation or account required. Open the link in a modern browser.
 
 - Bicycle physics inspired by San Francisco's steep hills
 - Delivery missions, obstacles, and playful customer feedback
+- Four deliveries, each with its own cargo: a lidless latte down Nob Hill, a wedding cake across Russian Hill, a bouquet in the wind on Telegraph Hill, and a disco ball from Twin Peaks to the Castro through fog, summit gusts, and a hairpin switchback
 - **Daily Dispatch:** a new route every day, the same for everyone, with one scored ride, unlimited practice, and a streak
 - Split times at every checkpoint against your best run
 - A spoiler-free Daily Dispatch share card: copy the text, post it, or save a picture of your review
@@ -33,7 +34,7 @@ No installation or account required. Open the link in a modern browser.
 ## 🕹️ How to play
 
 1. Open the [live game](https://hillarious.pages.dev), or run it locally using the steps below.
-2. Select **START SHIFT** for all three deliveries and the HR review, or **DISPATCH** to pick one delivery. Delivering one unlocks the next.
+2. Select **START SHIFT** for the three San Francisco deliveries and the HR review, or **DISPATCH** to pick one delivery. Delivering one unlocks the next; the bouquet unlocks Twin Peaks.
 3. Complete deliveries while navigating the hills and traffic.
 4. To practise, open **TRAINING**: work through the drills, or choose **FREE RIDE** to start anywhere with nothing saved. Receipts also offer **Practice this spot** for the stretch that cost you most.
 

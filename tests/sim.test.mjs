@@ -709,8 +709,8 @@ test('physics: pedaling turns the cranks the same way as the rolling wheels (no 
 const plain = (o) => JSON.parse(JSON.stringify(o)); // VM objects -> plain objects for deepEqual
 
 test('routes: the shift order and unlock chain come from one list', () => {
-  assert.deepEqual(plain(H.ROUTES.map((r) => r.id)), ['nobHill', 'russianHill', 'telegraph']);
-  assert.deepEqual(plain(H.ROUTES.map((r) => r.requires)), [null, 'nobHill', 'russianHill']);
+  assert.deepEqual(plain(H.ROUTES.map((r) => r.id)), ['nobHill', 'russianHill', 'telegraph', 'twinPeaks']);
+  assert.deepEqual(plain(H.ROUTES.map((r) => r.requires)), [null, 'nobHill', 'russianHill', 'telegraph']);
   for (const r of H.ROUTES) assert.equal(r.build().id, r.id, `${r.id} builds its own course`);
   assert.ok(H.COMING_SOON.every((c) => c.title && c.hood && c.note), 'teasers, if any, carry a title, hood and note');
 });
@@ -733,17 +733,18 @@ test('progress: migration reads legacy bests and survives corrupt saves', () => 
 test('progress: deliveries unlock in order; locks never hide a route already delivered', () => {
   const states = (p, all) => plain(H.unlockState(H.ROUTES, p, all).map((s) => s.state));
   const fresh = H.migrateProgress(null, null);
-  assert.deepEqual(states(fresh), ['new', 'locked', 'locked']);
-  assert.deepEqual(states(fresh, true), ['new', 'new', 'new'], '?unlock=all opens everything');
+  assert.deepEqual(states(fresh), ['new', 'locked', 'locked', 'locked']);
+  assert.deepEqual(states(fresh, true), ['new', 'new', 'new', 'new'], '?unlock=all opens everything');
   const after = H.applyRun(fresh, 'single', 'nobHill', { goals: [false, true, false] });
-  assert.deepEqual(states(after), ['delivered', 'new', 'locked']);
+  assert.deepEqual(states(after), ['delivered', 'new', 'locked', 'locked']);
   assert.deepEqual(plain(H.newlyUnlocked(H.unlockState(H.ROUTES, fresh), H.unlockState(H.ROUTES, after))), ['russianHill']);
   // A cake delivered through ?delivery=2 without the latte still shows as delivered.
-  assert.deepEqual(states(H.migrateProgress({ delivered: { russianHill: 1 } }, null)), ['new', 'delivered', 'new']);
+  assert.deepEqual(states(H.migrateProgress({ delivered: { russianHill: 1 } }, null)), ['new', 'delivered', 'new', 'locked']);
+  assert.deepEqual(states(H.migrateProgress({ delivered: { telegraph: 1 } }, null)), ['new', 'locked', 'delivered', 'new'], 'Twin Peaks opens after the bouquet');
   const mastered = H.applyRun(after, 'shift', 'nobHill', { goals: [true, false, true] });
   assert.deepEqual(plain(mastered.goals.nobHill), [true, true, true], 'goals are best-ever, merged across runs');
   assert.equal(mastered.delivered.nobHill, 2);
-  assert.deepEqual(states(mastered), ['mastered', 'new', 'locked']);
+  assert.deepEqual(states(mastered), ['mastered', 'new', 'locked', 'locked']);
   assert.equal(fresh.delivered.nobHill, undefined, 'applyRun never changes its input');
 });
 
@@ -1127,7 +1128,7 @@ test('routes: positions are a mark plus offsets, read left to right; an unknown 
 const PIECE_ROUTES = Object.keys(H.ROUTE_DATA).filter((id) => H.ROUTE_DATA[id].pieces);
 
 test('pieces: every route is built from set pieces', () => {
-  assert.deepEqual(plain(PIECE_ROUTES), ['nobHill', 'russianHill', 'telegraph']);
+  assert.deepEqual(plain(PIECE_ROUTES), ['nobHill', 'russianHill', 'telegraph', 'twinPeaks']);
 });
 
 test('pieces: the gust block (F-31) blows from its mark to the end of its straight, and declares the hazard', () => {
@@ -1157,6 +1158,8 @@ for (const id of PIECE_ROUTES) {
     if (C.lips.some((l) => l.big)) assert.ok(hazards.has('big-lip'));
     if (C.lips.some((l) => !l.big)) assert.ok(hazards.has('lip'));
     if ((C.gusts || []).length) assert.ok(hazards.has('gust'));
+    if ((C.fogs || []).length) assert.ok(hazards.has('fog'));
+    if ((C.switchbacks || []).length) assert.ok(hazards.has('switchback'));
     for (const c of C.crossers) assert.ok(hazards.has(c.kind), `${c.kind} is a declared hazard`);
   });
 }
@@ -1196,14 +1199,14 @@ test('style: the shift summary totals style and big air across deliveries', () =
 /* ------------------------------- themes (TD-12) ------------------------------- */
 
 test('themes: every course names a theme in THEMES, and every theme names layers that exist', () => {
-  const builds = ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill', 'buildTitleCourse', 'buildTestHill', ...H.DRILLS.map((D) => D.build)];
+  const builds = ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill', 'buildTwinPeaks', 'buildTitleCourse', 'buildTestHill', ...H.DRILLS.map((D) => D.build)];
   for (const b of builds) {
     const C = typeof b === 'string' ? H[b]() : b();
     assert.ok(Object.prototype.hasOwnProperty.call(H.THEMES, C.theme), `${C.id} theme "${C.theme}" has an entry`);
   }
   for (const [id, T] of Object.entries(H.THEMES)) {
     assert.ok(H.MID_LAYERS[T.mid], `${id} mid layer "${T.mid}"`);
-    assert.ok(['nob', 'russian'].includes(T.far), `${id} far skyline "${T.far}" has a builder`);
+    assert.ok(['nob', 'russian', 'twin'].includes(T.far), `${id} far skyline "${T.far}" has a builder`); // the builders live in the renderer (browser only)
     for (const k of ['horizon', 'farParallax', 'farDrop']) assert.ok(Number.isFinite(T[k]), `${id}.${k}`);
   }
   assert.equal(H.themeFor('nowhere'), H.THEMES.nob, 'an unknown theme falls back to Nob Hill');
@@ -1215,7 +1218,7 @@ test('chapters: San Francisco is the shift today, with every route in order and 
   const sf = H.CHAPTERS[0];
   assert.equal(sf.id, 'sf');
   assert.equal(sf.scoresKey, 'shifts', 'existing high scores stay where they are');
-  assert.deepEqual(plain(H.chapterRoutes(sf).map((r) => r.id)), plain(H.ROUTES.map((r) => r.id)));
+  assert.deepEqual(plain(H.chapterRoutes(sf).map((r) => r.id)), ['nobHill', 'russianHill', 'telegraph'], 'Twin Peaks is not in the first shift (Shift 2 is F-78)');
   const ids = new Set(), keys = new Set();
   for (const ch of H.CHAPTERS) {
     assert.ok(!ids.has(ch.id) && !keys.has(ch.scoresKey), `${ch.id} has its own id and scores key`); ids.add(ch.id); keys.add(ch.scoresKey);
@@ -1645,4 +1648,29 @@ test('switchback: every rider finishes, and each hairpin fires once (again after
   w.spawn(C.switchbacks[1] + 2, 0); w.step(input()); w.drain();
   w.cpIndex = 2; w.respawn(); // the second switchback's checkpoint is before its hairpin
   assert.equal(w.turns, 1);
+});
+
+// Twin Peaks (F-43): the route the spec asked for.
+test('twin peaks: summit wind on the first two blocks, fog, a switchback, the big lip, the disco ball, and a disco drop at the Castro', () => {
+  const C = H.buildTwinPeaks(), shapes = H.joinPieces(H.ROUTE_DATA.twinPeaks).pieceShapes;
+  assert.equal(C.cargo, 'disco'); assert.equal(C.theme, 'twin'); assert.equal(C.index, 4);
+  assert.deepEqual(plain(shapes.slice(1, 3).map((p) => p.kind)), ['gust', 'gust'], 'the wind is on the first two blocks only');
+  assert.equal(H.sockGusts(C).length, 2, 'both gusts have a windsock');
+  assert.ok(C.gusts.every((g) => g.x1 <= C.fogs[0].x0), 'no wind after the first fog');
+  assert.equal(C.fogs.length, 2); assert.ok(C.fogs[1].density > C.fogs[0].density, 'the second fog bank is the thick one');
+  assert.ok(C.crossers.some((c) => c.kind === 'maybemo' && H.fogAt(C, c.x) > 0), 'a robot car lost in the thick fog');
+  assert.equal(C.switchbacks.length, 1);
+  assert.ok(C.lips.some((l) => l.big));
+  const castro = C.intersections.find((i) => i.name === 'CASTRO ST');
+  assert.ok(castro && C.musicDrop === castro.x0, 'the music turns disco at Castro Street');
+  assert.ok(H.ROUTE_GOALS.twinPeaks.length === 3);
+});
+
+test('twin peaks: every rider finishes, the typical ride takes 40-50 s, and the music drops once', () => {
+  for (const profile of ['careful', 'typical', 'fast', 'reckless']) {
+    const { w, events, r } = rideProfile(profile, 200, 'buildTwinPeaks');
+    assert.equal(w.state, 'done', `${profile} finishes`);
+    assert.equal(events.filter((e) => e.type === 'MUSIC_DROP').length, 1);
+    if (profile === 'typical') assert.ok(r.time >= 40 && r.time <= 50 && r.crashes === 0, `typical ${r.time.toFixed(1)} s`);
+  }
 });

@@ -351,6 +351,9 @@
     tourist: { top: '#4fb3a9', pants: '#c9b28a', hair: '#e5c27a', skin: '#f0c8a0', voice: 1.0 },
     dog: { top: '#6b8f5e', pants: '#3e3a48', hair: '#2a1f1a', skin: '#8d5a3b', voice: 0.3 },
     fitness: { top: '#e8604c', pants: '#2d2a32', hair: '#1f1a17', skin: '#c98b5e', voice: 0.8 },
+    stoner: { top: '#8a5fc7', pants: '#6b7f9e', hair: '#5a3d2a', skin: '#e3b591', voice: 0.4 },       // Twin Peaks (F-43)
+    photographer: { top: '#7d7a5e', pants: '#3e3a48', hair: '#1f1a17', skin: '#a8714f', voice: 0.9 },
+    guide: { top: '#d9604c', pants: '#2d2a32', hair: '#c9a25e', skin: '#f0c8a0', voice: 1.1 },
   };
   function drawPedestrian(ctx, B, y, t) {
     const L = PED_LOOK[B.kind] || PED_LOOK.tech, r = B.react || null, rt = r ? r.t : 9;
@@ -384,13 +387,19 @@
     if (B.kind === 'fitness') { ctx.fillStyle = '#2c7a7b'; ctx.fillRect(-0.14, hy + 0.05, 0.28, 0.045); }
     if (B.kind === 'tourist') { ctx.fillStyle = '#f2dd9e'; ctx.beginPath(); ctx.ellipse(0, hy + 0.12, 0.24, 0.05, 0, 0, TAU); ctx.fill(); ctx.fillRect(-0.11, hy + 0.12, 0.22, 0.09); }
     if (B.kind === 'tech') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0.12, hy - 0.01, 0.02, 0, TAU); ctx.fill(); }
+    if (B.kind === 'stoner') { ctx.fillStyle = '#5fb36b'; ctx.beginPath(); ctx.arc(hx, hy + 0.07, 0.15, Math.PI * 0.05, Math.PI * 0.95); ctx.fill(); ctx.fillStyle = '#f2b134'; ctx.fillRect(-0.15, hy + 0.06, 0.3, 0.04); } // a beanie
+    if (B.kind === 'guide') { // a cap, and a flag held high for the tour group
+      ctx.fillStyle = '#d9604c'; ctx.beginPath(); ctx.arc(hx, hy + 0.06, 0.14, 0, Math.PI); ctx.fill(); ctx.fillRect(0, hy + 0.05, 0.22, 0.035);
+      ctx.strokeStyle = COL.ink; ctx.lineWidth = 0.025; ctx.beginPath(); ctx.moveTo(-0.2, sh); ctx.lineTo(-0.24, sh + 0.9); ctx.stroke();
+      ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.moveTo(-0.24, sh + 0.9); ctx.lineTo(0.08, sh + 0.8); ctx.lineTo(-0.24, sh + 0.7); ctx.closePath(); ctx.fill();
+    }
     ctx.fillStyle = COL.ink;
     ctx.beginPath(); ctx.arc(-0.045, hy + 0.01, 0.016, 0, TAU); ctx.arc(0.045, hy + 0.01, 0.016, 0, TAU); ctx.fill();
     ctx.strokeStyle = COL.ink; ctx.lineWidth = 0.014; ctx.beginPath();
     if (act === 'shock' || act === 'worried') { ctx.fillStyle = COL.ink; ctx.ellipse(0, hy - 0.06, 0.025, 0.035, 0, 0, TAU); ctx.fill(); }
     else if (act === 'cheer' || act === 'talk') { ctx.arc(0, hy - 0.04, 0.04, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
     else { ctx.moveTo(-0.03, hy - 0.06); ctx.lineTo(0.03, hy - 0.06); ctx.stroke(); }
-    if (act === 'photo' || (B.kind === 'tourist' && !act)) { // camera
+    if (act === 'photo' || ((B.kind === 'tourist' || B.kind === 'photographer') && !act)) { // camera
       const cy = act === 'photo' ? hy - 0.02 : 1.05 + bob;
       ctx.fillStyle = COL.ink; ctx.fillRect(-0.1, cy - 0.06, 0.2, 0.12); ctx.fillStyle = '#9fbccc'; ctx.beginPath(); ctx.arc(0, cy, 0.035, 0, TAU); ctx.fill();
       if (act === 'photo' && rt < 0.15) { ctx.fillStyle = 'rgba(255,255,240,0.9)'; ctx.beginPath(); ctx.arc(0, cy, 0.35, 0, TAU); ctx.fill(); }
@@ -413,6 +422,7 @@
     founder: ['#f2b134', '#7a8796', '#5a6b80', '#e0b48c', '#3b2a20'],
     planner: ['#9fd3f0', '#c2584a', '#fff6e5', '#c98b5e', '#2a1f1a'],
     hr: ['#b6dcd6', '#3f6f73', '#f2dd9e', '#d9a77c', '#5b4a3a'],
+    host: ['#f6c6dd', '#8a5fc7', '#f2dd9e', '#c98b5e', '#f2b134'], // the Castro's drag-brunch host (F-43)
   };
   function drawAvatar(canvas, mood, who) {
     if (!canvas || !canvas.getContext) return;
@@ -424,6 +434,13 @@
     c.fillStyle = A[2]; c.fillRect(44, 70, 12, 30);
     c.fillStyle = A[3]; c.beginPath(); c.arc(50, 45, 21, 0, TAU); c.fill();
     c.fillStyle = A[4]; c.beginPath(); c.arc(50, 38, 22, Math.PI, 0); c.fill(); c.beginPath(); c.arc(pl ? 50 : 64, pl ? 16 : 22, pl ? 10 : 7, 0, TAU); c.fill();
+    if (who === 'host') { // big golden hair, lashes, and a mirror-ball earring
+      c.fillStyle = A[4]; for (const [x, y, r] of [[30, 40, 14], [70, 40, 14], [36, 22, 14], [64, 22, 14], [50, 14, 15], [26, 58, 11], [74, 58, 11]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+      c.fillStyle = A[3]; c.beginPath(); c.arc(50, 45, 20, 0, TAU); c.fill();
+      c.strokeStyle = '#2d2a32'; c.lineWidth = 1.6; for (const x of [42, 58]) { c.beginPath(); c.moveTo(x - 4, 42); c.lineTo(x - 6, 39); c.moveTo(x + 4, 42); c.lineTo(x + 6, 39); c.stroke(); }
+      c.fillStyle = '#cfd8e0'; c.beginPath(); c.arc(31, 58, 4.5, 0, TAU); c.fill(); c.fillStyle = '#fff'; c.fillRect(29, 56, 2, 2);
+      c.fillStyle = '#d64f6c'; c.beginPath(); c.ellipse(50, 56, 6, 2.6, 0, 0, TAU); c.fill(); // lipstick, under the mood line
+    }
     if (pl) { c.strokeStyle = '#2d2a32'; c.lineWidth = 3; c.beginPath(); c.arc(50, 44, 25, Math.PI * 1.05, Math.PI * 1.6); c.stroke(); c.fillStyle = '#2d2a32'; c.beginPath(); c.arc(27, 52, 4, 0, TAU); c.fill(); }
     if (hr) {
       c.strokeStyle = '#e8604c'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(42, 70); c.lineTo(50, 86); c.lineTo(58, 70); c.stroke();
