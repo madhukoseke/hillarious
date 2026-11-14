@@ -850,6 +850,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   const HAZARD_HINTS = {
     car: { id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
     gust: { id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
+    fog: { id: 'fog', actions: ['brake'], text: 'Fog ahead. Listen for the beeps and watch for the amber lights.' },
   };
   function fragment(kind, mark, p) {
     const f = { kind, mark, difficulty: p.difficulty || 1, hazards: [], path: [], features: [], marks: { ...(p.marks || {}) },
@@ -920,6 +921,15 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       if (p.exit) f.path.push(['ease', ...p.exit]);
       f.hazards.push('gust');
       for (const h of p.hints || []) hint(f, { ...(HAZARD_HINTS[h.hazard] || {}), ...h });
+      return f;
+    },
+    // A block in fog (F-40, Karl the Fog): a block whose straight is fogged from its mark to its end. Fog only changes
+    // what you can see; the world warns of every hazard inside it at least 2 s ahead (FOG, fogHazards).
+    fog(p) {
+      const f = PIECES.block(p), i = f.path.findIndex((s) => s[0] === 'straight');
+      f.kind = 'fog';
+      f.path.splice(i + 1, 0, ['fog', p.mark, p.density === undefined ? 1 : p.density]);
+      f.hazards.unshift('fog');
       return f;
     },
     // A raised lip mid-block, away from any crossing (a driveway or a kerb): a short run to it, up, down, then the
@@ -1065,6 +1075,27 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     },
   };
 
+  // Karl the Fog (F-40). Fog hides the road ahead, so the world warns of each hazard inside it (or just past it) with a
+  // beep and an amber light, once the bike is within warnDist of it. warnDist assumes the bike keeps accelerating
+  // downhill, so at any rider's speed the warning comes at least 2 s ahead (the fog rule, tested on every route).
+  const FOG = { lead: 2.4, accel: 3, minDist: 14, tail: 8, rule: 2 };
+  function fogAt(C, x) {
+    for (const f of C.fogs || []) if (x >= f.x0 && x <= f.x1) return f.density;
+    return 0;
+  }
+  const fogWarnDist = (v) => Math.max(FOG.minDist, Math.max(0, v) * FOG.lead + 0.5 * FOG.accel * FOG.lead * FOG.lead);
+  // Every hazard inside a fog bank (or within FOG.tail past it), in road order: { kind, x }.
+  function fogHazards(C) {
+    if (!C.fogs || !C.fogs.length) return [];
+    const all = [
+      ...C.potholes.map((h) => ({ kind: 'pothole', x: h.x0 })), ...C.stairs.map((h) => ({ kind: 'stairs', x: h.x0 })),
+      ...C.lips.map((h) => ({ kind: h.big ? 'big-lip' : 'lip', x: h.x })), ...(C.cars || []).map((h) => ({ kind: 'car', x: h.x })),
+      ...(C.ramps || []).map((h) => ({ kind: 'ramp', x: h.x })), ...(C.crossers || []).map((h) => ({ kind: h.kind, x: h.x })),
+      ...(C.cones || []).map((x) => ({ kind: 'cone', x })),
+    ];
+    return all.filter((h) => C.fogs.some((f) => h.x >= f.x0 && h.x <= f.x1 + FOG.tail)).sort((a, b) => a.x - b.x);
+  }
+
   // Turns a ROUTE_DATA entry into a course. Marks are read left to right with their offsets, so the arithmetic (and so
   // every position) is exactly what the hand-written builders produced; the port check (F-28) holds it to that.
   const POS_KEYS = new Set(['x', 'x0', 'x1', 'trigger', 'arch']);
@@ -1090,6 +1121,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
       else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
       else if (op === 'gust') (C.gusts || (C.gusts = [])).push({ x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else if (op === 'fog') (C.fogs || (C.fogs = [])).push({ x0: marks[a[0]], x1: b.x, density: a[1] });
       else throw new Error(`route ${id}: unknown path step "${op}"`);
     }
     for (const [name, p] of Object.entries(R.marks || {})) marks[name] = at(p);
@@ -2806,6 +2838,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'mm-recalc', trigger: 'MAYBEMO_RESUME', speaker: 'car', text: 'Recalculating... emotionally.', priority: 3 },
     { id: 'mm-bonk', trigger: 'MAYBEMO_BONK', speaker: 'car', text: 'Collision detected. Feelings hurt.', priority: 3 },
     { id: 'mm-after', trigger: 'MAYBEMO_HOLD', speaker: 'car', text: 'After you. No, after you. No—', priority: 3 },
+    // Karl the Fog (F-40)
+    { id: 'karl', trigger: 'FOG_IN', speaker: 'rider', text: 'Karl the Fog has entered the chat.', priority: 3 },
     // Cable car operator
     { id: 'cc-ding', trigger: 'CABLE_CAR_ENCOUNTER', speaker: 'operator', text: 'DING DING! Make way for 1873!', priority: 4 },
     { id: 'cc-tracks', trigger: 'CABLE_CAR_HOLD', speaker: 'operator', text: 'Off the tracks, Speed Racer!', priority: 4 },
@@ -2962,12 +2996,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.runLog = []; this.laps = 0;                // crashes and spills by position, for "Practice this spot"
       this.inputLog = [];                             // every step's input, packed (packInput), for crash replays (F-32)
       this.splits = [];                               // ride time at each checkpoint after the start, then at the finish (F-35)
+      this.fogHz = fogHazards(course); this.fogIdx = 0; this.inFog = false; // fog warnings (F-40)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
         const x = course.checkpoints[cp].x;
         this.cpIndex = cp; this.spawn(x, 0); this.obstacles.onRespawn(x);
         while (this.hintIdx < course.hints.length && course.hints[this.hintIdx].x < x) this.hintIdx++; // no backlog of hints
+        this.fogFrom(x);
       }
     }
     emit(type, data) {
@@ -3082,6 +3118,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         this.emit('CHECKPOINT', { i: this.cpIndex, split: this.score.time });
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
+      if (this.fogHz.length || C.fogs) this.fogStep(b);
       if (b.brakeAmt > 0.85 && b.grounded && b.vx > 10 && this.t - this.brakeT > 3) { this.brakeT = this.t; this.emit('HARD_BRAKE', { speed: b.vx }); }
       const sp = Math.hypot(b.vx, b.vy);
       if (sp > 16 && b.grounded && this.t - this.fastT > 8) { this.fastT = this.t; this.emit('PLAYER_FAST', { speed: sp }); }
@@ -3094,6 +3131,18 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (!z.done && b.x > z.x0 && b.x < z.x1 && sp < 3) { z.done = true; this.emit('STOP_ZONE', { i, left: this.zones.filter((q) => !q.done).length }); }
       }
     }
+    // Fog (F-40): FOG_IN and FOG_OUT at a bank's edges, and one FOG_WARN per hazard once it is within warning range.
+    fogStep(b) {
+      const d = fogAt(this.course, b.x);
+      if (d > 0 && !this.inFog) { this.inFog = true; this.emit('FOG_IN', { density: d }); }
+      else if (d === 0 && this.inFog) { this.inFog = false; this.emit('FOG_OUT', {}); }
+      const range = fogWarnDist(b.vx);
+      while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x - b.x <= range) {
+        const h = this.fogHz[this.fogIdx++];
+        if (h.x >= b.x) this.emit('FOG_WARN', { kind: h.kind, x: h.x, d: h.x - b.x });
+      }
+    }
+    fogFrom(x) { this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false; }
     sinceEvent(type) { return this.lastT[type] !== undefined ? this.t - this.lastT[type] : 1e9; }
     trackDamage(amount, dt) {
       const S = this.spill;
@@ -3203,6 +3252,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.rag.on = false; this.cup.on = false;
       this.state = 'riding'; this.invuln = 0.8;
       this.obstacles.onRespawn(cp.x);
+      this.fogFrom(cp.x); // hazards ahead of the checkpoint warn again
       this.emit('RECOVER', { x: cp.x });
     }
     // Looping courses (The Test Hill): the bottom leads back to the top with fresh cargo and the props reset.
@@ -3400,7 +3450,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
     DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay, pickWipeout, CLIP_TYPES, clipType, replayFrames,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, DiscoCargo, DISCO, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
@@ -3433,6 +3483,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   ];
   const KEY_ALTS = { pedal: ['W'], brake: ['S'], leanBack: ['A'], leanFwd: ['D'] }; // keyboard only, shown in How to Play
   const LEVEL_WARN = 0.55; // radians off the slope while airborne before "LEVEL OUT!" shows (about 31°; tune after playtests)
+  const FOG_LABELS = { pothole: 'POTHOLE', stairs: 'STEPS', lip: 'LIP', 'big-lip': 'BIG LIP', car: 'PARKED CAR', ramp: 'RAMP', cablecar: 'CABLE CAR', maybemo: 'ROBOT CAR', cone: 'CONES' }; // fog warning tags (F-40)
   class InputManager {
     constructor() {
       this.down = {}; this.touchDown = {}; this.padDown = {}; this.padPrev = {}; this.jumpQueued = false; this.actions = [];
@@ -3650,7 +3701,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     play(name, k) {
       if (!this.ctx || this.ctx.state !== 'running') return;
-      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, boing: 0.4, glint: 0.12, bark: 0.6, shutter: 0.5, wobble: 0.7 };
+      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, boing: 0.4, glint: 0.12, fogbeep: 0.3, bark: 0.6, shutter: 0.5, wobble: 0.7 };
       const now = this.ctx.currentTime;
       if (MIN[name] && now - (this.last[name] || -9) < MIN[name]) return;
       this.last[name] = now;
@@ -3693,6 +3744,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'powerup': [523.3, 659.3, 784, 1046.5].forEach((f, i) => this.osc('triangle', f, f, t + i * 0.06, 0.12, 0.12)); break;
         case 'espresso': this.osc('sawtooth', 220, 1400, t, 0.28, 0.06); this.osc('triangle', 784, 1568, t + 0.12, 0.2, 0.08); break;
         case 'boing': { const o = this.osc('sine', 220, 520, t, 0.32, 0.18); this.vibrato(o, t, 14, 40, 0.32); break; } // the disco ball pops back in
+        case 'fogbeep': this.osc('sine', 523, 523, t, 0.12, 0.07); this.osc('sine', 392, 392, t + 0.16, 0.16, 0.07); break; // a hazard in the fog
         case 'glint': this.osc('triangle', 2637, 2637, t, 0.08, 0.06); this.osc('triangle', 3520, 3520, t + 0.05, 0.1, 0.04); break; // a mirror tile chips
         case 'wobble': { const o = this.osc('sine', 180, 140, t, 0.45, 0.16); this.vibrato(o, t, 9, 30, 0.45); break; }
         case 'decor': this.osc('sine', v(1500), 500, t, 0.18, 0.08); break;
@@ -6273,6 +6325,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'CAKE_GROOM': this.dropDecor(e); this.say('CAKE_GROOM'); break;
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
+        case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;
         case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
         case 'DISCO_ROLL': this.say('DISCO_ROLL'); break;
         case 'CLEAN_LANDING': this.pop('+$0.25 clean landing', 'good'); A.play('coin'); this.say('CLEAN_LANDING'); break;
@@ -6452,9 +6506,78 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const car of O.cars) if (car.x + CAR_LEN > xa && car.x - 4 < xb) drawCar(ctx, car, t);
       for (const cone of O.cones) if (vis(cone.x, 1)) drawCone(ctx, cone, alpha);
       for (const pu of O.powerups) if (!pu.taken && vis(pu.x, 1)) drawPowerup(ctx, pu, t);
+      if (W.course.fogs) { R.screenSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
       if (!(W.invuln > 0 && Math.floor(t * 16) % 2 === 0 && W.state === 'riding')) R.drawBike(W, alpha, this);
       for (const cc of front) drawCrosser(ctx, cc, t);
       this.particles.draw(ctx);
+      if (W.course.fogs) { R.screenSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+    }
+    // Karl the Fog (F-40): a few large translucent layers, no particles. Each bank veils the whole picture (the far
+    // background fades), the road ahead of the rider fades out (objects appear late), and soft bands drift through.
+    // With reduced motion the bands hold still and everything is lighter. The bike is drawn on top.
+    drawFog(W, xa, xb, t) {
+      const R = this.R, cam = this.cam, S = R.S, T = W.terrain, rm = this.reducedMotion, p = {}, q = {};
+      const light = rm ? 0.75 : 1, k = fogAt(W.course, W.bike.x + 4);
+      this.fogK = (this.fogK || 0) + (k - (this.fogK || 0)) * 0.08;
+      // Everything is soft, so it is drawn at quarter resolution and scaled up in one blit (cheap on software canvases).
+      const Q = 0.25, fc = this.fogCanvas || (this.fogCanvas = document.createElement('canvas')), fw = Math.ceil(R.W * Q), fh = Math.ceil(R.H * Q);
+      if (fc.width !== fw || fc.height !== fh) { fc.width = fw; fc.height = fh; }
+      const ctx = fc.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, fw, fh); ctx.setTransform(Q, 0, 0, Q, 0, 0);
+      ctx.save();
+      for (const f of W.course.fogs) {
+        if (f.x1 + 12 < xa || f.x0 - 12 > xb) continue;
+        const a = R.toScreen(cam, f.x0 - 10, 0, p).x, b = R.toScreen(cam, f.x1 + 10, 0, q).x, fade = 12 * S;
+        const g = ctx.createLinearGradient(a, 0, b, 0), al = 0.5 * f.density * light, e = clamp(fade / Math.max(1, b - a), 0, 0.5);
+        g.addColorStop(0, 'rgba(233,236,240,0)'); g.addColorStop(e, `rgba(233,236,240,${al})`); g.addColorStop(1 - e, `rgba(233,236,240,${al})`); g.addColorStop(1, 'rgba(233,236,240,0)');
+        ctx.fillStyle = g; ctx.fillRect(Math.max(0, a), 0, Math.min(R.W, b) - Math.max(0, a), R.H);
+        for (let i = 0; i < 4; i++) { // drifting bands
+          const wx = f.x0 + (f.x1 - f.x0) * (i + 0.5) / 4 + (rm ? 0 : Math.sin(t * 0.17 + i * 1.9) * 5), wy = T.height(clamp(wx, f.x0, f.x1)) + 2.5 + (i % 2) * 3.5;
+          R.toScreen(cam, wx, wy, p);
+          ctx.fillStyle = `rgba(245,247,250,${0.3 * f.density * light})`;
+          ctx.beginPath(); ctx.ellipse(p.x, p.y, 15 * S, 2.6 * S, 0, 0, TAU); ctx.fill();
+        }
+      }
+      if (this.fogK > 0.02) { // the road ahead fades out: hazards appear late
+        const bx = R.toScreen(cam, W.bike.x + 3, 0, p).x, g = ctx.createLinearGradient(bx, 0, Math.max(bx + 1, R.W), 0);
+        g.addColorStop(0, 'rgba(236,239,242,0)'); g.addColorStop(0.35, `rgba(236,239,242,${0.6 * this.fogK * light})`); g.addColorStop(1, `rgba(236,239,242,${0.92 * this.fogK * light})`);
+        ctx.fillStyle = g; ctx.fillRect(bx, 0, R.W - bx, R.H);
+      }
+      ctx.restore();
+      R.ctx.drawImage(fc, 0, 0, fw / Q, fh / Q);
+    }
+    // Every hazard the fog warned of gets an amber light on a pole that shows through the fog, and the nearest one
+    // ahead gets a tag at the top of the screen. The light blinks (holds steady with reduced motion).
+    drawFogWarnings(W, xa, xb, t) {
+      const R = this.R, ctx = R.ctx, cam = this.cam, S = R.S, T = W.terrain, b = W.bike, p = {}, q = {};
+      const on = this.reducedMotion || Math.floor(t * 3) % 2 === 0;
+      let next = null;
+      ctx.save();
+      for (let i = 0; i < W.fogIdx; i++) {
+        const h = W.fogHz[i];
+        if (h.x < b.x - 2) continue;
+        if (!next) next = h;
+        if (h.x < xa - 2 || h.x > xb + 2) continue;
+        const gy = T.height(h.x) + ROAD.walk;
+        R.toScreen(cam, h.x, gy, p); R.toScreen(cam, h.x, gy + 2.3, q);
+        ctx.strokeStyle = COL.ink; ctx.lineWidth = Math.max(2, S * 0.08); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+        if (on) {
+          const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, S * 1.6);
+          g.addColorStop(0, 'rgba(255,190,60,0.85)'); g.addColorStop(1, 'rgba(255,190,60,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, S * 1.6, 0, TAU); ctx.fill();
+        }
+        ctx.fillStyle = on ? '#ffbe3c' : '#8a6a2a'; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(4, S * 0.3), 0, TAU); ctx.fill(); ctx.stroke();
+      }
+      if (next && W.state === 'riding') {
+        const u = clamp(Math.min(R.W, R.H) / 46, 11, 18), label = '⚠ ' + (FOG_LABELS[next.kind] || 'HAZARD') + ' · ' + Math.max(0, Math.round(next.x - b.x)) + ' m';
+        ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const w = ctx.measureText(label).width + u * 1.6, x = R.W / 2, y = u * 5.2;
+        ctx.fillStyle = on ? '#ffbe3c' : '#f2d08a'; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - u * 0.9, w, u * 1.8, u * 0.5) : ctx.rect(x - w / 2, y - u * 0.9, w, u * 1.8); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = COL.ink; ctx.fillText(label, x, y + 1);
+      }
+      ctx.restore();
     }
     drawLabels(W) {
       const R = this.R, ctx = R.ctx, cam = this.cam, T = W.terrain, C = W.course, S = R.S, p = {};

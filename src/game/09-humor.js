@@ -13,6 +13,8 @@
     { id: 'mm-recalc', trigger: 'MAYBEMO_RESUME', speaker: 'car', text: 'Recalculating... emotionally.', priority: 3 },
     { id: 'mm-bonk', trigger: 'MAYBEMO_BONK', speaker: 'car', text: 'Collision detected. Feelings hurt.', priority: 3 },
     { id: 'mm-after', trigger: 'MAYBEMO_HOLD', speaker: 'car', text: 'After you. No, after you. No—', priority: 3 },
+    // Karl the Fog (F-40)
+    { id: 'karl', trigger: 'FOG_IN', speaker: 'rider', text: 'Karl the Fog has entered the chat.', priority: 3 },
     // Cable car operator
     { id: 'cc-ding', trigger: 'CABLE_CAR_ENCOUNTER', speaker: 'operator', text: 'DING DING! Make way for 1873!', priority: 4 },
     { id: 'cc-tracks', trigger: 'CABLE_CAR_HOLD', speaker: 'operator', text: 'Off the tracks, Speed Racer!', priority: 4 },

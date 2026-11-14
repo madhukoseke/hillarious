@@ -75,6 +75,7 @@
   const HAZARD_HINTS = {
     car: { id: 'car', actions: [], text: 'Parked robot car ahead. Ride the plank or hop it!' },
     gust: { id: 'gust', actions: ['brake'], text: 'On the road? Gust ahead. Ease off, or the petals go.' },
+    fog: { id: 'fog', actions: ['brake'], text: 'Fog ahead. Listen for the beeps and watch for the amber lights.' },
   };
   function fragment(kind, mark, p) {
     const f = { kind, mark, difficulty: p.difficulty || 1, hazards: [], path: [], features: [], marks: { ...(p.marks || {}) },
@@ -145,6 +146,15 @@
       if (p.exit) f.path.push(['ease', ...p.exit]);
       f.hazards.push('gust');
       for (const h of p.hints || []) hint(f, { ...(HAZARD_HINTS[h.hazard] || {}), ...h });
+      return f;
+    },
+    // A block in fog (F-40, Karl the Fog): a block whose straight is fogged from its mark to its end. Fog only changes
+    // what you can see; the world warns of every hazard inside it at least 2 s ahead (FOG, fogHazards).
+    fog(p) {
+      const f = PIECES.block(p), i = f.path.findIndex((s) => s[0] === 'straight');
+      f.kind = 'fog';
+      f.path.splice(i + 1, 0, ['fog', p.mark, p.density === undefined ? 1 : p.density]);
+      f.hazards.unshift('fog');
       return f;
     },
     // A raised lip mid-block, away from any crossing (a driveway or a kerb): a short run to it, up, down, then the
@@ -290,6 +300,27 @@
     },
   };
 
+  // Karl the Fog (F-40). Fog hides the road ahead, so the world warns of each hazard inside it (or just past it) with a
+  // beep and an amber light, once the bike is within warnDist of it. warnDist assumes the bike keeps accelerating
+  // downhill, so at any rider's speed the warning comes at least 2 s ahead (the fog rule, tested on every route).
+  const FOG = { lead: 2.4, accel: 3, minDist: 14, tail: 8, rule: 2 };
+  function fogAt(C, x) {
+    for (const f of C.fogs || []) if (x >= f.x0 && x <= f.x1) return f.density;
+    return 0;
+  }
+  const fogWarnDist = (v) => Math.max(FOG.minDist, Math.max(0, v) * FOG.lead + 0.5 * FOG.accel * FOG.lead * FOG.lead);
+  // Every hazard inside a fog bank (or within FOG.tail past it), in road order: { kind, x }.
+  function fogHazards(C) {
+    if (!C.fogs || !C.fogs.length) return [];
+    const all = [
+      ...C.potholes.map((h) => ({ kind: 'pothole', x: h.x0 })), ...C.stairs.map((h) => ({ kind: 'stairs', x: h.x0 })),
+      ...C.lips.map((h) => ({ kind: h.big ? 'big-lip' : 'lip', x: h.x })), ...(C.cars || []).map((h) => ({ kind: 'car', x: h.x })),
+      ...(C.ramps || []).map((h) => ({ kind: 'ramp', x: h.x })), ...(C.crossers || []).map((h) => ({ kind: h.kind, x: h.x })),
+      ...(C.cones || []).map((x) => ({ kind: 'cone', x })),
+    ];
+    return all.filter((h) => C.fogs.some((f) => h.x >= f.x0 && h.x <= f.x1 + FOG.tail)).sort((a, b) => a.x - b.x);
+  }
+
   // Turns a ROUTE_DATA entry into a course. Marks are read left to right with their offsets, so the arithmetic (and so
   // every position) is exactly what the hand-written builders produced; the port check (F-28) holds it to that.
   const POS_KEYS = new Set(['x', 'x0', 'x1', 'trigger', 'arch']);
@@ -315,6 +346,7 @@
       else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
       else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
       else if (op === 'gust') (C.gusts || (C.gusts = [])).push({ x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else if (op === 'fog') (C.fogs || (C.fogs = [])).push({ x0: marks[a[0]], x1: b.x, density: a[1] });
       else throw new Error(`route ${id}: unknown path step "${op}"`);
     }
     for (const [name, p] of Object.entries(R.marks || {})) marks[name] = at(p);

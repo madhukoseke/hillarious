@@ -11,9 +11,17 @@ const PROFILES = ['careful', 'typical', 'fast', 'reckless'];
 const BAND_MIN = 0.55;
 
 function ride(build, profile) {
-  const w = new H.World(build()), ap = new H.Autopilot(profile), seen = new Set();
-  while (w.t < 200 && w.state !== 'done') { w.step(ap.input(w)); for (const e of w.drain()) seen.add(e.type); }
-  return { w, r: w.result(), sanity: seen.has('SANITY') };
+  const w = new H.World(build()), ap = new H.Autopilot(profile), seen = new Set(), warned = [];
+  while (w.t < 200 && w.state !== 'done') {
+    w.step(ap.input(w));
+    for (const e of w.drain()) {
+      seen.add(e.type);
+      if (e.type === 'FOG_WARN') warned.push({ kind: e.kind, x: e.x, at: e.t, reached: null });
+      if (e.type === 'RECOVER') for (const h of warned) if (h.reached === null) h.dropped = true; // warned again after the respawn
+    }
+    for (const h of warned) if (h.reached === null && !h.dropped && w.bike.x >= h.x) h.reached = w.t;
+  }
+  return { w, r: w.result(), sanity: seen.has('SANITY'), fogLate: warned.filter((h) => h.reached !== null && h.reached - h.at < H.FOG.rule) };
 }
 
 // Generated routes (F-33): every seed must be fair, with every cargo. Each push rides seeds 1–5, which between them use
@@ -47,9 +55,11 @@ for (const { id, build } of content) {
   test(`fairness ${id}: every rider finishes, no silent respawns, careful and typical ride clean, typical inside the par band`, () => {
     const par = build().par;
     for (const p of PROFILES) {
-      const { w, r, sanity } = ride(build, p);
+      const { w, r, sanity, fogLate } = ride(build, p);
       assert.equal(w.state, 'done', `${id} ${p} did not finish (x=${w.bike.x.toFixed(1)} after ${w.t.toFixed(0)} s)`);
       assert.ok(!sanity, `${id} ${p} tripped the non-finite guard`);
+      // The fog rule (F-40): inside fog, every hazard warns at least 2 s before the rider reaches it.
+      assert.deepEqual(fogLate.map((h) => `${h.kind}@${h.x.toFixed(1)}`), [], `${id} ${p}: fog warnings under ${H.FOG.rule} s`);
       if (p === 'careful' || p === 'typical') assert.equal(r.crashes, 0, `${id} ${p} crashed ${r.crashes}×`);
       if (p === 'typical') {
         const share = r.time / par;

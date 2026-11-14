@@ -980,6 +980,8 @@
         case 'CAKE_GROOM': this.dropDecor(e); this.say('CAKE_GROOM'); break;
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
+        case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;
         case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
         case 'DISCO_ROLL': this.say('DISCO_ROLL'); break;
         case 'CLEAN_LANDING': this.pop('+$0.25 clean landing', 'good'); A.play('coin'); this.say('CLEAN_LANDING'); break;
@@ -1159,9 +1161,78 @@
       for (const car of O.cars) if (car.x + CAR_LEN > xa && car.x - 4 < xb) drawCar(ctx, car, t);
       for (const cone of O.cones) if (vis(cone.x, 1)) drawCone(ctx, cone, alpha);
       for (const pu of O.powerups) if (!pu.taken && vis(pu.x, 1)) drawPowerup(ctx, pu, t);
+      if (W.course.fogs) { R.screenSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
       if (!(W.invuln > 0 && Math.floor(t * 16) % 2 === 0 && W.state === 'riding')) R.drawBike(W, alpha, this);
       for (const cc of front) drawCrosser(ctx, cc, t);
       this.particles.draw(ctx);
+      if (W.course.fogs) { R.screenSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+    }
+    // Karl the Fog (F-40): a few large translucent layers, no particles. Each bank veils the whole picture (the far
+    // background fades), the road ahead of the rider fades out (objects appear late), and soft bands drift through.
+    // With reduced motion the bands hold still and everything is lighter. The bike is drawn on top.
+    drawFog(W, xa, xb, t) {
+      const R = this.R, cam = this.cam, S = R.S, T = W.terrain, rm = this.reducedMotion, p = {}, q = {};
+      const light = rm ? 0.75 : 1, k = fogAt(W.course, W.bike.x + 4);
+      this.fogK = (this.fogK || 0) + (k - (this.fogK || 0)) * 0.08;
+      // Everything is soft, so it is drawn at quarter resolution and scaled up in one blit (cheap on software canvases).
+      const Q = 0.25, fc = this.fogCanvas || (this.fogCanvas = document.createElement('canvas')), fw = Math.ceil(R.W * Q), fh = Math.ceil(R.H * Q);
+      if (fc.width !== fw || fc.height !== fh) { fc.width = fw; fc.height = fh; }
+      const ctx = fc.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, fw, fh); ctx.setTransform(Q, 0, 0, Q, 0, 0);
+      ctx.save();
+      for (const f of W.course.fogs) {
+        if (f.x1 + 12 < xa || f.x0 - 12 > xb) continue;
+        const a = R.toScreen(cam, f.x0 - 10, 0, p).x, b = R.toScreen(cam, f.x1 + 10, 0, q).x, fade = 12 * S;
+        const g = ctx.createLinearGradient(a, 0, b, 0), al = 0.5 * f.density * light, e = clamp(fade / Math.max(1, b - a), 0, 0.5);
+        g.addColorStop(0, 'rgba(233,236,240,0)'); g.addColorStop(e, `rgba(233,236,240,${al})`); g.addColorStop(1 - e, `rgba(233,236,240,${al})`); g.addColorStop(1, 'rgba(233,236,240,0)');
+        ctx.fillStyle = g; ctx.fillRect(Math.max(0, a), 0, Math.min(R.W, b) - Math.max(0, a), R.H);
+        for (let i = 0; i < 4; i++) { // drifting bands
+          const wx = f.x0 + (f.x1 - f.x0) * (i + 0.5) / 4 + (rm ? 0 : Math.sin(t * 0.17 + i * 1.9) * 5), wy = T.height(clamp(wx, f.x0, f.x1)) + 2.5 + (i % 2) * 3.5;
+          R.toScreen(cam, wx, wy, p);
+          ctx.fillStyle = `rgba(245,247,250,${0.3 * f.density * light})`;
+          ctx.beginPath(); ctx.ellipse(p.x, p.y, 15 * S, 2.6 * S, 0, 0, TAU); ctx.fill();
+        }
+      }
+      if (this.fogK > 0.02) { // the road ahead fades out: hazards appear late
+        const bx = R.toScreen(cam, W.bike.x + 3, 0, p).x, g = ctx.createLinearGradient(bx, 0, Math.max(bx + 1, R.W), 0);
+        g.addColorStop(0, 'rgba(236,239,242,0)'); g.addColorStop(0.35, `rgba(236,239,242,${0.6 * this.fogK * light})`); g.addColorStop(1, `rgba(236,239,242,${0.92 * this.fogK * light})`);
+        ctx.fillStyle = g; ctx.fillRect(bx, 0, R.W - bx, R.H);
+      }
+      ctx.restore();
+      R.ctx.drawImage(fc, 0, 0, fw / Q, fh / Q);
+    }
+    // Every hazard the fog warned of gets an amber light on a pole that shows through the fog, and the nearest one
+    // ahead gets a tag at the top of the screen. The light blinks (holds steady with reduced motion).
+    drawFogWarnings(W, xa, xb, t) {
+      const R = this.R, ctx = R.ctx, cam = this.cam, S = R.S, T = W.terrain, b = W.bike, p = {}, q = {};
+      const on = this.reducedMotion || Math.floor(t * 3) % 2 === 0;
+      let next = null;
+      ctx.save();
+      for (let i = 0; i < W.fogIdx; i++) {
+        const h = W.fogHz[i];
+        if (h.x < b.x - 2) continue;
+        if (!next) next = h;
+        if (h.x < xa - 2 || h.x > xb + 2) continue;
+        const gy = T.height(h.x) + ROAD.walk;
+        R.toScreen(cam, h.x, gy, p); R.toScreen(cam, h.x, gy + 2.3, q);
+        ctx.strokeStyle = COL.ink; ctx.lineWidth = Math.max(2, S * 0.08); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+        if (on) {
+          const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, S * 1.6);
+          g.addColorStop(0, 'rgba(255,190,60,0.85)'); g.addColorStop(1, 'rgba(255,190,60,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, S * 1.6, 0, TAU); ctx.fill();
+        }
+        ctx.fillStyle = on ? '#ffbe3c' : '#8a6a2a'; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(4, S * 0.3), 0, TAU); ctx.fill(); ctx.stroke();
+      }
+      if (next && W.state === 'riding') {
+        const u = clamp(Math.min(R.W, R.H) / 46, 11, 18), label = '⚠ ' + (FOG_LABELS[next.kind] || 'HAZARD') + ' · ' + Math.max(0, Math.round(next.x - b.x)) + ' m';
+        ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const w = ctx.measureText(label).width + u * 1.6, x = R.W / 2, y = u * 5.2;
+        ctx.fillStyle = on ? '#ffbe3c' : '#f2d08a'; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - u * 0.9, w, u * 1.8, u * 0.5) : ctx.rect(x - w / 2, y - u * 0.9, w, u * 1.8); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = COL.ink; ctx.fillText(label, x, y + 1);
+      }
+      ctx.restore();
     }
     drawLabels(W) {
       const R = this.R, ctx = R.ctx, cam = this.cam, T = W.terrain, C = W.course, S = R.S, p = {};
