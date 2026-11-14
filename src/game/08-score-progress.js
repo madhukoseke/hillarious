@@ -48,6 +48,13 @@
     { min: 1, stars: 2, text: 'Mostly stems. Very dramatic stems.' },
     { min: 0, stars: 1, text: 'Ruth asked for a receipt for the petals.' },
   ];
+  const DISCO_REVIEWS = [
+    { min: 90, stars: 5, text: "Flawless. It's giving Studio 54." },
+    { min: 60, stars: 4, text: 'A few tiles short. So are we all, honey.' },
+    { min: 30, stars: 3, text: 'Half disco, half ball.' },
+    { min: 1, stars: 2, text: "It's a ball. Barely." },
+    { min: 0, stars: 1, text: 'You delivered a crate. A very sparkly crate.' },
+  ];
   // The cargo registry (F-27): the one list of cargo types. Each class keeps its own rules behind the same methods
   // (update, splash, bump, kick, crashLoss, refill, resetSlosh, windShare, stability, alarm, condition); this table adds
   // what the world needs around it: how to make one, its review lines, and how it flies off the bike in a crash.
@@ -56,6 +63,7 @@
     coffee: { make: () => new CoffeeCargo(), reviews: COFFEE_REVIEWS, crashThrow: { mx: CARGO.mountX, my: 0.15, vx: 1.5, vy: 4.2, w: -9 } },
     cake: { make: () => new CakeCargo(), reviews: CAKE_REVIEWS, crashThrow: { mx: CAKE.mountX, my: 0.2, vx: 0.5, vy: 3.2, w: -4 } },
     bouquet: { make: () => new BouquetCargo(), reviews: BOUQUET_REVIEWS, crashThrow: { mx: CARGO.mountX, my: 0.15, vx: 1.5, vy: 4.2, w: -9 } },
+    disco: { make: () => new DiscoCargo(), reviews: DISCO_REVIEWS, crashThrow: { mx: DISCO.mountX, my: 0.25, vx: 1.2, vy: 4.6, w: -7 } },
   };
   function cargoType(kind) { return CARGO_TYPES[cleanCargo(kind)]; } // unknown kinds fall back to the latte, like cleanCargo
   function makeCargo(kind) { return cargoType(kind).make(); }
@@ -134,7 +142,7 @@
   }
   function shareLinks(S) { return intentLinks(shareText(S)); }
   // Daily Dispatch share card (F-36): spoiler-free, one emoji per segment (🟩 clean, 🟨 cargo lost, 💥 crash).
-  const CARGO_EMOJI = { coffee: '☕', cake: '🎂', bouquet: '💐' };
+  const CARGO_EMOJI = { coffee: '☕', cake: '🎂', bouquet: '💐', disco: '🪩' };
   const GRID_EMOJI = ['🟩', '🟨', '💥'], GRID_LOSS = 3; // percent lost in a segment that earns a 🟨
   function segmentGrid(segments, log) {
     return (segments || []).map((g) => {

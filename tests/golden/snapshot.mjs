@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 
 export const TOLERANCE = 1e-4;
 export const PROFILES = ['careful', 'typical', 'fast', 'reckless'];
-export const CARGOS = { coffee: 'CoffeeCargo', cake: 'CakeCargo', bouquet: 'BouquetCargo' };
+export const CARGOS = { coffee: 'CoffeeCargo', cake: 'CakeCargo', bouquet: 'BouquetCargo', disco: 'DiscoCargo' };
 const LOOP_SECONDS = 60; // looping courses (The Test Hill) have no finish: ride them for a fixed time
 
 // Every course the game can build: deliveries from ROUTES, drills from DRILLS, plus the title and Free Ride courses.

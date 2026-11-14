@@ -1411,3 +1411,74 @@ test('clips: the crash replays into the same frames every time', () => {
   assert.ok(a.length > 60 && a.length < 400, `${a.length} frames at 30 fps`);
   assert.ok(a.at(-1).zoom > a[0].zoom && a.at(-1).rate < 1, 'it ends zoomed in, in slow motion');
 });
+
+/* ---------------------------- disco ball (F-39) ---------------------------- */
+
+// A bike stand-in for driving a cargo directly: level, at a given speed, with Earth's gravity.
+const standBike = (vx = 8) => ({ a: 0, w: 0, vx, vy: 0, P: H.physicsFor() });
+
+test('disco: braking rolls the ball forward into the crate wall, which chips tiles', () => {
+  const c = new H.DiscoCargo(), b = standBike(12);
+  for (let i = 0; i < 30; i++) { b.vx -= 8 * H.STEP; c.update(H.STEP, b, false); } // a hard brake
+  assert.ok(c.v > 0 || c.p > 0, 'it rolls forward (toward +x) under braking');
+  let hit = false;
+  for (let i = 0; i < 240 && !hit; i++) { b.vx = Math.max(0, b.vx - 9 * H.STEP); c.update(H.STEP, b, false); hit = c.events.some((e) => e.type === 'DISCO_TILE'); }
+  assert.ok(hit && c.amount < 100, `the wall chips tiles (${c.amount.toFixed(1)}%)`);
+  assert.equal(c.tilesLeft(), Math.ceil((c.amount / 100) * H.DISCO.tiles));
+  assert.ok(Math.abs(c.p) <= H.DISCO.half + 1e-9, 'it stays in the crate');
+});
+
+test('disco: a calm ride costs nothing, and unbreakable cargo never chips', () => {
+  const c = new H.DiscoCargo(), b = standBike(6);
+  for (let i = 0; i < 600; i++) c.update(H.STEP, b, false);
+  assert.equal(c.amount, 100);
+  const u = new H.DiscoCargo(), ub = standBike(14);
+  for (let i = 0; i < 300; i++) { ub.vx = Math.max(0, ub.vx - 12 * H.STEP); u.update(H.STEP, ub, true); }
+  assert.equal(u.amount, 100);
+});
+
+test('disco: a big landing pops it out and back in: it costs condition, and it is not a crash', () => {
+  const c = new H.DiscoCargo();
+  assert.equal(c.splash(H.DISCO.landMin - 0.1, 0, false), 0, 'a soft landing is free');
+  const small = c.splash(H.DISCO.landMin + 1, 0, false);
+  assert.ok(small > 0 && !c.events.some((e) => e.type === 'DISCO_POP'), 'a firm landing only jolts it');
+  const before = c.amount, lost = c.splash(H.DISCO.popMin + 2, 0, false);
+  assert.ok(c.events.some((e) => e.type === 'DISCO_POP') && lost >= H.DISCO.popCost && c.amount === before - lost, `popped: −${lost.toFixed(1)}%`);
+  assert.ok(c.air > 0 && c.p === 0, 'out of the crate, landing back in the middle');
+  const w = new H.World(H.buildNobHill()); w.cargo = new H.DiscoCargo();
+  w.cargo.splash(20, 0, false);
+  assert.equal(w.state, 'riding', 'the rider carries on');
+});
+
+test('disco: bubble wrap takes one hit; a crash costs more the harder it is; gusts push the ball', () => {
+  const c = new H.DiscoCargo(); c.shield = true;
+  assert.equal(c.splash(H.DISCO.landMin + 3, 0, false), 0); assert.ok(!c.shield);
+  const soft = new H.DiscoCargo().crashLoss(0), hard = new H.DiscoCargo().crashLoss(1);
+  assert.ok(hard > soft && soft >= H.DISCO.crashBase);
+  const calm = new H.DiscoCargo(), windy = new H.DiscoCargo(), b = standBike(6), b2 = standBike(6);
+  for (let i = 0; i < 60; i++) { calm.update(H.STEP, b, false, 0); windy.update(H.STEP, b2, false, -8); }
+  assert.ok(windy.v < calm.v - 0.1, 'a headwind gust rolls it back');
+});
+
+test('disco: reviews from Studio 54 to a sparkly crate; it is a cargo like the others', () => {
+  const r = (c) => H.reviewFor(H.CARGO_TYPES.disco.reviews, c).text;
+  assert.match(r(95), /Studio 54/); assert.match(r(70), /tiles short/); assert.match(r(0), /sparkly crate/);
+  assert.equal(H.makeCargo('disco').kind, 'disco');
+  assert.equal(H.cargoWords('disco').name, 'DISCO BALL');
+});
+
+test('disco: every rider finishes every route with the ball, and the careful rider keeps the most', () => {
+  for (const build of ['buildNobHill', 'buildRussianHill', 'buildTelegraphHill']) {
+    const kept = {};
+    for (const p of ['careful', 'typical', 'fast', 'reckless']) {
+      const C = H[build](); C.cargo = 'disco';
+      const w = new H.World(C), ap = new H.Autopilot(p);
+      while (w.state !== 'done' && w.t < 150) w.step(ap.input(w));
+      assert.equal(w.state, 'done', `${build} ${p}`);
+      assert.ok(w.finite());
+      kept[p] = w.cargo.amount;
+    }
+    assert.ok(kept.careful >= kept.reckless, `${build}: careful ${kept.careful.toFixed(0)}% vs reckless ${kept.reckless.toFixed(0)}%`);
+    assert.ok(kept.typical >= 60, `${build}: typical keeps ${kept.typical.toFixed(0)}%`);
+  }
+});

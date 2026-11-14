@@ -803,6 +803,37 @@
     ctx.fillStyle = '#d64545'; rrect(ctx, -0.14, 0, 0.28, 0.05, 0.02); ctx.fill();
     ctx.restore();
   }
+  // Disco ball (F-39): a mirror-tiled ball rolling in an open crate on the rack. Missing tiles are dark squares.
+  function drawDiscoBall(ctx, r, spin, left, t) {
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.clip();
+    ctx.fillStyle = '#9aa8b8'; ctx.fillRect(-r, -r, 2 * r, 2 * r);
+    const cols = 6, rows = 4, cw = (2 * r) / cols * 1.25, rh = (2 * r) / rows, off = ((spin * r) % cw + cw) % cw;
+    for (let j = 0; j < rows; j++) for (let i = -1; i <= cols; i++) {
+      const k = j * cols + ((i % cols) + cols) % cols, x = -r + i * cw - off, y = -r + j * rh;
+      ctx.fillStyle = k >= left ? '#2d2a32' : (i + j + Math.floor(t * 3)) % 3 === 0 ? '#ffffff' : (i + j) % 2 ? '#dbe3ec' : '#b9c7d6';
+      ctx.fillRect(x + 0.004, y + 0.004, cw - 0.008, rh - 0.008);
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#2d2a32'; ctx.lineWidth = 0.012; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(-r * 0.4, r * 0.45, r * 0.18, 0, TAU); ctx.fill(); // highlight (y is up)
+  }
+  function drawDiscoInCrate(ctx, c, t) {
+    const D = DISCO, w = D.half + D.r + 0.02, hop = c.air > 0 ? Math.sin((1 - c.air / D.airTime) * Math.PI) * 0.45 : 0;
+    ctx.save(); ctx.translate(D.mountX, D.mountY + 0.03);
+    ctx.fillStyle = '#c99a5b'; ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 0.014;
+    rrect(ctx, -w, 0, 2 * w, 0.05, 0.01); ctx.fill(); ctx.stroke();                 // crate floor
+    for (const sx of [-1, 1]) { rrect(ctx, sx * w - 0.02, 0, 0.04, 0.17, 0.01); ctx.fill(); ctx.stroke(); } // low walls
+    ctx.save(); ctx.translate(c.p, 0.05 + D.r + hop); ctx.rotate(-c.spin);
+    drawDiscoBall(ctx, D.r, 0, c.tilesLeft(), t);
+    ctx.restore();
+    if (c.shield) drawBubbleWrap(ctx, -w, 0, 2 * w, 0.3, t);
+    ctx.restore();
+  }
+  function drawFlyingDisco(ctx, x, y, a, c, t) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a * 2);
+    drawDiscoBall(ctx, DISCO.r, 0, c ? c.tilesLeft() : DISCO.tiles, t || 0);
+    ctx.restore();
+  }
   function drawFlyingBouquet(ctx, x, y, a) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.translate(0, -0.25);
     ctx.fillStyle = '#f29ab0';
@@ -841,6 +872,15 @@
       const out = (Math.random() - 0.5) * (burst ? 3 : 1.6), up = 0.8 + Math.random() * (burst ? 2.4 : 1.2);
       const vx = b.vx * 0.7 + out * ca - up * sa, vy = b.vy * 0.7 + out * sa + up * ca;
       P.spawn(PK.CONFETTI, rim.x + (Math.random() - 0.5) * 0.2, rim.y, vx, vy, 1.8, 0.03 + Math.random() * 0.02, i % 3 ? '#f29ab0' : '#fff2f5');
+    }
+  }
+  function discoBits(game, n, burst) { // mirror shards
+    const W = game.world, b = W.bike, P = game.particles, rim = b.localToWorld(DISCO.mountX + (W.cargo.p || 0), 0.2, { x: 0, y: 0 });
+    const ca = Math.cos(b.a), sa = Math.sin(b.a);
+    for (let i = 0; i < n; i++) {
+      const out = (Math.random() - 0.5) * (burst ? 3 : 1.8), up = 1 + Math.random() * (burst ? 2.6 : 1.4);
+      const vx = b.vx * 0.7 + out * ca - up * sa, vy = b.vy * 0.7 + out * sa + up * ca;
+      P.spawn(PK.CONFETTI, rim.x, rim.y, vx, vy, 1.4, 0.025 + Math.random() * 0.015, i % 3 ? '#dbe3ec' : '#ffffff');
     }
   }
   const cupSpill = (game, e) => { game.audio.play('slosh'); game.spawnCargoBits(Math.min(9, 2 + Math.round(e.amount * 4)), false); };
@@ -885,6 +925,19 @@
       splashSound: 'wobble', bits: petalBits, onSpill: (game, e) => game.spawnCargoBits(Math.min(6, 1 + Math.round(e.amount * 3)), false),
       spillLine: true, condNote: () => '',
     },
+  };
+  CARGO_VIEW.disco = {
+    venueSign: ['THE MIRROR ROOM', 'DRAG BRUNCH TODAY · SPARKLE ENTRANCE →'],
+    pose: (c) => c,
+    rack: drawDiscoInCrate,
+    worried: (c) => Math.abs(c.v) > 0.8 || c.air > 0 || c.spilling > 0.2, lookX: -1,
+    flying: (ctx, x, y, a, c, t) => drawFlyingDisco(ctx, x, y, a, c, t),
+    hudIcon: (game, ctx, x, top, u, frac) => game.drawDiscoIcon(ctx, x, top + u * 0.5, u * 2.5, frac),
+    meter: (c) => ({ label: 'ROLL ', value: Math.min(1, Math.abs(c.v) / 1.4) }),
+    debug: (c) => 'ball p ' + c.p.toFixed(3) + '  v ' + c.v.toFixed(2) + '  air ' + c.air.toFixed(2) + '  tiles ' + c.tilesLeft() + '/' + DISCO.tiles + '  ' + c.amount.toFixed(1) + '%',
+    pauseLine: 'The disco ball is still spinning. And judgmental.', dropLabel: ' m to the sparkle drop',
+    arrival: { bell: true, bride: false, reviewAfter: 3.9, success: true },
+    splashSound: 'glint', bits: discoBits, onSpill: () => {}, spillLine: false, condNote: (r) => ' · ' + Math.ceil((r.condition / 100) * DISCO.tiles) + '/' + DISCO.tiles + ' tiles',
   };
   function cargoView(kind) { return CARGO_VIEW[cleanCargo(kind)]; }
   const EMPTY_RACK = {}; // nothing on the rack or in the basket
