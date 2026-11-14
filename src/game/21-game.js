@@ -981,6 +981,7 @@
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
         case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'GUST_WARN': A.play('whoosh'); this.pop('💨 GUST AHEAD', 'info', 1.6); this.say('GUST_WARN'); if (!this.autopilot) this.announce('Gust ahead.'); break;
         case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;
         case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
         case 'DISCO_ROLL': this.say('DISCO_ROLL'); break;
@@ -1161,11 +1162,47 @@
       for (const car of O.cars) if (car.x + CAR_LEN > xa && car.x - 4 < xb) drawCar(ctx, car, t);
       for (const cone of O.cones) if (vis(cone.x, 1)) drawCone(ctx, cone, alpha);
       for (const pu of O.powerups) if (!pu.taken && vis(pu.x, 1)) drawPowerup(ctx, pu, t);
+      if (W.socks.length) { R.screenSpace(); this.drawWind(W, xa, xb, t); R.worldSpace(cam); }
       if (W.course.fogs) { R.screenSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
       if (!(W.invuln > 0 && Math.floor(t * 16) % 2 === 0 && W.state === 'riding')) R.drawBike(W, alpha, this);
       for (const cc of front) drawCrosser(ctx, cc, t);
       this.particles.draw(ctx);
       if (W.course.fogs) { R.screenSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+    }
+    // Summit wind (F-41): a windsock before each exposed block hangs limp until its gust is warned, then fills and
+    // flutters toward the wind; leaves blow through the gust. With reduced motion, the sock and leaves hold still.
+    drawWind(W, xa, xb, t) {
+      const R = this.R, ctx = R.ctx, cam = this.cam, S = R.S, T = W.terrain, rm = this.reducedMotion, p = {}, q = {}, tt = rm ? 0 : t;
+      ctx.save();
+      W.socks.forEach((g, i) => {
+        const dir = Math.sign(g.wind) || -1, live = i < W.sockIdx;
+        const sx = g.x0 - 4;
+        if (sx > xa - 4 && sx < xb + 4) { // the windsock on its pole
+          const gy = T.height(sx) + ROAD.walk;
+          R.toScreen(cam, sx, gy, p); R.toScreen(cam, sx, gy + 3.4, q);
+          ctx.strokeStyle = COL.ink; ctx.lineWidth = Math.max(2, S * 0.07); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+          const fill = live ? 1 : 0.3, droop = (1 - fill) * 1.2, len = 1.7 * S, flap = live ? Math.sin(tt * 9) * 0.08 : 0;
+          ctx.translate(q.x, q.y); ctx.rotate(dir < 0 ? Math.PI - droop + flap : droop + flap); // points downwind; a limp sock droops toward the ground
+          for (let k = 0; k < 4; k++) { // red and white bands, narrowing
+            const x0 = (k / 4) * len, x1 = ((k + 1) / 4) * len, h0 = S * 0.32 * (1 - k * 0.14), h1 = S * 0.32 * (1 - (k + 1) * 0.14);
+            ctx.fillStyle = k % 2 ? '#fff6e5' : '#e8604c';
+            ctx.beginPath(); ctx.moveTo(x0, -h0); ctx.lineTo(x1, -h1); ctx.lineTo(x1, h1); ctx.lineTo(x0, h0); ctx.closePath(); ctx.fill();
+          }
+          const hE = S * 0.32 * 0.44; ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -S * 0.32); ctx.lineTo(len, -hE); ctx.lineTo(len, hE); ctx.lineTo(0, S * 0.32); ctx.closePath(); ctx.stroke();
+          ctx.setTransform(R.dpr, 0, 0, R.dpr, 0, 0);
+        }
+        const inGust = W.bike.x >= g.x0 - 30 && W.bike.x <= g.x1 + 10;
+        if (!(live && inGust) || g.x1 < xa || g.x0 > xb) return;
+        const span = g.x1 - g.x0 + 24;
+        for (let k = 0; k < 16; k++) { // leaves blowing downwind
+          const f = ((k * 0.618) % 1), u = (((k * 7.3 + dir * tt * Math.abs(g.wind) * 1.4) % span) + span) % span;
+          const lx = g.x0 - 12 + u, ly = T.height(clamp(lx, g.x0, g.x1)) + 0.4 + f * 2.6 + Math.sin(tt * 4 + k) * 0.35;
+          R.toScreen(cam, lx, ly, p);
+          ctx.fillStyle = ['#c9773a', '#d9a441', '#9c5a2e'][k % 3];
+          ctx.beginPath(); ctx.ellipse(p.x, p.y, S * 0.16, S * 0.07, tt * 6 + k, 0, TAU); ctx.fill();
+        }
+      });
+      ctx.restore();
     }
     // Karl the Fog (F-40): a few large translucent layers, no particles. Each bank veils the whole picture (the far
     // background fades), the road ahead of the rider fades out (objects appear late), and soft bands drift through.

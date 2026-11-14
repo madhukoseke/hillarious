@@ -917,7 +917,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     gust(p) {
       const f = fragment('gust', p.mark, p);
       if (p.enter) f.path.push(['ease', ...p.enter]);
-      f.path.push(['mark', p.mark], ['straight', p.len], ['gust', p.mark, p.wind]);
+      f.path.push(['mark', p.mark], ['straight', p.len], p.sock ? ['gust', p.mark, p.wind, 1] : ['gust', p.mark, p.wind]); // sock: a windsock warns (F-41)
       if (p.exit) f.path.push(['ease', ...p.exit]);
       f.hazards.push('gust');
       for (const h of p.hints || []) hint(f, { ...(HAZARD_HINTS[h.hazard] || {}), ...h });
@@ -1079,11 +1079,16 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   // beep and an amber light, once the bike is within warnDist of it. warnDist assumes the bike keeps accelerating
   // downhill, so at any rider's speed the warning comes at least 2 s ahead (the fog rule, tested on every route).
   const FOG = { lead: 2.4, accel: 3, minDist: 14, tail: 8, rule: 2 };
+  // Summit wind (F-41): a gust with a windsock warns (windsock, leaves, a whoosh) at least 1.5 s before it starts.
+  const WIND = { lead: 1.8, accel: 3, minDist: 10, rule: 1.5 };
+  // How far ahead to warn at speed v so the warning comes `lead` s early even while speeding up at `accel`.
+  const warnDist = (v, k) => Math.max(k.minDist, Math.max(0, v) * k.lead + 0.5 * k.accel * k.lead * k.lead);
   function fogAt(C, x) {
     for (const f of C.fogs || []) if (x >= f.x0 && x <= f.x1) return f.density;
     return 0;
   }
-  const fogWarnDist = (v) => Math.max(FOG.minDist, Math.max(0, v) * FOG.lead + 0.5 * FOG.accel * FOG.lead * FOG.lead);
+  const fogWarnDist = (v) => warnDist(v, FOG);
+  const sockGusts = (C) => (C.gusts || []).filter((g) => g.sock).sort((a, b) => a.x0 - b.x0);
   // Every hazard inside a fog bank (or within FOG.tail past it), in road order: { kind, x }.
   function fogHazards(C) {
     if (!C.fogs || !C.fogs.length) return [];
@@ -1120,7 +1125,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       else if (op === 'intersection') C.intersections.push({ x0: a[0], x1: a[1], name: a[2] });
       else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
       else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
-      else if (op === 'gust') (C.gusts || (C.gusts = [])).push({ x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else if (op === 'gust') (C.gusts || (C.gusts = [])).push(a[2] ? { x0: marks[a[0]], x1: b.x, wind: a[1], sock: true } : { x0: marks[a[0]], x1: b.x, wind: a[1] });
       else if (op === 'fog') (C.fogs || (C.fogs = [])).push({ x0: marks[a[0]], x1: b.x, density: a[1] });
       else throw new Error(`route ${id}: unknown path step "${op}"`);
     }
@@ -2840,6 +2845,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'mm-after', trigger: 'MAYBEMO_HOLD', speaker: 'car', text: 'After you. No, after you. No—', priority: 3 },
     // Karl the Fog (F-40)
     { id: 'karl', trigger: 'FOG_IN', speaker: 'rider', text: 'Karl the Fog has entered the chat.', priority: 3 },
+    { id: 'sock', trigger: 'GUST_WARN', speaker: 'rider', text: 'The windsock is doing a lot right now.', priority: 2 },
     // Cable car operator
     { id: 'cc-ding', trigger: 'CABLE_CAR_ENCOUNTER', speaker: 'operator', text: 'DING DING! Make way for 1873!', priority: 4 },
     { id: 'cc-tracks', trigger: 'CABLE_CAR_HOLD', speaker: 'operator', text: 'Off the tracks, Speed Racer!', priority: 4 },
@@ -2997,6 +3003,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.inputLog = [];                             // every step's input, packed (packInput), for crash replays (F-32)
       this.splits = [];                               // ride time at each checkpoint after the start, then at the finish (F-35)
       this.fogHz = fogHazards(course); this.fogIdx = 0; this.inFog = false; // fog warnings (F-40)
+      this.socks = sockGusts(course); this.sockIdx = 0;                     // windsock warnings (F-41)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
@@ -3119,6 +3126,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
       if (this.fogHz.length || C.fogs) this.fogStep(b);
+      if (this.socks.length) {
+        const range = warnDist(b.vx, WIND);
+        while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 - b.x <= range) {
+          const g = this.socks[this.sockIdx++];
+          if (g.x0 >= b.x) this.emit('GUST_WARN', { x: g.x0, x1: g.x1, wind: g.wind, d: g.x0 - b.x });
+        }
+      }
       if (b.brakeAmt > 0.85 && b.grounded && b.vx > 10 && this.t - this.brakeT > 3) { this.brakeT = this.t; this.emit('HARD_BRAKE', { speed: b.vx }); }
       const sp = Math.hypot(b.vx, b.vy);
       if (sp > 16 && b.grounded && this.t - this.fastT > 8) { this.fastT = this.t; this.emit('PLAYER_FAST', { speed: sp }); }
@@ -3142,7 +3156,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (h.x >= b.x) this.emit('FOG_WARN', { kind: h.kind, x: h.x, d: h.x - b.x });
       }
     }
-    fogFrom(x) { this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false; }
+    fogFrom(x) {
+      this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false;
+      this.sockIdx = 0; while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 <= x) this.sockIdx++;
+    }
     sinceEvent(type) { return this.lastT[type] !== undefined ? this.t - this.lastT[type] : 1e9; }
     trackDamage(amount, dt) {
       const S = this.spill;
@@ -3450,7 +3467,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, WIND, warnDist, sockGusts, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
     DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay, pickWipeout, CLIP_TYPES, clipType, replayFrames,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, DiscoCargo, DISCO, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
@@ -3701,7 +3718,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     play(name, k) {
       if (!this.ctx || this.ctx.state !== 'running') return;
-      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, boing: 0.4, glint: 0.12, fogbeep: 0.3, bark: 0.6, shutter: 0.5, wobble: 0.7 };
+      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, boing: 0.4, glint: 0.12, fogbeep: 0.3, whoosh: 0.5, bark: 0.6, shutter: 0.5, wobble: 0.7 };
       const now = this.ctx.currentTime;
       if (MIN[name] && now - (this.last[name] || -9) < MIN[name]) return;
       this.last[name] = now;
@@ -3744,6 +3761,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'powerup': [523.3, 659.3, 784, 1046.5].forEach((f, i) => this.osc('triangle', f, f, t + i * 0.06, 0.12, 0.12)); break;
         case 'espresso': this.osc('sawtooth', 220, 1400, t, 0.28, 0.06); this.osc('triangle', 784, 1568, t + 0.12, 0.2, 0.08); break;
         case 'boing': { const o = this.osc('sine', 220, 520, t, 0.32, 0.18); this.vibrato(o, t, 14, 40, 0.32); break; } // the disco ball pops back in
+        case 'whoosh': this.osc('triangle', 340, 110, t, 0.5, 0.05); this.osc('sine', 180, 90, t + 0.05, 0.45, 0.04); break; // a gust is coming
         case 'fogbeep': this.osc('sine', 523, 523, t, 0.12, 0.07); this.osc('sine', 392, 392, t + 0.16, 0.16, 0.07); break; // a hazard in the fog
         case 'glint': this.osc('triangle', 2637, 2637, t, 0.08, 0.06); this.osc('triangle', 3520, 3520, t + 0.05, 0.1, 0.04); break; // a mirror tile chips
         case 'wobble': { const o = this.osc('sine', 180, 140, t, 0.45, 0.16); this.vibrato(o, t, 9, 30, 0.45); break; }
@@ -6326,6 +6344,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
         case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'GUST_WARN': A.play('whoosh'); this.pop('💨 GUST AHEAD', 'info', 1.6); this.say('GUST_WARN'); if (!this.autopilot) this.announce('Gust ahead.'); break;
         case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;
         case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
         case 'DISCO_ROLL': this.say('DISCO_ROLL'); break;
@@ -6506,11 +6525,47 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const car of O.cars) if (car.x + CAR_LEN > xa && car.x - 4 < xb) drawCar(ctx, car, t);
       for (const cone of O.cones) if (vis(cone.x, 1)) drawCone(ctx, cone, alpha);
       for (const pu of O.powerups) if (!pu.taken && vis(pu.x, 1)) drawPowerup(ctx, pu, t);
+      if (W.socks.length) { R.screenSpace(); this.drawWind(W, xa, xb, t); R.worldSpace(cam); }
       if (W.course.fogs) { R.screenSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
       if (!(W.invuln > 0 && Math.floor(t * 16) % 2 === 0 && W.state === 'riding')) R.drawBike(W, alpha, this);
       for (const cc of front) drawCrosser(ctx, cc, t);
       this.particles.draw(ctx);
       if (W.course.fogs) { R.screenSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+    }
+    // Summit wind (F-41): a windsock before each exposed block hangs limp until its gust is warned, then fills and
+    // flutters toward the wind; leaves blow through the gust. With reduced motion, the sock and leaves hold still.
+    drawWind(W, xa, xb, t) {
+      const R = this.R, ctx = R.ctx, cam = this.cam, S = R.S, T = W.terrain, rm = this.reducedMotion, p = {}, q = {}, tt = rm ? 0 : t;
+      ctx.save();
+      W.socks.forEach((g, i) => {
+        const dir = Math.sign(g.wind) || -1, live = i < W.sockIdx;
+        const sx = g.x0 - 4;
+        if (sx > xa - 4 && sx < xb + 4) { // the windsock on its pole
+          const gy = T.height(sx) + ROAD.walk;
+          R.toScreen(cam, sx, gy, p); R.toScreen(cam, sx, gy + 3.4, q);
+          ctx.strokeStyle = COL.ink; ctx.lineWidth = Math.max(2, S * 0.07); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+          const fill = live ? 1 : 0.3, droop = (1 - fill) * 1.2, len = 1.7 * S, flap = live ? Math.sin(tt * 9) * 0.08 : 0;
+          ctx.translate(q.x, q.y); ctx.rotate(dir < 0 ? Math.PI - droop + flap : droop + flap); // points downwind; a limp sock droops toward the ground
+          for (let k = 0; k < 4; k++) { // red and white bands, narrowing
+            const x0 = (k / 4) * len, x1 = ((k + 1) / 4) * len, h0 = S * 0.32 * (1 - k * 0.14), h1 = S * 0.32 * (1 - (k + 1) * 0.14);
+            ctx.fillStyle = k % 2 ? '#fff6e5' : '#e8604c';
+            ctx.beginPath(); ctx.moveTo(x0, -h0); ctx.lineTo(x1, -h1); ctx.lineTo(x1, h1); ctx.lineTo(x0, h0); ctx.closePath(); ctx.fill();
+          }
+          const hE = S * 0.32 * 0.44; ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -S * 0.32); ctx.lineTo(len, -hE); ctx.lineTo(len, hE); ctx.lineTo(0, S * 0.32); ctx.closePath(); ctx.stroke();
+          ctx.setTransform(R.dpr, 0, 0, R.dpr, 0, 0);
+        }
+        const inGust = W.bike.x >= g.x0 - 30 && W.bike.x <= g.x1 + 10;
+        if (!(live && inGust) || g.x1 < xa || g.x0 > xb) return;
+        const span = g.x1 - g.x0 + 24;
+        for (let k = 0; k < 16; k++) { // leaves blowing downwind
+          const f = ((k * 0.618) % 1), u = (((k * 7.3 + dir * tt * Math.abs(g.wind) * 1.4) % span) + span) % span;
+          const lx = g.x0 - 12 + u, ly = T.height(clamp(lx, g.x0, g.x1)) + 0.4 + f * 2.6 + Math.sin(tt * 4 + k) * 0.35;
+          R.toScreen(cam, lx, ly, p);
+          ctx.fillStyle = ['#c9773a', '#d9a441', '#9c5a2e'][k % 3];
+          ctx.beginPath(); ctx.ellipse(p.x, p.y, S * 0.16, S * 0.07, tt * 6 + k, 0, TAU); ctx.fill();
+        }
+      });
+      ctx.restore();
     }
     // Karl the Fog (F-40): a few large translucent layers, no particles. Each bank veils the whole picture (the far
     // background fades), the road ahead of the rider fades out (objects appear late), and soft bands drift through.

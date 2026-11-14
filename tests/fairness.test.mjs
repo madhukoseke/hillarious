@@ -16,12 +16,13 @@ function ride(build, profile) {
     w.step(ap.input(w));
     for (const e of w.drain()) {
       seen.add(e.type);
-      if (e.type === 'FOG_WARN') warned.push({ kind: e.kind, x: e.x, at: e.t, reached: null });
+      if (e.type === 'FOG_WARN') warned.push({ kind: e.kind, x: e.x, at: e.t, reached: null, rule: H.FOG.rule });
+      if (e.type === 'GUST_WARN') warned.push({ kind: 'gust', x: e.x, at: e.t, reached: null, rule: H.WIND.rule }); // F-41
       if (e.type === 'RECOVER') for (const h of warned) if (h.reached === null) h.dropped = true; // warned again after the respawn
     }
     for (const h of warned) if (h.reached === null && !h.dropped && w.bike.x >= h.x) h.reached = w.t;
   }
-  return { w, r: w.result(), sanity: seen.has('SANITY'), fogLate: warned.filter((h) => h.reached !== null && h.reached - h.at < H.FOG.rule) };
+  return { w, r: w.result(), sanity: seen.has('SANITY'), fogLate: warned.filter((h) => h.reached !== null && h.reached - h.at < h.rule) };
 }
 
 // Generated routes (F-33): every seed must be fair, with every cargo. Each push rides seeds 1–5, which between them use
@@ -58,8 +59,9 @@ for (const { id, build } of content) {
       const { w, r, sanity, fogLate } = ride(build, p);
       assert.equal(w.state, 'done', `${id} ${p} did not finish (x=${w.bike.x.toFixed(1)} after ${w.t.toFixed(0)} s)`);
       assert.ok(!sanity, `${id} ${p} tripped the non-finite guard`);
-      // The fog rule (F-40): inside fog, every hazard warns at least 2 s before the rider reaches it.
-      assert.deepEqual(fogLate.map((h) => `${h.kind}@${h.x.toFixed(1)}`), [], `${id} ${p}: fog warnings under ${H.FOG.rule} s`);
+      // The fog rule (F-40): inside fog, every hazard warns at least 2 s before the rider reaches it. A windsock warns
+      // at least 1.5 s before its gust (F-41).
+      assert.deepEqual(fogLate.map((h) => `${h.kind}@${h.x.toFixed(1)}`), [], `${id} ${p}: warnings later than the rule`);
       if (p === 'careful' || p === 'typical') assert.equal(r.crashes, 0, `${id} ${p} crashed ${r.crashes}×`);
       if (p === 'typical') {
         const share = r.time / par;
