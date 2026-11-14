@@ -157,6 +157,20 @@
       f.hazards.unshift('fog');
       return f;
     },
+    // A switchback (F-42): a grade, a flatter hairpin, then the grade again. At the hairpin the view swings 180° and the
+    // ride carries on "the other way" across the screen. Underneath it is one continuous road, so physics is untouched.
+    switchback(p) {
+      const f = fragment('switchback', p.mark, p), g = p.grade, turn = p.turn === undefined ? -0.03 : p.turn;
+      f.path.push(['mark', p.mark]);
+      if (p.enter) f.path.push(['ease', ...p.enter]);
+      f.path.push(['straight', p.len], ['ease', turn, 4], ['mark', p.mark + 'Turn', (p.turnLen || 6) / 2], ['switchback', p.mark + 'Turn'],
+        ['straight', p.turnLen || 6], ['ease', g, 4], ['straight', p.len2 === undefined ? p.len : p.len2]);
+      if (p.exit) f.path.push(['ease', ...p.exit]);
+      f.hazards.push('switchback');
+      for (const [x, w, d] of p.potholes || []) { f.features.push(['pothole', f.at(x), w, d]); f.hazards.push('pothole'); }
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
     // A raised lip mid-block, away from any crossing (a driveway or a kerb): a short run to it, up, down, then the
     // rest of the block.
     lip(p) {
@@ -313,6 +327,8 @@
     return 0;
   }
   const fogWarnDist = (v) => warnDist(v, FOG);
+  // How many switchbacks lie behind x: odd means the view is turned around (F-42).
+  const switchParity = (C, x) => (C.switchbacks || []).filter((s) => s <= x).length % 2;
   const sockGusts = (C) => (C.gusts || []).filter((g) => g.sock).sort((a, b) => a.x0 - b.x0);
   // Every hazard inside a fog bank (or within FOG.tail past it), in road order: { kind, x }.
   function fogHazards(C) {
@@ -351,6 +367,7 @@
       else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
       else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
       else if (op === 'gust') (C.gusts || (C.gusts = [])).push(a[2] ? { x0: marks[a[0]], x1: b.x, wind: a[1], sock: true } : { x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else if (op === 'switchback') (C.switchbacks || (C.switchbacks = [])).push(marks[a[0]]);
       else if (op === 'fog') (C.fogs || (C.fogs = [])).push({ x0: marks[a[0]], x1: b.x, density: a[1] });
       else throw new Error(`route ${id}: unknown path step "${op}"`);
     }

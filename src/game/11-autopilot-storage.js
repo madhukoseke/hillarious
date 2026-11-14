@@ -86,7 +86,7 @@
   }
 
   const HILL = {
-    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, WIND, warnDist, sockGusts, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, WIND, warnDist, sockGusts, switchParity, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
     DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay, pickWipeout, CLIP_TYPES, clipType, replayFrames,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, DiscoCargo, DISCO, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,

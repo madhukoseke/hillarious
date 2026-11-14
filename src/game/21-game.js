@@ -981,6 +981,7 @@
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
         case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'SWITCHBACK': A.play('whoosh'); this.say('SWITCHBACK'); break;
         case 'GUST_WARN': A.play('whoosh'); this.pop('💨 GUST AHEAD', 'info', 1.6); this.say('GUST_WARN'); if (!this.autopilot) this.announce('Gust ahead.'); break;
         case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;
         case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
@@ -1104,7 +1105,7 @@
       R.S = R.baseS * 0.66;
       const portrait = R.W < R.H;
       cam.x = b.x + (portrait ? 0.22 : 0.34) * (R.W / R.S); cam.y = b.y + (portrait ? 0.08 : -0.18) * (R.H / R.S); cam.sx = 0; cam.sy = 0;
-      this.windX = -3.5;
+      this.windX = -3.5; R.mx = 1;
       this.drawWorldScene(W, 1);
       R.screenSpace();
       this.drawLabels(W);
@@ -1118,8 +1119,10 @@
       R.S = R.baseS * this.cam.zoom;
       R.ensureScenery(live.course); // the replay's course is a copy: same scenery
       this.windX = -2;
+      const wipe = this.updateTurn(W);
       this.drawWorldScene(W, rp ? rp.alpha : this.alpha);
       R.screenSpace();
+      if (wipe > 0) { ctx.fillStyle = `rgba(20,18,24,${wipe})`; ctx.fillRect(0, 0, R.W, R.H); } // reduced motion: a wipe through black
       this.drawLabels(W);
       if (rp) this.drawReplay(rp);
       else {
@@ -1145,12 +1148,31 @@
       ctx.fillStyle = '#f2b134'; ctx.fillRect(0, h - bar, w * rp.progress, 3);
       ctx.restore();
     }
+    // Switchbacks (F-42): past an odd number of hairpins the view is turned around, so the ride carries on the other way
+    // across the screen. Turning swings the view 180° over 0.8 s (the mirror factor runs through cos of the angle); with
+    // reduced motion it cuts at the midpoint of a 0.6 s wipe through black, and returns the wipe's strength. Physics is
+    // untouched: only R.mx changes. A new world (a run, a replay) or a respawn snaps it.
+    updateTurn(W) {
+      const R = this.R, target = switchParity(W.course, W.bike.x) ? -1 : 1, rm = this.reducedMotion;
+      const T = this.turn || (this.turn = { a0: 0, a1: 0, t: 1, world: null, snap: false });
+      const aim = target < 0 ? Math.PI : 0, cur = () => T.a0 + (T.a1 - T.a0) * smoothstep(0, 1, T.t);
+      if (T.world !== W || T.snap) { T.world = W; T.snap = false; T.a0 = T.a1 = aim; T.t = 1; }
+      else if (aim !== T.a1) { T.a0 = rm ? T.a1 : cur(); T.a1 = aim; T.t = 0; }
+      if (T.t < 1) T.t = Math.min(1, T.t + this.frameDt / (rm ? 0.6 : 0.8));
+      let m = rm ? (T.t < 0.5 ? Math.cos(T.a0) : Math.cos(T.a1)) : Math.cos(cur());
+      if (Math.abs(m) < 0.02) m = m < 0 ? -0.02 : 0.02; // edge-on for a moment, never zero
+      R.mx = m;
+      return rm && T.t < 1 ? 1 - Math.abs(2 * T.t - 1) : 0;
+    }
     drawWorldScene(W, alpha) {
       const R = this.R, ctx = R.ctx, cam = this.cam, t = this.time, O = W.obstacles;
-      R.screenSpace();
+      R.raw = true; // inside the scene the canvas transform mirrors (switchbacks)
+      const mx = R.mx;
+      R.mx = mx < 0 ? -1 : 1; R.sceneSpace(); // the sky fills the screen; mid-swing it only flips side, it never squashes
       R.drawBackdrop(cam, t, W.course.theme);
+      R.mx = mx;
       R.worldSpace(cam);
-      const half = R.W / 2 / R.S + 3, xa = cam.x - half, xb = cam.x + half, vis = (x, m) => x > xa - m && x < xb + m;
+      const half = (R.W / 2 / R.S + 3) / Math.max(Math.abs(mx), 0.25), xa = cam.x - half, xb = cam.x + half, vis = (x, m) => x > xa - m && x < xb + m;
       R.drawScenery(W, xa, xb, t);
       R.drawRoad(W, xa, xb);
       const front = [];
@@ -1162,12 +1184,13 @@
       for (const car of O.cars) if (car.x + CAR_LEN > xa && car.x - 4 < xb) drawCar(ctx, car, t);
       for (const cone of O.cones) if (vis(cone.x, 1)) drawCone(ctx, cone, alpha);
       for (const pu of O.powerups) if (!pu.taken && vis(pu.x, 1)) drawPowerup(ctx, pu, t);
-      if (W.socks.length) { R.screenSpace(); this.drawWind(W, xa, xb, t); R.worldSpace(cam); }
-      if (W.course.fogs) { R.screenSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
+      if (W.socks.length) { R.sceneSpace(); this.drawWind(W, xa, xb, t); R.worldSpace(cam); }
+      if (W.course.fogs) { R.sceneSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
       if (!(W.invuln > 0 && Math.floor(t * 16) % 2 === 0 && W.state === 'riding')) R.drawBike(W, alpha, this);
       for (const cc of front) drawCrosser(ctx, cc, t);
       this.particles.draw(ctx);
-      if (W.course.fogs) { R.screenSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+      if (W.course.fogs) { R.sceneSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+      R.raw = false;
     }
     // Summit wind (F-41): a windsock before each exposed block hangs limp until its gust is warned, then fills and
     // flutters toward the wind; leaves blow through the gust. With reduced motion, the sock and leaves hold still.
@@ -1243,12 +1266,10 @@
     drawFogWarnings(W, xa, xb, t) {
       const R = this.R, ctx = R.ctx, cam = this.cam, S = R.S, T = W.terrain, b = W.bike, p = {}, q = {};
       const on = this.reducedMotion || Math.floor(t * 3) % 2 === 0;
-      let next = null;
       ctx.save();
       for (let i = 0; i < W.fogIdx; i++) {
         const h = W.fogHz[i];
         if (h.x < b.x - 2) continue;
-        if (!next) next = h;
         if (h.x < xa - 2 || h.x > xb + 2) continue;
         const gy = T.height(h.x) + ROAD.walk;
         R.toScreen(cam, h.x, gy, p); R.toScreen(cam, h.x, gy + 2.3, q);
@@ -1261,6 +1282,14 @@
         ctx.fillStyle = on ? '#ffbe3c' : '#8a6a2a'; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(4, S * 0.3), 0, TAU); ctx.fill(); ctx.stroke();
       }
+      ctx.restore();
+    }
+    // The tag for the nearest hazard the fog warned of, drawn with the HUD so its text is never mirrored.
+    drawFogTag(W) {
+      const R = this.R, ctx = R.ctx, b = W.bike, on = this.reducedMotion || Math.floor(this.time * 3) % 2 === 0;
+      let next = null;
+      for (let i = 0; i < W.fogIdx && !next; i++) if (W.fogHz[i].x >= b.x - 2) next = W.fogHz[i];
+      ctx.save();
       if (next && W.state === 'riding') {
         const u = clamp(Math.min(R.W, R.H) / 46, 11, 18), label = '⚠ ' + (FOG_LABELS[next.kind] || 'HAZARD') + ' · ' + Math.max(0, Math.round(next.x - b.x)) + ' m';
         ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1481,16 +1510,18 @@
       });
       const sp = {}, warn = (wx, wy, d) => { // off-screen hazard arrows
         R.toScreen(this.cam, wx, wy, sp);
-        if (!(d > 0 && d < 60 && sp.x > Wd - 10 && W.state === 'riding')) return;
+        const k = R.mx < 0 ? -1 : 1; // which side is ahead (a switchback turns the view around)
+        if (!(d > 0 && d < 60 && (k > 0 ? sp.x > Wd - 10 : sp.x < 10) && W.state === 'riding')) return;
         const y = clamp(sp.y, u * 8, R.H - u * 3), pulse = 1 + Math.sin(this.time * 10) * 0.08;
-        ctx.save(); ctx.translate(Wd - u * 1.8, y); ctx.scale(pulse, pulse);
-        ctx.fillStyle = COL.coral; ctx.beginPath(); ctx.moveTo(u * 1.2, 0); ctx.lineTo(-u * 0.5, -u * 1.1); ctx.lineTo(-u * 0.5, u * 1.1); ctx.closePath(); ctx.fill();
+        ctx.save(); ctx.translate(k > 0 ? Wd - u * 1.8 : u * 1.8, y); ctx.scale(pulse, pulse);
+        ctx.fillStyle = COL.coral; ctx.beginPath(); ctx.moveTo(k * u * 1.2, 0); ctx.lineTo(-k * u * 0.5, -u * 1.1); ctx.lineTo(-k * u * 0.5, u * 1.1); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = COL.cream; ctx.font = '900 ' + (u * 1.1).toFixed(1) + 'px ' + FONT_DISPLAY; ctx.textAlign = 'center'; ctx.fillText('!', 0, u * 0.05);
         ctx.restore();
-        ctx.fillStyle = COL.ink; ctx.font = '800 ' + (u * 0.7).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'right';
-        ctx.fillText(Math.round(d) + ' m', Wd - u * 3.1, y);
+        ctx.fillStyle = COL.ink; ctx.font = '800 ' + (u * 0.7).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = k > 0 ? 'right' : 'left';
+        ctx.fillText(Math.round(d) + ' m', k > 0 ? Wd - u * 3.1 : u * 3.1, y);
       };
+      if (W.course.fogs) this.drawFogTag(W);
       for (const car of W.obstacles.cars) warn(car.x, car.roofY, car.x - W.bike.x);
       for (const cc of W.obstacles.crossers) if (cc.active) warn(cc.cx, cc.y + 1.5, cc.x0 - W.bike.x);
     }

@@ -932,6 +932,20 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       f.hazards.unshift('fog');
       return f;
     },
+    // A switchback (F-42): a grade, a flatter hairpin, then the grade again. At the hairpin the view swings 180° and the
+    // ride carries on "the other way" across the screen. Underneath it is one continuous road, so physics is untouched.
+    switchback(p) {
+      const f = fragment('switchback', p.mark, p), g = p.grade, turn = p.turn === undefined ? -0.03 : p.turn;
+      f.path.push(['mark', p.mark]);
+      if (p.enter) f.path.push(['ease', ...p.enter]);
+      f.path.push(['straight', p.len], ['ease', turn, 4], ['mark', p.mark + 'Turn', (p.turnLen || 6) / 2], ['switchback', p.mark + 'Turn'],
+        ['straight', p.turnLen || 6], ['ease', g, 4], ['straight', p.len2 === undefined ? p.len : p.len2]);
+      if (p.exit) f.path.push(['ease', ...p.exit]);
+      f.hazards.push('switchback');
+      for (const [x, w, d] of p.potholes || []) { f.features.push(['pothole', f.at(x), w, d]); f.hazards.push('pothole'); }
+      for (const h of p.hints || []) hint(f, h);
+      return f;
+    },
     // A raised lip mid-block, away from any crossing (a driveway or a kerb): a short run to it, up, down, then the
     // rest of the block.
     lip(p) {
@@ -1088,6 +1102,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     return 0;
   }
   const fogWarnDist = (v) => warnDist(v, FOG);
+  // How many switchbacks lie behind x: odd means the view is turned around (F-42).
+  const switchParity = (C, x) => (C.switchbacks || []).filter((s) => s <= x).length % 2;
   const sockGusts = (C) => (C.gusts || []).filter((g) => g.sock).sort((a, b) => a.x0 - b.x0);
   // Every hazard inside a fog bank (or within FOG.tail past it), in road order: { kind, x }.
   function fogHazards(C) {
@@ -1126,6 +1142,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       else if (op === 'street') { const x0 = b.x; if (a[2]) marks[a[2]] = x0; b.straight(a[1]); C.intersections.push({ x0, x1: b.x, name: a[0] }); }
       else if (op === 'lip') { const x = marks[a[0]]; C.lips.push({ x, big: a[1] }); if (a[2] !== undefined) C.crosswalks.push({ x0: x - a[2], x1: x }); }
       else if (op === 'gust') (C.gusts || (C.gusts = [])).push(a[2] ? { x0: marks[a[0]], x1: b.x, wind: a[1], sock: true } : { x0: marks[a[0]], x1: b.x, wind: a[1] });
+      else if (op === 'switchback') (C.switchbacks || (C.switchbacks = [])).push(marks[a[0]]);
       else if (op === 'fog') (C.fogs || (C.fogs = [])).push({ x0: marks[a[0]], x1: b.x, density: a[1] });
       else throw new Error(`route ${id}: unknown path step "${op}"`);
     }
@@ -2846,6 +2863,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     // Karl the Fog (F-40)
     { id: 'karl', trigger: 'FOG_IN', speaker: 'rider', text: 'Karl the Fog has entered the chat.', priority: 3 },
     { id: 'sock', trigger: 'GUST_WARN', speaker: 'rider', text: 'The windsock is doing a lot right now.', priority: 2 },
+    { id: 'hairpin', trigger: 'SWITCHBACK', speaker: 'rider', text: 'Hairpin! The whole city just swapped sides.', priority: 2 },
     // Cable car operator
     { id: 'cc-ding', trigger: 'CABLE_CAR_ENCOUNTER', speaker: 'operator', text: 'DING DING! Make way for 1873!', priority: 4 },
     { id: 'cc-tracks', trigger: 'CABLE_CAR_HOLD', speaker: 'operator', text: 'Off the tracks, Speed Racer!', priority: 4 },
@@ -3004,6 +3022,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.splits = [];                               // ride time at each checkpoint after the start, then at the finish (F-35)
       this.fogHz = fogHazards(course); this.fogIdx = 0; this.inFog = false; // fog warnings (F-40)
       this.socks = sockGusts(course); this.sockIdx = 0;                     // windsock warnings (F-41)
+      this.turns = 0;                                                       // switchbacks passed (F-42)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
@@ -3126,6 +3145,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
       if (this.fogHz.length || C.fogs) this.fogStep(b);
+      const SB = C.switchbacks;
+      if (SB) while (this.turns < SB.length && b.x >= SB[this.turns]) this.emit('SWITCHBACK', { i: this.turns++, x: b.x });
       if (this.socks.length) {
         const range = warnDist(b.vx, WIND);
         while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 - b.x <= range) {
@@ -3159,6 +3180,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     fogFrom(x) {
       this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false;
       this.sockIdx = 0; while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 <= x) this.sockIdx++;
+      this.turns = (this.course.switchbacks || []).filter((s) => s <= x).length;
     }
     sinceEvent(type) { return this.lastT[type] !== undefined ? this.t - this.lastT[type] : 1e9; }
     trackDamage(amount, dt) {
@@ -3467,7 +3489,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, WIND, warnDist, sockGusts, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, WIND, warnDist, sockGusts, switchParity, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
     DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay, pickWipeout, CLIP_TYPES, clipType, replayFrames,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, DiscoCargo, DISCO, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
@@ -4897,6 +4919,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     constructor(canvas) {
       this.cv = canvas; this.ctx = canvas.getContext('2d', { alpha: false });
       this.dpr = 1; this.W = 1; this.H = 1; this.baseS = 50; this.S = 50;
+      this.mx = 1; this.raw = false; // switchbacks (F-42): mx mirrors the view (-1 is turned around); raw: toScreen ignores it
       this.sx = new Float32Array(4096); this.sh = new Float32Array(4096); this.sb = new Float32Array(4096);
       this.scenery = null; this.sceneryFor = null;
       this.pose = { hub: [{ x: 0, y: 0 }, { x: 0, y: 0 }], spin: [0, 0] };
@@ -4991,11 +5014,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       c.prof = prof;
       return c;
     }
-    toScreen(cam, wx, wy, out) { out.x = (wx - cam.x + cam.sx) * this.S + this.W / 2; out.y = this.H / 2 - (wy - cam.y + cam.sy) * this.S; return out; }
+    // Outside the world scene, toScreen gives mirrored positions (labels, bubbles, and HUD arrows stay upright text).
+    // Inside it (raw), the canvas transform does the mirroring, so positions are not mirrored twice.
+    toScreen(cam, wx, wy, out) { out.x = (wx - cam.x + cam.sx) * this.S * (this.raw ? 1 : this.mx) + this.W / 2; out.y = this.H / 2 - (wy - cam.y + cam.sy) * this.S; return out; }
     screenSpace() { this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); }
+    sceneSpace() { const d = this.dpr, m = this.mx; this.ctx.setTransform(d * m, 0, 0, d, d * this.W * (1 - m) / 2, 0); } // screen space, mirrored with the world
     worldSpace(cam) {
-      const S = this.S, d = this.dpr;
-      this.ctx.setTransform(d * S, 0, 0, -d * S, d * (this.W / 2 - (cam.x - cam.sx) * S), d * (this.H / 2 + (cam.y - cam.sy) * S));
+      const S = this.S, d = this.dpr, m = this.mx;
+      this.ctx.setTransform(d * S * m, 0, 0, -d * S, d * (this.W / 2 - (cam.x - cam.sx) * S * m), d * (this.H / 2 + (cam.y - cam.sy) * S));
     }
     ensureScenery(course) { if (this.sceneryFor !== course) { this.scenery = buildScenery(course); this.sceneryFor = course; } }
     drawBackdrop(cam, time, theme) {
@@ -6344,6 +6370,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
         case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'SWITCHBACK': A.play('whoosh'); this.say('SWITCHBACK'); break;
         case 'GUST_WARN': A.play('whoosh'); this.pop('💨 GUST AHEAD', 'info', 1.6); this.say('GUST_WARN'); if (!this.autopilot) this.announce('Gust ahead.'); break;
         case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;
         case 'DISCO_POP': A.play('boing'); this.cam.shake(0.2); this.pop('Boing! Back in the crate', 'bad', 1.4); this.say('DISCO_POP'); break;
@@ -6467,7 +6494,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       R.S = R.baseS * 0.66;
       const portrait = R.W < R.H;
       cam.x = b.x + (portrait ? 0.22 : 0.34) * (R.W / R.S); cam.y = b.y + (portrait ? 0.08 : -0.18) * (R.H / R.S); cam.sx = 0; cam.sy = 0;
-      this.windX = -3.5;
+      this.windX = -3.5; R.mx = 1;
       this.drawWorldScene(W, 1);
       R.screenSpace();
       this.drawLabels(W);
@@ -6481,8 +6508,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       R.S = R.baseS * this.cam.zoom;
       R.ensureScenery(live.course); // the replay's course is a copy: same scenery
       this.windX = -2;
+      const wipe = this.updateTurn(W);
       this.drawWorldScene(W, rp ? rp.alpha : this.alpha);
       R.screenSpace();
+      if (wipe > 0) { ctx.fillStyle = `rgba(20,18,24,${wipe})`; ctx.fillRect(0, 0, R.W, R.H); } // reduced motion: a wipe through black
       this.drawLabels(W);
       if (rp) this.drawReplay(rp);
       else {
@@ -6508,12 +6537,31 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.fillStyle = '#f2b134'; ctx.fillRect(0, h - bar, w * rp.progress, 3);
       ctx.restore();
     }
+    // Switchbacks (F-42): past an odd number of hairpins the view is turned around, so the ride carries on the other way
+    // across the screen. Turning swings the view 180° over 0.8 s (the mirror factor runs through cos of the angle); with
+    // reduced motion it cuts at the midpoint of a 0.6 s wipe through black, and returns the wipe's strength. Physics is
+    // untouched: only R.mx changes. A new world (a run, a replay) or a respawn snaps it.
+    updateTurn(W) {
+      const R = this.R, target = switchParity(W.course, W.bike.x) ? -1 : 1, rm = this.reducedMotion;
+      const T = this.turn || (this.turn = { a0: 0, a1: 0, t: 1, world: null, snap: false });
+      const aim = target < 0 ? Math.PI : 0, cur = () => T.a0 + (T.a1 - T.a0) * smoothstep(0, 1, T.t);
+      if (T.world !== W || T.snap) { T.world = W; T.snap = false; T.a0 = T.a1 = aim; T.t = 1; }
+      else if (aim !== T.a1) { T.a0 = rm ? T.a1 : cur(); T.a1 = aim; T.t = 0; }
+      if (T.t < 1) T.t = Math.min(1, T.t + this.frameDt / (rm ? 0.6 : 0.8));
+      let m = rm ? (T.t < 0.5 ? Math.cos(T.a0) : Math.cos(T.a1)) : Math.cos(cur());
+      if (Math.abs(m) < 0.02) m = m < 0 ? -0.02 : 0.02; // edge-on for a moment, never zero
+      R.mx = m;
+      return rm && T.t < 1 ? 1 - Math.abs(2 * T.t - 1) : 0;
+    }
     drawWorldScene(W, alpha) {
       const R = this.R, ctx = R.ctx, cam = this.cam, t = this.time, O = W.obstacles;
-      R.screenSpace();
+      R.raw = true; // inside the scene the canvas transform mirrors (switchbacks)
+      const mx = R.mx;
+      R.mx = mx < 0 ? -1 : 1; R.sceneSpace(); // the sky fills the screen; mid-swing it only flips side, it never squashes
       R.drawBackdrop(cam, t, W.course.theme);
+      R.mx = mx;
       R.worldSpace(cam);
-      const half = R.W / 2 / R.S + 3, xa = cam.x - half, xb = cam.x + half, vis = (x, m) => x > xa - m && x < xb + m;
+      const half = (R.W / 2 / R.S + 3) / Math.max(Math.abs(mx), 0.25), xa = cam.x - half, xb = cam.x + half, vis = (x, m) => x > xa - m && x < xb + m;
       R.drawScenery(W, xa, xb, t);
       R.drawRoad(W, xa, xb);
       const front = [];
@@ -6525,12 +6573,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       for (const car of O.cars) if (car.x + CAR_LEN > xa && car.x - 4 < xb) drawCar(ctx, car, t);
       for (const cone of O.cones) if (vis(cone.x, 1)) drawCone(ctx, cone, alpha);
       for (const pu of O.powerups) if (!pu.taken && vis(pu.x, 1)) drawPowerup(ctx, pu, t);
-      if (W.socks.length) { R.screenSpace(); this.drawWind(W, xa, xb, t); R.worldSpace(cam); }
-      if (W.course.fogs) { R.screenSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
+      if (W.socks.length) { R.sceneSpace(); this.drawWind(W, xa, xb, t); R.worldSpace(cam); }
+      if (W.course.fogs) { R.sceneSpace(); this.drawFog(W, xa, xb, t); R.worldSpace(cam); }
       if (!(W.invuln > 0 && Math.floor(t * 16) % 2 === 0 && W.state === 'riding')) R.drawBike(W, alpha, this);
       for (const cc of front) drawCrosser(ctx, cc, t);
       this.particles.draw(ctx);
-      if (W.course.fogs) { R.screenSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+      if (W.course.fogs) { R.sceneSpace(); this.drawFogWarnings(W, xa, xb, t); R.worldSpace(cam); }
+      R.raw = false;
     }
     // Summit wind (F-41): a windsock before each exposed block hangs limp until its gust is warned, then fills and
     // flutters toward the wind; leaves blow through the gust. With reduced motion, the sock and leaves hold still.
@@ -6606,12 +6655,10 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     drawFogWarnings(W, xa, xb, t) {
       const R = this.R, ctx = R.ctx, cam = this.cam, S = R.S, T = W.terrain, b = W.bike, p = {}, q = {};
       const on = this.reducedMotion || Math.floor(t * 3) % 2 === 0;
-      let next = null;
       ctx.save();
       for (let i = 0; i < W.fogIdx; i++) {
         const h = W.fogHz[i];
         if (h.x < b.x - 2) continue;
-        if (!next) next = h;
         if (h.x < xa - 2 || h.x > xb + 2) continue;
         const gy = T.height(h.x) + ROAD.walk;
         R.toScreen(cam, h.x, gy, p); R.toScreen(cam, h.x, gy + 2.3, q);
@@ -6624,6 +6671,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ctx.fillStyle = on ? '#ffbe3c' : '#8a6a2a'; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(4, S * 0.3), 0, TAU); ctx.fill(); ctx.stroke();
       }
+      ctx.restore();
+    }
+    // The tag for the nearest hazard the fog warned of, drawn with the HUD so its text is never mirrored.
+    drawFogTag(W) {
+      const R = this.R, ctx = R.ctx, b = W.bike, on = this.reducedMotion || Math.floor(this.time * 3) % 2 === 0;
+      let next = null;
+      for (let i = 0; i < W.fogIdx && !next; i++) if (W.fogHz[i].x >= b.x - 2) next = W.fogHz[i];
+      ctx.save();
       if (next && W.state === 'riding') {
         const u = clamp(Math.min(R.W, R.H) / 46, 11, 18), label = '⚠ ' + (FOG_LABELS[next.kind] || 'HAZARD') + ' · ' + Math.max(0, Math.round(next.x - b.x)) + ' m';
         ctx.font = '900 ' + (u * 1.05).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -6844,16 +6899,18 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       });
       const sp = {}, warn = (wx, wy, d) => { // off-screen hazard arrows
         R.toScreen(this.cam, wx, wy, sp);
-        if (!(d > 0 && d < 60 && sp.x > Wd - 10 && W.state === 'riding')) return;
+        const k = R.mx < 0 ? -1 : 1; // which side is ahead (a switchback turns the view around)
+        if (!(d > 0 && d < 60 && (k > 0 ? sp.x > Wd - 10 : sp.x < 10) && W.state === 'riding')) return;
         const y = clamp(sp.y, u * 8, R.H - u * 3), pulse = 1 + Math.sin(this.time * 10) * 0.08;
-        ctx.save(); ctx.translate(Wd - u * 1.8, y); ctx.scale(pulse, pulse);
-        ctx.fillStyle = COL.coral; ctx.beginPath(); ctx.moveTo(u * 1.2, 0); ctx.lineTo(-u * 0.5, -u * 1.1); ctx.lineTo(-u * 0.5, u * 1.1); ctx.closePath(); ctx.fill();
+        ctx.save(); ctx.translate(k > 0 ? Wd - u * 1.8 : u * 1.8, y); ctx.scale(pulse, pulse);
+        ctx.fillStyle = COL.coral; ctx.beginPath(); ctx.moveTo(k * u * 1.2, 0); ctx.lineTo(-k * u * 0.5, -u * 1.1); ctx.lineTo(-k * u * 0.5, u * 1.1); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = COL.cream; ctx.font = '900 ' + (u * 1.1).toFixed(1) + 'px ' + FONT_DISPLAY; ctx.textAlign = 'center'; ctx.fillText('!', 0, u * 0.05);
         ctx.restore();
-        ctx.fillStyle = COL.ink; ctx.font = '800 ' + (u * 0.7).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = 'right';
-        ctx.fillText(Math.round(d) + ' m', Wd - u * 3.1, y);
+        ctx.fillStyle = COL.ink; ctx.font = '800 ' + (u * 0.7).toFixed(1) + 'px ' + FONT_MONO; ctx.textAlign = k > 0 ? 'right' : 'left';
+        ctx.fillText(Math.round(d) + ' m', k > 0 ? Wd - u * 3.1 : u * 3.1, y);
       };
+      if (W.course.fogs) this.drawFogTag(W);
       for (const car of W.obstacles.cars) warn(car.x, car.roofY, car.x - W.bike.x);
       for (const cc of W.obstacles.crossers) if (cc.active) warn(cc.cx, cc.y + 1.5, cc.x0 - W.bike.x);
     }

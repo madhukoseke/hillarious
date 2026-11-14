@@ -30,6 +30,7 @@
     constructor(canvas) {
       this.cv = canvas; this.ctx = canvas.getContext('2d', { alpha: false });
       this.dpr = 1; this.W = 1; this.H = 1; this.baseS = 50; this.S = 50;
+      this.mx = 1; this.raw = false; // switchbacks (F-42): mx mirrors the view (-1 is turned around); raw: toScreen ignores it
       this.sx = new Float32Array(4096); this.sh = new Float32Array(4096); this.sb = new Float32Array(4096);
       this.scenery = null; this.sceneryFor = null;
       this.pose = { hub: [{ x: 0, y: 0 }, { x: 0, y: 0 }], spin: [0, 0] };
@@ -124,11 +125,14 @@
       c.prof = prof;
       return c;
     }
-    toScreen(cam, wx, wy, out) { out.x = (wx - cam.x + cam.sx) * this.S + this.W / 2; out.y = this.H / 2 - (wy - cam.y + cam.sy) * this.S; return out; }
+    // Outside the world scene, toScreen gives mirrored positions (labels, bubbles, and HUD arrows stay upright text).
+    // Inside it (raw), the canvas transform does the mirroring, so positions are not mirrored twice.
+    toScreen(cam, wx, wy, out) { out.x = (wx - cam.x + cam.sx) * this.S * (this.raw ? 1 : this.mx) + this.W / 2; out.y = this.H / 2 - (wy - cam.y + cam.sy) * this.S; return out; }
     screenSpace() { this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); }
+    sceneSpace() { const d = this.dpr, m = this.mx; this.ctx.setTransform(d * m, 0, 0, d, d * this.W * (1 - m) / 2, 0); } // screen space, mirrored with the world
     worldSpace(cam) {
-      const S = this.S, d = this.dpr;
-      this.ctx.setTransform(d * S, 0, 0, -d * S, d * (this.W / 2 - (cam.x - cam.sx) * S), d * (this.H / 2 + (cam.y - cam.sy) * S));
+      const S = this.S, d = this.dpr, m = this.mx;
+      this.ctx.setTransform(d * S * m, 0, 0, -d * S, d * (this.W / 2 - (cam.x - cam.sx) * S * m), d * (this.H / 2 + (cam.y - cam.sy) * S));
     }
     ensureScenery(course) { if (this.sceneryFor !== course) { this.scenery = buildScenery(course); this.sceneryFor = course; } }
     drawBackdrop(cam, time, theme) {
