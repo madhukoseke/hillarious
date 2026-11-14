@@ -178,6 +178,7 @@
     { id: 'nobHill', build: buildNobHill, requires: null },
     { id: 'russianHill', build: buildRussianHill, requires: 'nobHill' },
     { id: 'telegraph', build: buildTelegraphHill, requires: 'russianHill' },
+    { id: 'twinPeaks', build: buildTwinPeaks, requires: 'telegraph' }, // Shift 2's first route (F-43); its chapter is F-78
   ];
   // Neighbourhood themes (TD-12): how each course.theme looks behind the street. A theme names its far skyline and
   // mid ridge layers and sets the horizon, water, hills, parallax, and moving extras. A new neighbourhood or planet
@@ -191,6 +192,8 @@
     nob: NOB_THEME,
     russian: { far: 'russian', mid: 'russian', horizon: 0.56, water: '#7fb3d3', hills: false, farParallax: 0.06, farDrop: 0.02, sailboats: true, ridgeCableCar: false },
     telegraph: { ...NOB_THEME }, // Telegraph Hill looks east over downtown, like Nob Hill, for now
+    // Twin Peaks looks down over the whole city grid to the bay, with the radio tower; the Castro has rainbow crosswalks.
+    twin: { far: 'twin', mid: 'nob', horizon: 0.5, water: '#8dbbd6', hills: false, farParallax: 0.05, farDrop: 0.18, sailboats: false, ridgeCableCar: false, rainbowCrosswalks: true },
   };
   function themeFor(id) { return THEMES[id] || NOB_THEME; }
 
@@ -221,6 +224,11 @@
       { text: 'Beat par with no crashes', test: (r) => r.time <= r.par && r.crashes === 0 },
     ],
   };
+  ROUTE_GOALS.twinPeaks = [
+    { text: 'Deliver at least 90% of the sparkle', test: (r) => r.condition >= 90 },
+    { text: 'Land the big Clayton lip level', test: (r) => !!r.bigLipClean },
+    { text: 'Beat par with no crashes', test: (r) => r.time <= r.par && r.crashes === 0 },
+  ];
   function routeGoals(id, r) { return (ROUTE_GOALS[id] || []).map((g) => !!(r && g.test(r))); }
 
   // Courier Academy drills, in unlock order. A run's stamp is how many tiers in a row it met; tier 1 is a pass.

@@ -167,6 +167,7 @@
         ['straight', p.turnLen || 6], ['ease', g, 4], ['straight', p.len2 === undefined ? p.len : p.len2]);
       if (p.exit) f.path.push(['ease', ...p.exit]);
       f.hazards.push('switchback');
+      if (p.car) { f.cars.push({ x: f.at(p.car.at), plank: p.car.plank }); f.hazards.push(p.car.plank ? 'car-plank' : 'car'); }
       for (const [x, w, d] of p.potholes || []) { f.features.push(['pothole', f.at(x), w, d]); f.hazards.push('pothole'); }
       for (const h of p.hints || []) hint(f, h);
       return f;
@@ -312,6 +313,39 @@
       },
       landmarks: 'telegraph-hill',
     },
+    // Twin Peaks (F-43): from the summit viewpoint down to the Castro with the disco ball. Windsock gusts on the first two
+    // blocks (F-41), a fog bank, a switchback past a parked car (F-42), thick fog with a lost robot car in it (F-40), the
+    // big Clayton lip onto the 30% drop, then the rainbow crossing at Castro Street and the brunch crowd.
+    twinPeaks: {
+      meta: { index: 4, title: 'THE DISCO BALL', hood: 'TWIN PEAKS', street: 'TWIN PEAKS BLVD', theme: 'twin', cargo: 'disco', par: 50, seed: 1977, music: 'peaks' },
+      origin: [-60, 0], start: 3, park: { x0: -60, x1: 110 }, dropLabel: ' m to the disco drop', // open hillside over the summit and the windy blocks: the view
+      pieces: [
+        ['plateau', { len: 90, street: [3, 12, 'CHRISTMAS TREE PT'], pedestrians: [{ at: 22, kind: 'photographer' }, { at: 44, kind: 'tourist' }], checkpoints: ['start'],
+          hints: [{ at: 6, id: 'disco', actions: ['pedal'], text: 'Disco ball on board. It rolls. Smooth is fabulous.' }] }],
+        ['gust', { mark: 'summit', enter: [-0.08, 6], len: 34, wind: -6, sock: true, exit: [-0.14, 6], difficulty: 2, pedestrians: [{ at: 18, kind: 'stoner' }], checkpoints: [10],
+          hints: [{ hazard: 'gust', at: -10, text: 'Windsock up! Ease off, or the ball rolls into the wall.' }] }],
+        ['gust', { mark: 'blockA', len: 34, wind: -7, sock: true, difficulty: 3 }], // 14%
+        ['fog', { mark: 'fogA', len: 40, density: 0.6, exit: [-0.1, 6], difficulty: 2, potholes: [[22, 1.3, 0.2]], checkpoints: [4], hints: [{ hazard: 'fog', at: -6 }] }],
+        ['switchback', { mark: 'hairpin', grade: -0.1, len: 26, len2: 34, exit: [-0.22, 6], difficulty: 3, car: { at: 52, plank: true }, pedestrians: [{ at: 46, kind: 'guide' }], checkpoints: [8, 40],
+          hints: [{ at: 40, id: 'bus', actions: ['hop'], text: 'Parked car after the hairpin. Ride the plank or hop it!' }] }],
+        ['fog', { mark: 'fogB', len: 64, density: 1, exit: [0, 6], difficulty: 4, potholes: [[20, 1.4, 0.22]], crossers: [{ kind: 'maybemo', at: 50, trigger: 8 }], checkpoints: [6] }], // 22%, thick fog
+        ['crossing', { name: 'CLAYTON ST', len: 12, mark: 'clayton', difficulty: 4, lip: { up: [0.24, 1.8], flat: 1.2, mark: 'lipC', down: [-0.3, 1.0], big: true, crosswalk: 3.0 },
+          powerups: [{ kind: 'espresso', at: 10 }], checkpoints: [2], hints: [{ at: 6, id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Big lip! Land level, or the ball goes to space.' }] }],
+        ['block', { mark: 'drop', len: 56, exit: [-0.06, 8], difficulty: 5, bumps: [[30, 0.9, 0.07]], powerups: [{ kind: 'bubble', at: 14 }], checkpoints: [20] }], // 30%, the drop
+        ['crossing', { name: 'CASTRO ST', len: 12, mark: 'castroSt', lip: { up: [0.06, 1.2], mark: 'lipD', down: [-0.06, 1.2], big: false, crosswalk: 1.2 }, checkpoints: [2] }],
+        ['block', { mark: 'castro', len: 60, exit: [0, 6], cones: [30, 31.3], pedestrians: [{ at: 16, kind: 'tourist' }, { at: 38, kind: 'dog' }], checkpoints: [24] }],
+        ['finish', { mark: 'fin', len: 140 }],
+      ],
+      finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
+      musicDrop: 'castroSt', // the music turns disco here (F-43)
+      customer: {
+        name: 'Anita Refill', role: 'Host, Sunday Disco Brunch', avatar: 'host', brand: 'THE MIRROR ROOM',
+        order: 'ORDER #0004 · DISCO BALL · FRAGILE · FABULOUS', route: 'Down Twin Peaks to the Castro',
+        messages: ['Brunch starts at 11. The disco ball starts when *you* arrive.', "If it arrives cracked, we're calling it 'distressed chic'."],
+        cargoNote: 'Cargo: one mirrored disco ball, loose in a crate. Rolling is its love language.', cargoLabel: 'Sparkle',
+      },
+      length: true,
+    },
   };
 
   // Karl the Fog (F-40). Fog hides the road ahead, so the world warns of each hazard inside it (or just past it) with a
@@ -394,12 +428,14 @@
     C.hints = R.hints.map(place);
     C.customer = { ...R.customer, messages: R.customer.messages.slice() };
     if (R.length) C.length = C.doorX - C.start;
+    if (R.musicDrop) C.musicDrop = at(R.musicDrop);
     C.landmarks = landmarksFor(R.landmarks, C);
     return C;
   }
   function buildNobHill() { return buildRoute('nobHill'); }
   function buildRussianHill() { return buildRoute('russianHill'); }
   function buildTelegraphHill() { return buildRoute('telegraph'); }
+  function buildTwinPeaks() { return buildRoute('twinPeaks'); }
 
   // Route generator (F-33). It never invents terrain (D-05): it joins hand-made segments, each one or two set pieces
   // lifted from the hand-written routes, starting and ending on level ground, so every join is smooth. The layout

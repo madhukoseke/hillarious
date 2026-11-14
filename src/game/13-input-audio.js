@@ -219,17 +219,20 @@
       const c = this.ctx, q = this.seq, mode = this.musicMode || null, now = c.currentTime;
       if (mode !== q.mode) { q.mode = mode; q.step = 0; q.next = now + 0.06; }
       if (!mode) return;
-      const ride = mode === 'ride', dt = 60 / (ride ? 124 : 96) / 4;
+      // Twin Peaks (F-43): 'airy' (the summit: no kick, soft and sparse) builds to 'disco' at the Castro (four on the floor).
+      const airy = mode === 'airy', disco = mode === 'disco', ride = mode !== 'title', dt = 60 / (disco ? 120 : airy ? 104 : ride ? 124 : 96) / 4;
       if (q.next < now - 0.2) q.next = now + 0.02;
       const BASS = [87.31, 73.42, 58.27, 65.41], CH = [[349.2, 440, 523.3], [293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 329.6, 392]];
       const MEL = [698.5, 0, 0, 880, 0, 784, 0, 698.5, 0, 0, 587.3, 0, 523.3, 0, 587.3, 0];
       while (q.next < now + 0.18) {
         const t = q.next, st = q.step % 16, bar = Math.floor(q.step / 16) % 4, o = this.mus;
         const tone = (type, f, d, g, dest) => { const x = c.createOscillator(), e = c.createGain(); x.type = type; x.frequency.value = f; e.gain.setValueAtTime(0.0001, t); e.gain.linearRampToValueAtTime(g, t + 0.008); e.gain.exponentialRampToValueAtTime(0.0001, t + d); x.connect(e); e.connect(dest || o); x.start(t); x.stop(t + d + 0.05); };
-        if (st === 0 || st === 6 || st === 8 || (ride && st === 14)) tone('triangle', BASS[bar] * (st === 6 ? 1.5 : 1), dt * 2.2, 0.42);
-        if (st === 4 || st === 12 || (ride && st === 10)) for (const f of CH[bar]) tone('square', f, dt * 0.9, 0.028);
-        if (ride && (st === 0 || st === 8)) { const x = c.createOscillator(), e = c.createGain(); x.frequency.setValueAtTime(140, t); x.frequency.exponentialRampToValueAtTime(45, t + 0.12); e.gain.setValueAtTime(0.5, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); x.connect(e); e.connect(o); x.start(t); x.stop(t + 0.2); }
-        if (st % (ride ? 2 : 4) === 2) { const sN = c.createBufferSource(), f = c.createBiquadFilter(), e = c.createGain(); sN.buffer = this.noise; f.type = 'highpass'; f.frequency.value = 7000; e.gain.setValueAtTime(0.04, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.04); sN.connect(f); f.connect(e); e.connect(o); sN.start(t, Math.random()); sN.stop(t + 0.06); }
+        if (disco) { if (st % 2 === 0) tone('triangle', BASS[bar] * (st % 4 === 2 ? 2 : 1), dt * 1.6, 0.4); } // octave disco bass
+        else if (st === 0 || st === 6 || st === 8 || (ride && !airy && st === 14)) tone(airy ? 'sine' : 'triangle', BASS[bar] * (st === 6 ? 1.5 : 1), dt * 2.2, airy ? 0.3 : 0.42);
+        if (airy) { if (st === 0) for (const f of CH[bar]) tone('sine', f, dt * 14, 0.02); } // a slow pad
+        else if (st === 4 || st === 12 || (ride && st === 10)) for (const f of CH[bar]) tone('square', f, dt * 0.9, 0.028);
+        if (ride && !airy && (disco ? st % 4 === 0 : st === 0 || st === 8)) { const x = c.createOscillator(), e = c.createGain(); x.frequency.setValueAtTime(140, t); x.frequency.exponentialRampToValueAtTime(45, t + 0.12); e.gain.setValueAtTime(0.5, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); x.connect(e); e.connect(o); x.start(t); x.stop(t + 0.2); }
+        if (!airy && st % (ride ? 2 : 4) === 2) { const sN = c.createBufferSource(), f = c.createBiquadFilter(), e = c.createGain(); sN.buffer = this.noise; f.type = 'highpass'; f.frequency.value = 7000; e.gain.setValueAtTime(0.04, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.04); sN.connect(f); f.connect(e); e.connect(o); sN.start(t, Math.random()); sN.stop(t + 0.06); }
         if (ride && bar % 2 === 1 && MEL[st]) tone('triangle', MEL[st] * (bar === 3 ? 0.89 : 1), dt * 1.6, 0.07);
         if (!ride && st === 0 && bar === 0) tone('sine', 1046.5, 0.5, 0.05);
         q.next += dt; q.step++;

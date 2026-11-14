@@ -150,6 +150,7 @@
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
       if (this.fogHz.length || C.fogs) this.fogStep(b);
+      if (C.musicDrop !== undefined && !this.flags.drop && b.x >= C.musicDrop) { this.flags.drop = true; this.emit('MUSIC_DROP', {}); } // F-43
       const SB = C.switchbacks;
       if (SB) while (this.turns < SB.length && b.x >= SB[this.turns]) this.emit('SWITCHBACK', { i: this.turns++, x: b.x });
       if (this.socks.length) {

@@ -942,6 +942,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         ['straight', p.turnLen || 6], ['ease', g, 4], ['straight', p.len2 === undefined ? p.len : p.len2]);
       if (p.exit) f.path.push(['ease', ...p.exit]);
       f.hazards.push('switchback');
+      if (p.car) { f.cars.push({ x: f.at(p.car.at), plank: p.car.plank }); f.hazards.push(p.car.plank ? 'car-plank' : 'car'); }
       for (const [x, w, d] of p.potholes || []) { f.features.push(['pothole', f.at(x), w, d]); f.hazards.push('pothole'); }
       for (const h of p.hints || []) hint(f, h);
       return f;
@@ -1087,6 +1088,39 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       },
       landmarks: 'telegraph-hill',
     },
+    // Twin Peaks (F-43): from the summit viewpoint down to the Castro with the disco ball. Windsock gusts on the first two
+    // blocks (F-41), a fog bank, a switchback past a parked car (F-42), thick fog with a lost robot car in it (F-40), the
+    // big Clayton lip onto the 30% drop, then the rainbow crossing at Castro Street and the brunch crowd.
+    twinPeaks: {
+      meta: { index: 4, title: 'THE DISCO BALL', hood: 'TWIN PEAKS', street: 'TWIN PEAKS BLVD', theme: 'twin', cargo: 'disco', par: 50, seed: 1977, music: 'peaks' },
+      origin: [-60, 0], start: 3, park: { x0: -60, x1: 110 }, dropLabel: ' m to the disco drop', // open hillside over the summit and the windy blocks: the view
+      pieces: [
+        ['plateau', { len: 90, street: [3, 12, 'CHRISTMAS TREE PT'], pedestrians: [{ at: 22, kind: 'photographer' }, { at: 44, kind: 'tourist' }], checkpoints: ['start'],
+          hints: [{ at: 6, id: 'disco', actions: ['pedal'], text: 'Disco ball on board. It rolls. Smooth is fabulous.' }] }],
+        ['gust', { mark: 'summit', enter: [-0.08, 6], len: 34, wind: -6, sock: true, exit: [-0.14, 6], difficulty: 2, pedestrians: [{ at: 18, kind: 'stoner' }], checkpoints: [10],
+          hints: [{ hazard: 'gust', at: -10, text: 'Windsock up! Ease off, or the ball rolls into the wall.' }] }],
+        ['gust', { mark: 'blockA', len: 34, wind: -7, sock: true, difficulty: 3 }], // 14%
+        ['fog', { mark: 'fogA', len: 40, density: 0.6, exit: [-0.1, 6], difficulty: 2, potholes: [[22, 1.3, 0.2]], checkpoints: [4], hints: [{ hazard: 'fog', at: -6 }] }],
+        ['switchback', { mark: 'hairpin', grade: -0.1, len: 26, len2: 34, exit: [-0.22, 6], difficulty: 3, car: { at: 52, plank: true }, pedestrians: [{ at: 46, kind: 'guide' }], checkpoints: [8, 40],
+          hints: [{ at: 40, id: 'bus', actions: ['hop'], text: 'Parked car after the hairpin. Ride the plank or hop it!' }] }],
+        ['fog', { mark: 'fogB', len: 64, density: 1, exit: [0, 6], difficulty: 4, potholes: [[20, 1.4, 0.22]], crossers: [{ kind: 'maybemo', at: 50, trigger: 8 }], checkpoints: [6] }], // 22%, thick fog
+        ['crossing', { name: 'CLAYTON ST', len: 12, mark: 'clayton', difficulty: 4, lip: { up: [0.24, 1.8], flat: 1.2, mark: 'lipC', down: [-0.3, 1.0], big: true, crosswalk: 3.0 },
+          powerups: [{ kind: 'espresso', at: 10 }], checkpoints: [2], hints: [{ at: 6, id: 'air', actions: ['hop', 'leanBack', 'leanFwd'], text: 'Big lip! Land level, or the ball goes to space.' }] }],
+        ['block', { mark: 'drop', len: 56, exit: [-0.06, 8], difficulty: 5, bumps: [[30, 0.9, 0.07]], powerups: [{ kind: 'bubble', at: 14 }], checkpoints: [20] }], // 30%, the drop
+        ['crossing', { name: 'CASTRO ST', len: 12, mark: 'castroSt', lip: { up: [0.06, 1.2], mark: 'lipD', down: [-0.06, 1.2], big: false, crosswalk: 1.2 }, checkpoints: [2] }],
+        ['block', { mark: 'castro', len: 60, exit: [0, 6], cones: [30, 31.3], pedestrians: [{ at: 16, kind: 'tourist' }, { at: 38, kind: 'dog' }], checkpoints: [24] }],
+        ['finish', { mark: 'fin', len: 140 }],
+      ],
+      finish: { at: 'fin', venue: { x0: 7, x1: 34, arch: 18 } },
+      musicDrop: 'castroSt', // the music turns disco here (F-43)
+      customer: {
+        name: 'Anita Refill', role: 'Host, Sunday Disco Brunch', avatar: 'host', brand: 'THE MIRROR ROOM',
+        order: 'ORDER #0004 · DISCO BALL · FRAGILE · FABULOUS', route: 'Down Twin Peaks to the Castro',
+        messages: ['Brunch starts at 11. The disco ball starts when *you* arrive.', "If it arrives cracked, we're calling it 'distressed chic'."],
+        cargoNote: 'Cargo: one mirrored disco ball, loose in a crate. Rolling is its love language.', cargoLabel: 'Sparkle',
+      },
+      length: true,
+    },
   };
 
   // Karl the Fog (F-40). Fog hides the road ahead, so the world warns of each hazard inside it (or just past it) with a
@@ -1169,12 +1203,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     C.hints = R.hints.map(place);
     C.customer = { ...R.customer, messages: R.customer.messages.slice() };
     if (R.length) C.length = C.doorX - C.start;
+    if (R.musicDrop) C.musicDrop = at(R.musicDrop);
     C.landmarks = landmarksFor(R.landmarks, C);
     return C;
   }
   function buildNobHill() { return buildRoute('nobHill'); }
   function buildRussianHill() { return buildRoute('russianHill'); }
   function buildTelegraphHill() { return buildRoute('telegraph'); }
+  function buildTwinPeaks() { return buildRoute('twinPeaks'); }
 
   // Route generator (F-33). It never invents terrain (D-05): it joins hand-made segments, each one or two set pieces
   // lifted from the hand-written routes, starting and ending on level ground, so every join is smooth. The layout
@@ -2682,6 +2718,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'nobHill', build: buildNobHill, requires: null },
     { id: 'russianHill', build: buildRussianHill, requires: 'nobHill' },
     { id: 'telegraph', build: buildTelegraphHill, requires: 'russianHill' },
+    { id: 'twinPeaks', build: buildTwinPeaks, requires: 'telegraph' }, // Shift 2's first route (F-43); its chapter is F-78
   ];
   // Neighbourhood themes (TD-12): how each course.theme looks behind the street. A theme names its far skyline and
   // mid ridge layers and sets the horizon, water, hills, parallax, and moving extras. A new neighbourhood or planet
@@ -2695,6 +2732,8 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     nob: NOB_THEME,
     russian: { far: 'russian', mid: 'russian', horizon: 0.56, water: '#7fb3d3', hills: false, farParallax: 0.06, farDrop: 0.02, sailboats: true, ridgeCableCar: false },
     telegraph: { ...NOB_THEME }, // Telegraph Hill looks east over downtown, like Nob Hill, for now
+    // Twin Peaks looks down over the whole city grid to the bay, with the radio tower; the Castro has rainbow crosswalks.
+    twin: { far: 'twin', mid: 'nob', horizon: 0.5, water: '#8dbbd6', hills: false, farParallax: 0.05, farDrop: 0.18, sailboats: false, ridgeCableCar: false, rainbowCrosswalks: true },
   };
   function themeFor(id) { return THEMES[id] || NOB_THEME; }
 
@@ -2725,6 +2764,11 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       { text: 'Beat par with no crashes', test: (r) => r.time <= r.par && r.crashes === 0 },
     ],
   };
+  ROUTE_GOALS.twinPeaks = [
+    { text: 'Deliver at least 90% of the sparkle', test: (r) => r.condition >= 90 },
+    { text: 'Land the big Clayton lip level', test: (r) => !!r.bigLipClean },
+    { text: 'Beat par with no crashes', test: (r) => r.time <= r.par && r.crashes === 0 },
+  ];
   function routeGoals(id, r) { return (ROUTE_GOALS[id] || []).map((g) => !!(r && g.test(r))); }
 
   // Courier Academy drills, in unlock order. A run's stamp is how many tiers in a row it met; tier 1 is a pass.
@@ -2864,6 +2908,14 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     { id: 'karl', trigger: 'FOG_IN', speaker: 'rider', text: 'Karl the Fog has entered the chat.', priority: 3 },
     { id: 'sock', trigger: 'GUST_WARN', speaker: 'rider', text: 'The windsock is doing a lot right now.', priority: 2 },
     { id: 'hairpin', trigger: 'SWITCHBACK', speaker: 'rider', text: 'Hairpin! The whole city just swapped sides.', priority: 2 },
+    // Twin Peaks (F-43): all original characters
+    { id: 'tp-stoner', trigger: 'FOG_IN', speaker: 'stoner', text: 'Bro, the fog is, like, *in* you.', priority: 4, delivery: 4 },
+    { id: 'tp-photo', trigger: 'PLAYER_FAST', speaker: 'photographer', text: "You're in my golden hour!", priority: 3, delivery: 4 },
+    { id: 'tp-photo2', trigger: 'BIG_JUMP', speaker: 'photographer', text: "You're in my golden hour!", priority: 3, delivery: 4 },
+    { id: 'tp-guide', trigger: 'SWITCHBACK', speaker: 'guide', text: 'And on your left, a courier making poor decisions.', priority: 3, delivery: 4 },
+    { id: 'tp-mm-fog', trigger: 'MAYBEMO_ENCOUNTER', speaker: 'car', text: 'Visibility: 3%. Confidence: also 3%.', priority: 4, delivery: 4 },
+    { id: 'tp-mm-daly', trigger: 'MAYBEMO_STOPPED', speaker: 'car', text: 'Is this… Daly City?', priority: 4, delivery: 4 },
+    { id: 'tp-drop', trigger: 'MUSIC_DROP', speaker: 'rider', text: 'Is that... four on the floor?', priority: 2, delivery: 4 },
     // Cable car operator
     { id: 'cc-ding', trigger: 'CABLE_CAR_ENCOUNTER', speaker: 'operator', text: 'DING DING! Make way for 1873!', priority: 4 },
     { id: 'cc-tracks', trigger: 'CABLE_CAR_HOLD', speaker: 'operator', text: 'Off the tracks, Speed Racer!', priority: 4 },
@@ -3145,6 +3197,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
       if (this.fogHz.length || C.fogs) this.fogStep(b);
+      if (C.musicDrop !== undefined && !this.flags.drop && b.x >= C.musicDrop) { this.flags.drop = true; this.emit('MUSIC_DROP', {}); } // F-43
       const SB = C.switchbacks;
       if (SB) while (this.turns < SB.length && b.x >= SB[this.turns]) this.emit('SWITCHBACK', { i: this.turns++, x: b.x });
       if (this.socks.length) {
@@ -3489,7 +3542,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
   }
 
   const HILL = {
-    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, WIND, warnDist, sockGusts, switchParity, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
+    STEP, PHYS, PLANETS, physicsFor, CARGO, CAKE, RIDE_H, SAG, CRASH_TIME, LANE, Terrain, CourseBuilder, buildNobHill, buildRussianHill, buildTelegraphHill, buildTwinPeaks, ROUTE_DATA, buildRoute, PIECES, joinPieces, FOG, fogAt, fogHazards, fogWarnDist, WIND, warnDist, sockGusts, switchParity, GEN_SEGMENTS, PAR_SHARE, planRoute, generateRoute, buildGenerated,
     DAILY_EPOCH, DAILY_REMIXES, dateKey, dayIndex, keyForDay, validDateKey, dailyNumber, dailySeed, dailySpec, dailyRoute, buildDaily, cleanDaily, cleanStreak, nextStreak, startDaily, finishDaily, cleanSplits, splitDeltas, recordSplits, fmtDelta, segmentSpans, segmentGrid, cleanGrid, dailyShareText, intentLinks, CARGO_EMOJI, CAM_LEAD, cameraLead, AIR_DUCK, airDuckWanted, REPLAY, packInput, unpackInput, CrashReplay, pickWipeout, CLIP_TYPES, clipType, replayFrames,
     buildTitleCourse, makeTestCourse, LANDMARK_DATA, HAND_LANDMARKS, landmarksFor, Bike, CoffeeCargo, CakeCargo, BouquetCargo, DiscoCargo, DISCO, CARGO_TYPES, cargoType, makeCargo, BOUQUET, World, Score,
     cleanCargo, computeTip, tipBreakdown, reviewFor, COFFEE_REVIEWS, CAKE_REVIEWS, EMPLOYEE_REVIEWS, shiftSummary, recordShift, TOP_SHIFTS, RECORD_VERSION, cleanStyleBest, recordStyle, cleanBest, cleanHandle, readTime, CONTROL_LABELS, controlKeys, SPILL_CAUSES, mainCause, shareText, shareLinks, HumorEngine, DIALOGUE, CRASH_LINES,
@@ -3722,17 +3775,20 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       const c = this.ctx, q = this.seq, mode = this.musicMode || null, now = c.currentTime;
       if (mode !== q.mode) { q.mode = mode; q.step = 0; q.next = now + 0.06; }
       if (!mode) return;
-      const ride = mode === 'ride', dt = 60 / (ride ? 124 : 96) / 4;
+      // Twin Peaks (F-43): 'airy' (the summit: no kick, soft and sparse) builds to 'disco' at the Castro (four on the floor).
+      const airy = mode === 'airy', disco = mode === 'disco', ride = mode !== 'title', dt = 60 / (disco ? 120 : airy ? 104 : ride ? 124 : 96) / 4;
       if (q.next < now - 0.2) q.next = now + 0.02;
       const BASS = [87.31, 73.42, 58.27, 65.41], CH = [[349.2, 440, 523.3], [293.7, 349.2, 440], [233.1, 293.7, 349.2], [261.6, 329.6, 392]];
       const MEL = [698.5, 0, 0, 880, 0, 784, 0, 698.5, 0, 0, 587.3, 0, 523.3, 0, 587.3, 0];
       while (q.next < now + 0.18) {
         const t = q.next, st = q.step % 16, bar = Math.floor(q.step / 16) % 4, o = this.mus;
         const tone = (type, f, d, g, dest) => { const x = c.createOscillator(), e = c.createGain(); x.type = type; x.frequency.value = f; e.gain.setValueAtTime(0.0001, t); e.gain.linearRampToValueAtTime(g, t + 0.008); e.gain.exponentialRampToValueAtTime(0.0001, t + d); x.connect(e); e.connect(dest || o); x.start(t); x.stop(t + d + 0.05); };
-        if (st === 0 || st === 6 || st === 8 || (ride && st === 14)) tone('triangle', BASS[bar] * (st === 6 ? 1.5 : 1), dt * 2.2, 0.42);
-        if (st === 4 || st === 12 || (ride && st === 10)) for (const f of CH[bar]) tone('square', f, dt * 0.9, 0.028);
-        if (ride && (st === 0 || st === 8)) { const x = c.createOscillator(), e = c.createGain(); x.frequency.setValueAtTime(140, t); x.frequency.exponentialRampToValueAtTime(45, t + 0.12); e.gain.setValueAtTime(0.5, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); x.connect(e); e.connect(o); x.start(t); x.stop(t + 0.2); }
-        if (st % (ride ? 2 : 4) === 2) { const sN = c.createBufferSource(), f = c.createBiquadFilter(), e = c.createGain(); sN.buffer = this.noise; f.type = 'highpass'; f.frequency.value = 7000; e.gain.setValueAtTime(0.04, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.04); sN.connect(f); f.connect(e); e.connect(o); sN.start(t, Math.random()); sN.stop(t + 0.06); }
+        if (disco) { if (st % 2 === 0) tone('triangle', BASS[bar] * (st % 4 === 2 ? 2 : 1), dt * 1.6, 0.4); } // octave disco bass
+        else if (st === 0 || st === 6 || st === 8 || (ride && !airy && st === 14)) tone(airy ? 'sine' : 'triangle', BASS[bar] * (st === 6 ? 1.5 : 1), dt * 2.2, airy ? 0.3 : 0.42);
+        if (airy) { if (st === 0) for (const f of CH[bar]) tone('sine', f, dt * 14, 0.02); } // a slow pad
+        else if (st === 4 || st === 12 || (ride && st === 10)) for (const f of CH[bar]) tone('square', f, dt * 0.9, 0.028);
+        if (ride && !airy && (disco ? st % 4 === 0 : st === 0 || st === 8)) { const x = c.createOscillator(), e = c.createGain(); x.frequency.setValueAtTime(140, t); x.frequency.exponentialRampToValueAtTime(45, t + 0.12); e.gain.setValueAtTime(0.5, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.16); x.connect(e); e.connect(o); x.start(t); x.stop(t + 0.2); }
+        if (!airy && st % (ride ? 2 : 4) === 2) { const sN = c.createBufferSource(), f = c.createBiquadFilter(), e = c.createGain(); sN.buffer = this.noise; f.type = 'highpass'; f.frequency.value = 7000; e.gain.setValueAtTime(0.04, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.04); sN.connect(f); f.connect(e); e.connect(o); sN.start(t, Math.random()); sN.stop(t + 0.06); }
         if (ride && bar % 2 === 1 && MEL[st]) tone('triangle', MEL[st] * (bar === 3 ? 0.89 : 1), dt * 1.6, 0.07);
         if (!ride && st === 0 && bar === 0) tone('sine', 1046.5, 0.5, 0.05);
         q.next += dt; q.step++;
@@ -4296,6 +4352,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     tourist: { top: '#4fb3a9', pants: '#c9b28a', hair: '#e5c27a', skin: '#f0c8a0', voice: 1.0 },
     dog: { top: '#6b8f5e', pants: '#3e3a48', hair: '#2a1f1a', skin: '#8d5a3b', voice: 0.3 },
     fitness: { top: '#e8604c', pants: '#2d2a32', hair: '#1f1a17', skin: '#c98b5e', voice: 0.8 },
+    stoner: { top: '#8a5fc7', pants: '#6b7f9e', hair: '#5a3d2a', skin: '#e3b591', voice: 0.4 },       // Twin Peaks (F-43)
+    photographer: { top: '#7d7a5e', pants: '#3e3a48', hair: '#1f1a17', skin: '#a8714f', voice: 0.9 },
+    guide: { top: '#d9604c', pants: '#2d2a32', hair: '#c9a25e', skin: '#f0c8a0', voice: 1.1 },
   };
   function drawPedestrian(ctx, B, y, t) {
     const L = PED_LOOK[B.kind] || PED_LOOK.tech, r = B.react || null, rt = r ? r.t : 9;
@@ -4329,13 +4388,19 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     if (B.kind === 'fitness') { ctx.fillStyle = '#2c7a7b'; ctx.fillRect(-0.14, hy + 0.05, 0.28, 0.045); }
     if (B.kind === 'tourist') { ctx.fillStyle = '#f2dd9e'; ctx.beginPath(); ctx.ellipse(0, hy + 0.12, 0.24, 0.05, 0, 0, TAU); ctx.fill(); ctx.fillRect(-0.11, hy + 0.12, 0.22, 0.09); }
     if (B.kind === 'tech') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0.12, hy - 0.01, 0.02, 0, TAU); ctx.fill(); }
+    if (B.kind === 'stoner') { ctx.fillStyle = '#5fb36b'; ctx.beginPath(); ctx.arc(hx, hy + 0.07, 0.15, Math.PI * 0.05, Math.PI * 0.95); ctx.fill(); ctx.fillStyle = '#f2b134'; ctx.fillRect(-0.15, hy + 0.06, 0.3, 0.04); } // a beanie
+    if (B.kind === 'guide') { // a cap, and a flag held high for the tour group
+      ctx.fillStyle = '#d9604c'; ctx.beginPath(); ctx.arc(hx, hy + 0.06, 0.14, 0, Math.PI); ctx.fill(); ctx.fillRect(0, hy + 0.05, 0.22, 0.035);
+      ctx.strokeStyle = COL.ink; ctx.lineWidth = 0.025; ctx.beginPath(); ctx.moveTo(-0.2, sh); ctx.lineTo(-0.24, sh + 0.9); ctx.stroke();
+      ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.moveTo(-0.24, sh + 0.9); ctx.lineTo(0.08, sh + 0.8); ctx.lineTo(-0.24, sh + 0.7); ctx.closePath(); ctx.fill();
+    }
     ctx.fillStyle = COL.ink;
     ctx.beginPath(); ctx.arc(-0.045, hy + 0.01, 0.016, 0, TAU); ctx.arc(0.045, hy + 0.01, 0.016, 0, TAU); ctx.fill();
     ctx.strokeStyle = COL.ink; ctx.lineWidth = 0.014; ctx.beginPath();
     if (act === 'shock' || act === 'worried') { ctx.fillStyle = COL.ink; ctx.ellipse(0, hy - 0.06, 0.025, 0.035, 0, 0, TAU); ctx.fill(); }
     else if (act === 'cheer' || act === 'talk') { ctx.arc(0, hy - 0.04, 0.04, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
     else { ctx.moveTo(-0.03, hy - 0.06); ctx.lineTo(0.03, hy - 0.06); ctx.stroke(); }
-    if (act === 'photo' || (B.kind === 'tourist' && !act)) { // camera
+    if (act === 'photo' || ((B.kind === 'tourist' || B.kind === 'photographer') && !act)) { // camera
       const cy = act === 'photo' ? hy - 0.02 : 1.05 + bob;
       ctx.fillStyle = COL.ink; ctx.fillRect(-0.1, cy - 0.06, 0.2, 0.12); ctx.fillStyle = '#9fbccc'; ctx.beginPath(); ctx.arc(0, cy, 0.035, 0, TAU); ctx.fill();
       if (act === 'photo' && rt < 0.15) { ctx.fillStyle = 'rgba(255,255,240,0.9)'; ctx.beginPath(); ctx.arc(0, cy, 0.35, 0, TAU); ctx.fill(); }
@@ -4358,6 +4423,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     founder: ['#f2b134', '#7a8796', '#5a6b80', '#e0b48c', '#3b2a20'],
     planner: ['#9fd3f0', '#c2584a', '#fff6e5', '#c98b5e', '#2a1f1a'],
     hr: ['#b6dcd6', '#3f6f73', '#f2dd9e', '#d9a77c', '#5b4a3a'],
+    host: ['#f6c6dd', '#8a5fc7', '#f2dd9e', '#c98b5e', '#f2b134'], // the Castro's drag-brunch host (F-43)
   };
   function drawAvatar(canvas, mood, who) {
     if (!canvas || !canvas.getContext) return;
@@ -4369,6 +4435,13 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     c.fillStyle = A[2]; c.fillRect(44, 70, 12, 30);
     c.fillStyle = A[3]; c.beginPath(); c.arc(50, 45, 21, 0, TAU); c.fill();
     c.fillStyle = A[4]; c.beginPath(); c.arc(50, 38, 22, Math.PI, 0); c.fill(); c.beginPath(); c.arc(pl ? 50 : 64, pl ? 16 : 22, pl ? 10 : 7, 0, TAU); c.fill();
+    if (who === 'host') { // big golden hair, lashes, and a mirror-ball earring
+      c.fillStyle = A[4]; for (const [x, y, r] of [[30, 40, 14], [70, 40, 14], [36, 22, 14], [64, 22, 14], [50, 14, 15], [26, 58, 11], [74, 58, 11]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+      c.fillStyle = A[3]; c.beginPath(); c.arc(50, 45, 20, 0, TAU); c.fill();
+      c.strokeStyle = '#2d2a32'; c.lineWidth = 1.6; for (const x of [42, 58]) { c.beginPath(); c.moveTo(x - 4, 42); c.lineTo(x - 6, 39); c.moveTo(x + 4, 42); c.lineTo(x + 6, 39); c.stroke(); }
+      c.fillStyle = '#cfd8e0'; c.beginPath(); c.arc(31, 58, 4.5, 0, TAU); c.fill(); c.fillStyle = '#fff'; c.fillRect(29, 56, 2, 2);
+      c.fillStyle = '#d64f6c'; c.beginPath(); c.ellipse(50, 56, 6, 2.6, 0, 0, TAU); c.fill(); // lipstick, under the mood line
+    }
     if (pl) { c.strokeStyle = '#2d2a32'; c.lineWidth = 3; c.beginPath(); c.arc(50, 44, 25, Math.PI * 1.05, Math.PI * 1.6); c.stroke(); c.fillStyle = '#2d2a32'; c.beginPath(); c.arc(27, 52, 4, 0, TAU); c.fill(); }
     if (hr) {
       c.strokeStyle = '#e8604c'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(42, 70); c.lineTo(50, 86); c.lineTo(58, 70); c.stroke();
@@ -4935,7 +5008,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
     }
     buildSkyline() {
       const H = Math.round(Math.max(120, this.H * 0.46));
-      this.far = { nob: this.farNob(H), russian: this.farRussian(H) };
+      this.far = { nob: this.farNob(H), russian: this.farRussian(H), twin: this.farTwin(H) };
       const Hm = Math.round(Math.max(110, this.H * 0.5));
       this.mid = Object.fromEntries(Object.entries(MID_LAYERS).map(([k, spec]) => [k, this.midLayer(Hm, spec)]));
     }
@@ -4960,6 +5033,27 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         else { g.beginPath(); g.moveTo(cx - bw / 2, H); g.lineTo(cx - bw / 2, H - h + bw / 2); g.quadraticCurveTo(cx, H - h - bw * 0.1, cx + bw / 2, H - h + bw / 2); g.lineTo(cx + bw / 2, H); g.fill(); }
       };
       tower(520, 64, H * 0.95, 'pyramid'); tower(1180, 56, H * 0.98, 'round'); tower(1500, 40, H * 0.7, 'round');
+      return c;
+    }
+    farTwin(H) { // from Twin Peaks (F-43): the city grid falling away to the bay, Market Street running to downtown, a radio tower
+      const W = 2600, c = document.createElement('canvas'); c.width = W; c.height = H;
+      const g = c.getContext('2d'), rng = mulberry32(1977), B = H;
+      g.fillStyle = '#c9c3b4'; g.fillRect(0, B * 0.42, W, B * 0.58); // the city floor, seen from above
+      const cols = ['#f3d9c4', '#e8cfe0', '#d6e6d0', '#f6e7b8', '#cfe0ee', '#efd2c6', '#e9e2d6'];
+      for (let row = 0; row < 9; row++) { // rows of blocks, smaller toward the bay
+        const y = B * (0.44 + row * 0.062), h = B * (0.018 + row * 0.006), w = 10 + row * 3.5, gap = 3 + row;
+        for (let x = (row * 13) % 30; x < W; x += w + gap) { g.fillStyle = cols[Math.floor(rng() * cols.length)]; g.fillRect(x, y, w, h); }
+      }
+      g.strokeStyle = 'rgba(110,104,96,0.55)'; g.lineWidth = 5; g.beginPath(); g.moveTo(300, B); g.lineTo(1560, B * 0.45); g.stroke(); // Market Street
+      for (let i = 0; i < 9; i++) { const x = 1500 + i * 26 + rng() * 10, h = B * (0.08 + rng() * 0.16); g.fillStyle = i % 2 ? '#a9b4c2' : '#b8c1cc'; g.fillRect(x, B * 0.45 - h, 20, h); } // downtown
+      // A three-legged radio tower on its hill (an original drawing).
+      g.fillStyle = '#b9c7a2'; g.beginPath(); g.moveTo(2050, B); g.quadraticCurveTo(2250, B * 0.5, 2450, B); g.fill();
+      const tx = 2250, base = B * 0.72, top = B * 0.06, leg = (dx) => { g.beginPath(); g.moveTo(tx + dx, base); g.lineTo(tx, top + B * 0.18); g.stroke(); };
+      g.lineWidth = 4; g.strokeStyle = '#d9604c'; leg(-46); leg(46); g.strokeStyle = '#e88a78'; leg(0);
+      g.lineWidth = 2; g.strokeStyle = '#f5efe6';
+      for (let k = 1; k < 5; k++) { const y = base - (base - top - B * 0.18) * k / 5, half = 46 * (1 - k / 5); g.beginPath(); g.moveTo(tx - half, y); g.lineTo(tx + half, y); g.stroke(); }
+      g.strokeStyle = '#d9604c'; g.lineWidth = 3; g.beginPath(); g.moveTo(tx, top + B * 0.18); g.lineTo(tx, top); g.stroke();
+      g.fillStyle = 'rgba(236,239,242,0.55)'; g.fillRect(0, B * 0.3, W, B * 0.16); // a haze line where the fog sits
       return c;
     }
     farRussian(H) { // the bay: headlands, a generic red suspension bridge, Alcatraz, Angel Island, Coit Tower
@@ -5299,8 +5393,12 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       ctx.strokeStyle = COL.lane; ctx.lineWidth = 0.05;
       for (let x = Math.floor(xa / 4.2) * 4.2; x < xb; x += 4.2) this.strokeAlong(T, x, x + 1.6, 0.3, 0.4);
       ctx.fillStyle = 'rgba(244,236,220,0.92)';
+      const RAINBOW = ['#e8604c', '#f2b134', '#f6e05e', '#5fb36b', '#4f8fd9', '#8a5fc7'], rainbow = themeFor(C.theme).rainbowCrosswalks;
       const stripes = (x0, x1) => {
+        let k = 0;
         for (let x = x0 + 0.25; x < x1 - 0.2; x += 0.55) {
+          if (rainbow && x > (C.musicDrop || 0) - 15) ctx.fillStyle = RAINBOW[k++ % RAINBOW.length]; // the Castro's rainbow crossings
+          else ctx.fillStyle = 'rgba(244,236,220,0.92)';
           const h0 = T.base(x), h1 = T.base(x + 0.3);
           ctx.beginPath(); ctx.moveTo(x, h0 + 0.04); ctx.lineTo(x + 0.3, h1 + 0.04); ctx.lineTo(x + 0.3, h1 + ROAD.far - 0.04); ctx.lineTo(x, h0 + ROAD.far - 0.04); ctx.closePath(); ctx.fill();
         }
@@ -5733,7 +5831,9 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         if (!res.scored) { this.startRun({ mode: 'free', daily: this.run.daily, traffic: true }); return; }
         this.store.set('daily', res.rec); this.store.set('streak', res.streak); this.dailyStarted = true;
       }
-      this.state = 'riding'; this.show(null); this.input.clear(); this.last = performance.now(); this.audio.setMusic('ride'); }
+      this.state = 'riding'; this.show(null); this.input.clear(); this.last = performance.now(); this.audio.setMusic(this.rideMusic()); }
+    // The ride's music: most routes have one loop; Twin Peaks (F-43) is airy until the Castro, then disco.
+    rideMusic() { const W = this.world; return W && W.course.music === 'peaks' ? (W.flags.drop ? 'disco' : 'airy') : 'ride'; }
     restartDelivery() {
       if (this.mode === 'daily') this.run = { mode: 'free', daily: this.run.daily, traffic: true }; // a restart is practice
       this.newWorld(this.run); this.beginRide(); this.fx.flash = 0.7; }
@@ -5881,7 +5981,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
       this.syncMute();
       this.show('pause');
     }
-    resume() { if (this.state !== 'paused') return; this.state = 'riding'; this.show(null); this.input.clear(); this.audio.setMusic('ride'); }
+    resume() { if (this.state !== 'paused') return; this.state = 'riding'; this.show(null); this.input.clear(); this.audio.setMusic(this.rideMusic()); }
     // The receipt, for every kind of run. Saves only what writesFor(mode) allows, then shows unlocks, goals and the trouble spot.
     showReview() {
       if (this.state === 'review' || !this.world) return;
@@ -6370,6 +6470,7 @@ noscript { position: fixed; inset: 0; display: grid; place-items: center; font: 
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
         case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'MUSIC_DROP': A.setMusic('disco'); this.say('MUSIC_DROP'); break;
         case 'SWITCHBACK': A.play('whoosh'); this.say('SWITCHBACK'); break;
         case 'GUST_WARN': A.play('whoosh'); this.pop('💨 GUST AHEAD', 'info', 1.6); this.say('GUST_WARN'); if (!this.autopilot) this.announce('Gust ahead.'); break;
         case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;

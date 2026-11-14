@@ -46,7 +46,7 @@
     }
     buildSkyline() {
       const H = Math.round(Math.max(120, this.H * 0.46));
-      this.far = { nob: this.farNob(H), russian: this.farRussian(H) };
+      this.far = { nob: this.farNob(H), russian: this.farRussian(H), twin: this.farTwin(H) };
       const Hm = Math.round(Math.max(110, this.H * 0.5));
       this.mid = Object.fromEntries(Object.entries(MID_LAYERS).map(([k, spec]) => [k, this.midLayer(Hm, spec)]));
     }
@@ -71,6 +71,27 @@
         else { g.beginPath(); g.moveTo(cx - bw / 2, H); g.lineTo(cx - bw / 2, H - h + bw / 2); g.quadraticCurveTo(cx, H - h - bw * 0.1, cx + bw / 2, H - h + bw / 2); g.lineTo(cx + bw / 2, H); g.fill(); }
       };
       tower(520, 64, H * 0.95, 'pyramid'); tower(1180, 56, H * 0.98, 'round'); tower(1500, 40, H * 0.7, 'round');
+      return c;
+    }
+    farTwin(H) { // from Twin Peaks (F-43): the city grid falling away to the bay, Market Street running to downtown, a radio tower
+      const W = 2600, c = document.createElement('canvas'); c.width = W; c.height = H;
+      const g = c.getContext('2d'), rng = mulberry32(1977), B = H;
+      g.fillStyle = '#c9c3b4'; g.fillRect(0, B * 0.42, W, B * 0.58); // the city floor, seen from above
+      const cols = ['#f3d9c4', '#e8cfe0', '#d6e6d0', '#f6e7b8', '#cfe0ee', '#efd2c6', '#e9e2d6'];
+      for (let row = 0; row < 9; row++) { // rows of blocks, smaller toward the bay
+        const y = B * (0.44 + row * 0.062), h = B * (0.018 + row * 0.006), w = 10 + row * 3.5, gap = 3 + row;
+        for (let x = (row * 13) % 30; x < W; x += w + gap) { g.fillStyle = cols[Math.floor(rng() * cols.length)]; g.fillRect(x, y, w, h); }
+      }
+      g.strokeStyle = 'rgba(110,104,96,0.55)'; g.lineWidth = 5; g.beginPath(); g.moveTo(300, B); g.lineTo(1560, B * 0.45); g.stroke(); // Market Street
+      for (let i = 0; i < 9; i++) { const x = 1500 + i * 26 + rng() * 10, h = B * (0.08 + rng() * 0.16); g.fillStyle = i % 2 ? '#a9b4c2' : '#b8c1cc'; g.fillRect(x, B * 0.45 - h, 20, h); } // downtown
+      // A three-legged radio tower on its hill (an original drawing).
+      g.fillStyle = '#b9c7a2'; g.beginPath(); g.moveTo(2050, B); g.quadraticCurveTo(2250, B * 0.5, 2450, B); g.fill();
+      const tx = 2250, base = B * 0.72, top = B * 0.06, leg = (dx) => { g.beginPath(); g.moveTo(tx + dx, base); g.lineTo(tx, top + B * 0.18); g.stroke(); };
+      g.lineWidth = 4; g.strokeStyle = '#d9604c'; leg(-46); leg(46); g.strokeStyle = '#e88a78'; leg(0);
+      g.lineWidth = 2; g.strokeStyle = '#f5efe6';
+      for (let k = 1; k < 5; k++) { const y = base - (base - top - B * 0.18) * k / 5, half = 46 * (1 - k / 5); g.beginPath(); g.moveTo(tx - half, y); g.lineTo(tx + half, y); g.stroke(); }
+      g.strokeStyle = '#d9604c'; g.lineWidth = 3; g.beginPath(); g.moveTo(tx, top + B * 0.18); g.lineTo(tx, top); g.stroke();
+      g.fillStyle = 'rgba(236,239,242,0.55)'; g.fillRect(0, B * 0.3, W, B * 0.16); // a haze line where the fog sits
       return c;
     }
     farRussian(H) { // the bay: headlands, a generic red suspension bridge, Alcatraz, Angel Island, Coit Tower
@@ -410,8 +431,12 @@
       ctx.strokeStyle = COL.lane; ctx.lineWidth = 0.05;
       for (let x = Math.floor(xa / 4.2) * 4.2; x < xb; x += 4.2) this.strokeAlong(T, x, x + 1.6, 0.3, 0.4);
       ctx.fillStyle = 'rgba(244,236,220,0.92)';
+      const RAINBOW = ['#e8604c', '#f2b134', '#f6e05e', '#5fb36b', '#4f8fd9', '#8a5fc7'], rainbow = themeFor(C.theme).rainbowCrosswalks;
       const stripes = (x0, x1) => {
+        let k = 0;
         for (let x = x0 + 0.25; x < x1 - 0.2; x += 0.55) {
+          if (rainbow && x > (C.musicDrop || 0) - 15) ctx.fillStyle = RAINBOW[k++ % RAINBOW.length]; // the Castro's rainbow crossings
+          else ctx.fillStyle = 'rgba(244,236,220,0.92)';
           const h0 = T.base(x), h1 = T.base(x + 0.3);
           ctx.beginPath(); ctx.moveTo(x, h0 + 0.04); ctx.lineTo(x + 0.3, h1 + 0.04); ctx.lineTo(x + 0.3, h1 + ROAD.far - 0.04); ctx.lineTo(x, h0 + ROAD.far - 0.04); ctx.closePath(); ctx.fill();
         }

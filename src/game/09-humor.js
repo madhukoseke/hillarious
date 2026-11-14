@@ -17,6 +17,14 @@
     { id: 'karl', trigger: 'FOG_IN', speaker: 'rider', text: 'Karl the Fog has entered the chat.', priority: 3 },
     { id: 'sock', trigger: 'GUST_WARN', speaker: 'rider', text: 'The windsock is doing a lot right now.', priority: 2 },
     { id: 'hairpin', trigger: 'SWITCHBACK', speaker: 'rider', text: 'Hairpin! The whole city just swapped sides.', priority: 2 },
+    // Twin Peaks (F-43): all original characters
+    { id: 'tp-stoner', trigger: 'FOG_IN', speaker: 'stoner', text: 'Bro, the fog is, like, *in* you.', priority: 4, delivery: 4 },
+    { id: 'tp-photo', trigger: 'PLAYER_FAST', speaker: 'photographer', text: "You're in my golden hour!", priority: 3, delivery: 4 },
+    { id: 'tp-photo2', trigger: 'BIG_JUMP', speaker: 'photographer', text: "You're in my golden hour!", priority: 3, delivery: 4 },
+    { id: 'tp-guide', trigger: 'SWITCHBACK', speaker: 'guide', text: 'And on your left, a courier making poor decisions.', priority: 3, delivery: 4 },
+    { id: 'tp-mm-fog', trigger: 'MAYBEMO_ENCOUNTER', speaker: 'car', text: 'Visibility: 3%. Confidence: also 3%.', priority: 4, delivery: 4 },
+    { id: 'tp-mm-daly', trigger: 'MAYBEMO_STOPPED', speaker: 'car', text: 'Is this… Daly City?', priority: 4, delivery: 4 },
+    { id: 'tp-drop', trigger: 'MUSIC_DROP', speaker: 'rider', text: 'Is that... four on the floor?', priority: 2, delivery: 4 },
     // Cable car operator
     { id: 'cc-ding', trigger: 'CABLE_CAR_ENCOUNTER', speaker: 'operator', text: 'DING DING! Make way for 1873!', priority: 4 },
     { id: 'cc-tracks', trigger: 'CABLE_CAR_HOLD', speaker: 'operator', text: 'Off the tracks, Speed Racer!', priority: 4 },

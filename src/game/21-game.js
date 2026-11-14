@@ -344,7 +344,9 @@
         if (!res.scored) { this.startRun({ mode: 'free', daily: this.run.daily, traffic: true }); return; }
         this.store.set('daily', res.rec); this.store.set('streak', res.streak); this.dailyStarted = true;
       }
-      this.state = 'riding'; this.show(null); this.input.clear(); this.last = performance.now(); this.audio.setMusic('ride'); }
+      this.state = 'riding'; this.show(null); this.input.clear(); this.last = performance.now(); this.audio.setMusic(this.rideMusic()); }
+    // The ride's music: most routes have one loop; Twin Peaks (F-43) is airy until the Castro, then disco.
+    rideMusic() { const W = this.world; return W && W.course.music === 'peaks' ? (W.flags.drop ? 'disco' : 'airy') : 'ride'; }
     restartDelivery() {
       if (this.mode === 'daily') this.run = { mode: 'free', daily: this.run.daily, traffic: true }; // a restart is practice
       this.newWorld(this.run); this.beginRide(); this.fx.flash = 0.7; }
@@ -492,7 +494,7 @@
       this.syncMute();
       this.show('pause');
     }
-    resume() { if (this.state !== 'paused') return; this.state = 'riding'; this.show(null); this.input.clear(); this.audio.setMusic('ride'); }
+    resume() { if (this.state !== 'paused') return; this.state = 'riding'; this.show(null); this.input.clear(); this.audio.setMusic(this.rideMusic()); }
     // The receipt, for every kind of run. Saves only what writesFor(mode) allows, then shows unlocks, goals and the trouble spot.
     showReview() {
       if (this.state === 'review' || !this.world) return;
@@ -981,6 +983,7 @@
         case 'CAKE_WOBBLE': this.say('CAKE_WOBBLE'); break;
         case 'DISCO_TILE': A.play('glint'); this.spawnCargoBits(Math.min(5, 1 + Math.round(e.hit * 2)), false); break;
         case 'FOG_IN': this.say('FOG_IN'); break;
+        case 'MUSIC_DROP': A.setMusic('disco'); this.say('MUSIC_DROP'); break;
         case 'SWITCHBACK': A.play('whoosh'); this.say('SWITCHBACK'); break;
         case 'GUST_WARN': A.play('whoosh'); this.pop('💨 GUST AHEAD', 'info', 1.6); this.say('GUST_WARN'); if (!this.autopilot) this.announce('Gust ahead.'); break;
         case 'FOG_WARN': A.play('fogbeep'); if (!this.autopilot) this.announce('Fog: ' + (FOG_LABELS[e.kind] || 'hazard').toLowerCase() + ' ahead.'); break;
