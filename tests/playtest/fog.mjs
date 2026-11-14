@@ -73,16 +73,18 @@ for (const reduced of [false, true]) {
     return a.length > 0 && a.join() === b.join();
   });
   check(`${tag}: fog bands ${reduced ? 'hold still' : 'drift'}`, still === reduced);
-  // Drawing budget: the same frame with and without fog, each flushed to pixels. The fog's layers cost little, and a
-  // fogged frame stays inside 60 fps (16.7 ms) even in headless Chromium's software renderer.
+  // Drawing budget: the same frame with and without fog, each flushed to pixels. The fog may cost at most 45% of the
+  // frame (about 2 ms of 9 ms in headless Chromium's software renderer on an idle machine; full-resolution fog was 54%). It is a ratio because a busy
+  // machine slows every frame; the absolute times are printed for information (real-device fps is TD-07).
   const cost = await page.evaluate(() => {
     const g = HILL.game, C = g.world.course, fogs = C.fogs, c = g.R.ctx;
-    const time = (n) => { const t0 = Date.now(); for (let i = 0; i < n; i++) { g.renderWorld(); c.getImageData(0, 0, 1, 1); } return (Date.now() - t0) / n; }; // Date: the page clock is faked
+    const batch = (n) => { const t0 = Date.now(); for (let i = 0; i < n; i++) { g.renderWorld(); c.getImageData(0, 0, 1, 1); } return (Date.now() - t0) / n; }; // Date: the page clock is faked
+    const time = (n) => Math.min(...Array.from({ length: 6 }, () => batch(Math.ceil(n / 6)))); // the fastest batch: robust to a busy machine
     time(10);
     const withFog = time(40); C.fogs = undefined; const without = time(40); C.fogs = fogs;
     return { withFog: +withFog.toFixed(2), without: +without.toFixed(2) };
   });
-  check(`${tag}: a fogged frame stays inside 60 fps, and the fog adds under 3 ms`, cost.withFog < 16.7 && cost.withFog - cost.without < 3, cost);
+  check(`${tag}: the fog costs under 45% of a frame`, cost.withFog < cost.without * 1.45, cost);
   for (let i = 0; i < 400 && (await page.evaluate(() => HILL.game.state)) !== 'review'; i++) await page.evaluate(() => window.__tick(30));
   const end = await page.evaluate(() => ({ state: HILL.game.state, beeps: window.__sounds.filter((k) => k === 'fogbeep').length, hazards: HILL.game.world.fogHz.length, karl: window.__said.includes('FOG_IN') }));
   check(`${tag}: every hazard beeped and Karl spoke, and the ride finished`, end.state === 'review' && end.beeps >= end.hazards && end.karl, end);

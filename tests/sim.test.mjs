@@ -1597,3 +1597,52 @@ test('summit wind: every rider sees the windsock at least 1.5 s before each gust
     }
   }
 });
+
+// The switchback (F-42). Two hairpins in a row on a 10% grade: the view turns around and back again.
+const SWITCH_ROUTE = {
+  meta: { index: 9, title: 'SWITCHBACK TEST', hood: 'TWIN PEAKS', street: 'TWIN PEAKS BLVD', theme: 'nob', cargo: 'disco', par: 60, seed: 9 },
+  origin: [-60, 0], start: 3, park: { x0: -60, x1: 1 },
+  pieces: [
+    ['plateau', { len: 90, street: [3, 12, 'BURNETT AVE'], checkpoints: ['start'] }],
+    ['switchback', { mark: 'sb1', enter: [-0.1, 6], grade: -0.1, len: 30, len2: 20, checkpoints: [6] }],
+    ['switchback', { mark: 'sb2', grade: -0.1, len: 20, exit: [0, 6], potholes: [[34, 1.2, 0.18]], checkpoints: [4] }],
+    ['block', { mark: 'out', len: 40 }],
+    ['finish', { mark: 'fin', len: 90 }],
+  ],
+  finish: { at: 'fin', office: { x0: 12, x1: 30 } },
+  customer: { name: 'Test', role: 'Tester', avatar: 'founder', brand: 'TEST', order: 'ORDER #0000', route: 'Switchback test', messages: ['a', 'b'], cargoNote: 'n', cargoLabel: 'l' },
+};
+const withRoute = (id, data, f) => { H.ROUTE_DATA[id] = data; try { return f(); } finally { delete H.ROUTE_DATA[id]; } };
+
+test('switchback: the hairpin is marked, and the road is exactly the same road as the steps it is made of', () => {
+  const C = withRoute('__sb', SWITCH_ROUTE, () => H.buildRoute('__sb'));
+  assert.equal(C.switchbacks.length, 2);
+  assert.ok(C.switchbacks[0] < C.switchbacks[1]);
+  // The same path with the switchback steps taken out builds identical terrain: the switchback is only a view change.
+  const raw = H.joinPieces(SWITCH_ROUTE);
+  const plain = { ...raw, path: raw.path.filter((s) => s[0] !== 'switchback') };
+  const D = withRoute('__plain', plain, () => H.buildRoute('__plain'));
+  for (let x = C.start; x < C.finishX; x += 0.37) assert.equal(C.terrain.height(x), D.terrain.height(x));
+  assert.equal(D.switchbacks, undefined);
+  // The hairpin itself is flatter than the grade around it.
+  const s = C.switchbacks[0];
+  assert.ok(Math.abs(C.terrain.slope(s)) < 0.05 && Math.abs(C.terrain.slope(s - 12)) > 0.08);
+  assert.equal(H.switchParity(C, s - 0.1), 0);
+  assert.equal(H.switchParity(C, s + 0.1), 1);
+  assert.equal(H.switchParity(C, C.switchbacks[1] + 0.1), 0);
+});
+
+test('switchback: every rider finishes, and each hairpin fires once (again after a respawn behind it)', () => {
+  const C = withRoute('__sb', SWITCH_ROUTE, () => H.buildRoute('__sb'));
+  for (const profile of ['careful', 'typical', 'fast', 'reckless']) {
+    const w = new H.World(C), ap = new H.Autopilot(profile), turns = [];
+    let recovered = 0;
+    while (w.t < 200 && w.state !== 'done') { w.step(ap.input(w)); for (const e of w.drain()) { if (e.type === 'SWITCHBACK') turns.push(e.i); if (e.type === 'RECOVER') recovered++; } }
+    assert.equal(w.state, 'done', `${profile} finishes`);
+    if (!recovered) assert.deepEqual(turns.join(), '0,1', `${profile} turns twice`);
+  }
+  const w = new H.World(C);
+  w.spawn(C.switchbacks[1] + 2, 0); w.step(input()); w.drain();
+  w.cpIndex = 2; w.respawn(); // the second switchback's checkpoint is before its hairpin
+  assert.equal(w.turns, 1);
+});

@@ -27,6 +27,7 @@
       this.splits = [];                               // ride time at each checkpoint after the start, then at the finish (F-35)
       this.fogHz = fogHazards(course); this.fogIdx = 0; this.inFog = false; // fog warnings (F-40)
       this.socks = sockGusts(course); this.sockIdx = 0;                     // windsock warnings (F-41)
+      this.turns = 0;                                                       // switchbacks passed (F-42)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
@@ -149,6 +150,8 @@
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
       if (this.fogHz.length || C.fogs) this.fogStep(b);
+      const SB = C.switchbacks;
+      if (SB) while (this.turns < SB.length && b.x >= SB[this.turns]) this.emit('SWITCHBACK', { i: this.turns++, x: b.x });
       if (this.socks.length) {
         const range = warnDist(b.vx, WIND);
         while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 - b.x <= range) {
@@ -182,6 +185,7 @@
     fogFrom(x) {
       this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false;
       this.sockIdx = 0; while (this.sockIdx < this.socks.length && this.socks[this.sockIdx].x0 <= x) this.sockIdx++;
+      this.turns = (this.course.switchbacks || []).filter((s) => s <= x).length;
     }
     sinceEvent(type) { return this.lastT[type] !== undefined ? this.t - this.lastT[type] : 1e9; }
     trackDamage(amount, dt) {

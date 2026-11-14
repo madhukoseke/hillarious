@@ -16,6 +16,7 @@
     // Karl the Fog (F-40)
     { id: 'karl', trigger: 'FOG_IN', speaker: 'rider', text: 'Karl the Fog has entered the chat.', priority: 3 },
     { id: 'sock', trigger: 'GUST_WARN', speaker: 'rider', text: 'The windsock is doing a lot right now.', priority: 2 },
+    { id: 'hairpin', trigger: 'SWITCHBACK', speaker: 'rider', text: 'Hairpin! The whole city just swapped sides.', priority: 2 },
     // Cable car operator
     { id: 'cc-ding', trigger: 'CABLE_CAR_ENCOUNTER', speaker: 'operator', text: 'DING DING! Make way for 1873!', priority: 4 },
     { id: 'cc-tracks', trigger: 'CABLE_CAR_HOLD', speaker: 'operator', text: 'Off the tracks, Speed Racer!', priority: 4 },
