@@ -1482,3 +1482,71 @@ test('disco: every rider finishes every route with the ball, and the careful rid
     assert.ok(kept.typical >= 60, `${build}: typical keeps ${kept.typical.toFixed(0)}%`);
   }
 });
+
+// Karl the Fog (F-40). A test route with two fog banks over a steep descent: hazards of every kind the fog piece takes.
+const FOG_ROUTE = {
+  meta: { index: 9, title: 'FOG TEST', hood: 'TWIN PEAKS', street: 'TWIN PEAKS BLVD', theme: 'nob', cargo: 'coffee', par: 60, seed: 9 },
+  origin: [-60, 0], start: 3, park: { x0: -60, x1: 1 },
+  pieces: [
+    ['plateau', { len: 70, street: [3, 12, 'BURNETT AVE'], checkpoints: ['start'] }],
+    ['fog', { mark: 'fogA', enter: [-0.14, 6], len: 70, exit: [0, 6], difficulty: 2, density: 0.8, potholes: [[30, 1.3, 0.2]], car: { at: 52, plank: true }, cones: [44], checkpoints: [10], hints: [{ hazard: 'fog', at: -8 }] }],
+    ['fog', { mark: 'fogB', enter: [-0.22, 6], len: 60, exit: [0, 7], difficulty: 3, density: 1, potholes: [[24, 1.5, 0.22]], ramp: 44, checkpoints: [8] }],
+    ['block', { mark: 'out', len: 40, exit: [0, 6] }],
+    ['finish', { mark: 'fin', len: 90 }],
+  ],
+  finish: { at: 'fin', office: { x0: 12, x1: 30 } },
+  customer: { name: 'Test', role: 'Tester', avatar: 'founder', brand: 'TEST', order: 'ORDER #0000', route: 'Fog test', messages: ['a', 'b'], cargoNote: 'n', cargoLabel: 'l' },
+};
+const fogCourse = () => { H.ROUTE_DATA.__fog = FOG_ROUTE; try { return H.buildRoute('__fog'); } finally { delete H.ROUTE_DATA.__fog; } };
+// Rides a course and measures, for each fog warning, how long until the bike reached that hazard.
+function fogRide(course, profile) {
+  const w = new H.World(course), ap = new H.Autopilot(profile), warned = [], events = [];
+  while (w.t < 200 && w.state !== 'done') {
+    w.step(ap.input(w));
+    for (const e of w.drain()) { events.push(e); if (e.type === 'FOG_WARN') warned.push({ ...e, at: e.t, reached: null }); if (e.type === 'RECOVER') warned.forEach((h) => { if (h.reached === null) h.dropped = true; }); }
+    for (const h of warned) if (h.reached === null && !h.dropped && w.bike.x >= h.x) h.reached = w.t;
+  }
+  return { w, warned, events };
+}
+
+test('fog: a fog piece fogs its straight, lists the hazards inside, and changes nothing else', () => {
+  const C = fogCourse();
+  assert.equal(C.fogs.length, 2);
+  assert.ok(C.fogs[0].x1 > C.fogs[0].x0 && H.fogAt(C, (C.fogs[0].x0 + C.fogs[0].x1) / 2) === 0.8 && H.fogAt(C, C.start) === 0);
+  assert.deepEqual(H.fogHazards(C).map((h) => h.kind).join(','), 'pothole,cone,car,pothole,ramp');
+  // The same blocks without fog build the same road.
+  const clear = { ...FOG_ROUTE, pieces: FOG_ROUTE.pieces.map(([k, p]) => [k === 'fog' ? 'block' : k, p]) };
+  H.ROUTE_DATA.__clear = clear; const D = H.buildRoute('__clear'); delete H.ROUTE_DATA.__clear;
+  assert.equal(D.fogs, undefined);
+  assert.equal(JSON.stringify({ ...C, fogs: undefined, id: 0 }), JSON.stringify({ ...D, fogs: undefined, id: 0 }));
+  assert.equal(H.fogHazards(H.buildNobHill()).length, 0, 'routes without fog warn of nothing');
+});
+
+test('fog: warning range covers 2 s even while speeding up downhill', () => {
+  for (const v of [0, 3, 8, 14, 20]) {
+    const d = H.fogWarnDist(v), a = H.FOG.accel; // time to cover d from v at constant acceleration a
+    const t = (-v + Math.sqrt(v * v + 2 * a * d)) / a;
+    assert.ok(t >= H.FOG.rule, `at ${v} m/s the warning comes ${t.toFixed(2)} s ahead`);
+  }
+});
+
+test('fog rule: every rider hears each hazard in fog at least 2 s before reaching it, and enters and leaves the fog', () => {
+  const C = fogCourse(), n = H.fogHazards(C).length;
+  for (const profile of ['careful', 'typical', 'fast', 'reckless']) {
+    const { w, warned, events } = fogRide(C, profile);
+    assert.equal(w.state, 'done', `${profile} finishes`);
+    const reached = warned.filter((h) => !h.dropped);
+    assert.ok(reached.length >= n, `${profile}: every hazard warned (${reached.length}/${n})`);
+    for (const h of reached) assert.ok(h.reached - h.at >= H.FOG.rule, `${profile}: ${h.kind} at ${h.x.toFixed(1)} warned ${(h.reached - h.at).toFixed(2)} s ahead`);
+    assert.ok(events.filter((e) => e.type === 'FOG_IN').length >= 2 && events.some((e) => e.type === 'FOG_OUT'), `${profile} enters and leaves both banks`);
+  }
+});
+
+test('fog: a respawn warns again of the hazards ahead of the checkpoint', () => {
+  const C = fogCourse(), w = new H.World(C), hz = H.fogHazards(C);
+  w.spawn(hz[0].x + 3, 0); w.bike.vx = 6; w.step(input()); w.drain();
+  w.cpIndex = 1; w.respawn(); w.drain();
+  const ap = new H.Autopilot('typical'), kinds = [];
+  while (w.bike.x < hz[0].x + 1 && w.t < 30) { w.step(ap.input(w)); for (const e of w.drain()) if (e.type === 'FOG_WARN') kinds.push(e.kind); }
+  assert.equal(kinds[0], 'pothole');
+});

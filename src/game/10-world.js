@@ -25,12 +25,14 @@
       this.runLog = []; this.laps = 0;                // crashes and spills by position, for "Practice this spot"
       this.inputLog = [];                             // every step's input, packed (packInput), for crash replays (F-32)
       this.splits = [];                               // ride time at each checkpoint after the start, then at the finish (F-35)
+      this.fogHz = fogHazards(course); this.fogIdx = 0; this.inFog = false; // fog warnings (F-40)
       this.spawn(course.start, 0);
       const cp = this.opts.startCp | 0;
       if (cp > 0 && cp < course.checkpoints.length) {
         const x = course.checkpoints[cp].x;
         this.cpIndex = cp; this.spawn(x, 0); this.obstacles.onRespawn(x);
         while (this.hintIdx < course.hints.length && course.hints[this.hintIdx].x < x) this.hintIdx++; // no backlog of hints
+        this.fogFrom(x);
       }
     }
     emit(type, data) {
@@ -145,6 +147,7 @@
         this.emit('CHECKPOINT', { i: this.cpIndex, split: this.score.time });
       }
       while (this.hintIdx < C.hints.length && b.x >= C.hints[this.hintIdx].x) { this.emit('HINT', Object.assign({}, C.hints[this.hintIdx])); this.hintIdx++; }
+      if (this.fogHz.length || C.fogs) this.fogStep(b);
       if (b.brakeAmt > 0.85 && b.grounded && b.vx > 10 && this.t - this.brakeT > 3) { this.brakeT = this.t; this.emit('HARD_BRAKE', { speed: b.vx }); }
       const sp = Math.hypot(b.vx, b.vy);
       if (sp > 16 && b.grounded && this.t - this.fastT > 8) { this.fastT = this.t; this.emit('PLAYER_FAST', { speed: sp }); }
@@ -157,6 +160,18 @@
         if (!z.done && b.x > z.x0 && b.x < z.x1 && sp < 3) { z.done = true; this.emit('STOP_ZONE', { i, left: this.zones.filter((q) => !q.done).length }); }
       }
     }
+    // Fog (F-40): FOG_IN and FOG_OUT at a bank's edges, and one FOG_WARN per hazard once it is within warning range.
+    fogStep(b) {
+      const d = fogAt(this.course, b.x);
+      if (d > 0 && !this.inFog) { this.inFog = true; this.emit('FOG_IN', { density: d }); }
+      else if (d === 0 && this.inFog) { this.inFog = false; this.emit('FOG_OUT', {}); }
+      const range = fogWarnDist(b.vx);
+      while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x - b.x <= range) {
+        const h = this.fogHz[this.fogIdx++];
+        if (h.x >= b.x) this.emit('FOG_WARN', { kind: h.kind, x: h.x, d: h.x - b.x });
+      }
+    }
+    fogFrom(x) { this.fogIdx = 0; while (this.fogIdx < this.fogHz.length && this.fogHz[this.fogIdx].x <= x) this.fogIdx++; this.inFog = false; }
     sinceEvent(type) { return this.lastT[type] !== undefined ? this.t - this.lastT[type] : 1e9; }
     trackDamage(amount, dt) {
       const S = this.spill;
@@ -266,6 +281,7 @@
       this.rag.on = false; this.cup.on = false;
       this.state = 'riding'; this.invuln = 0.8;
       this.obstacles.onRespawn(cp.x);
+      this.fogFrom(cp.x); // hazards ahead of the checkpoint warn again
       this.emit('RECOVER', { x: cp.x });
     }
     // Looping courses (The Test Hill): the bottom leads back to the top with fresh cargo and the props reset.

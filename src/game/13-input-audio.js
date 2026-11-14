@@ -19,6 +19,7 @@
   ];
   const KEY_ALTS = { pedal: ['W'], brake: ['S'], leanBack: ['A'], leanFwd: ['D'] }; // keyboard only, shown in How to Play
   const LEVEL_WARN = 0.55; // radians off the slope while airborne before "LEVEL OUT!" shows (about 31°; tune after playtests)
+  const FOG_LABELS = { pothole: 'POTHOLE', stairs: 'STEPS', lip: 'LIP', 'big-lip': 'BIG LIP', car: 'PARKED CAR', ramp: 'RAMP', cablecar: 'CABLE CAR', maybemo: 'ROBOT CAR', cone: 'CONES' }; // fog warning tags (F-40)
   class InputManager {
     constructor() {
       this.down = {}; this.touchDown = {}; this.padDown = {}; this.padPrev = {}; this.jumpQueued = false; this.actions = [];
@@ -236,7 +237,7 @@
     }
     play(name, k) {
       if (!this.ctx || this.ctx.state !== 'running') return;
-      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, boing: 0.4, glint: 0.12, bark: 0.6, shutter: 0.5, wobble: 0.7 };
+      const MIN = { land: 0.08, splash: 0.12, slosh: 0.22, tick: 0.05, coin: 0.06, blip: 0.1, cone: 0.06, ding: 0.5, mmbeep: 0.4, pop: 0.1, decor: 0.15, boing: 0.4, glint: 0.12, fogbeep: 0.3, bark: 0.6, shutter: 0.5, wobble: 0.7 };
       const now = this.ctx.currentTime;
       if (MIN[name] && now - (this.last[name] || -9) < MIN[name]) return;
       this.last[name] = now;
@@ -279,6 +280,7 @@
         case 'powerup': [523.3, 659.3, 784, 1046.5].forEach((f, i) => this.osc('triangle', f, f, t + i * 0.06, 0.12, 0.12)); break;
         case 'espresso': this.osc('sawtooth', 220, 1400, t, 0.28, 0.06); this.osc('triangle', 784, 1568, t + 0.12, 0.2, 0.08); break;
         case 'boing': { const o = this.osc('sine', 220, 520, t, 0.32, 0.18); this.vibrato(o, t, 14, 40, 0.32); break; } // the disco ball pops back in
+        case 'fogbeep': this.osc('sine', 523, 523, t, 0.12, 0.07); this.osc('sine', 392, 392, t + 0.16, 0.16, 0.07); break; // a hazard in the fog
         case 'glint': this.osc('triangle', 2637, 2637, t, 0.08, 0.06); this.osc('triangle', 3520, 3520, t + 0.05, 0.1, 0.04); break; // a mirror tile chips
         case 'wobble': { const o = this.osc('sine', 180, 140, t, 0.45, 0.16); this.vibrato(o, t, 9, 30, 0.45); break; }
         case 'decor': this.osc('sine', v(1500), 500, t, 0.18, 0.08); break;
